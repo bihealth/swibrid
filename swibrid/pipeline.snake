@@ -1,0 +1,380 @@
+import os
+
+shell.executable("/bin/bash")
+shell.prefix("set -e pipefail;")
+
+
+rule all:
+  input:
+    expand('plots/{sample}_reads.png',sample=config['SAMPLES']),
+    'collect/{0}_stats.csv'.format(config['STUDY'])
+
+
+rule demux:
+  input:
+    config['INPUT']
+  output:
+    fastq=expand('fastq/{sample}.fastq.gz',sample=config['SAMPLES']),
+    info=expand('info/{sample}_info.csv',sample=config['SAMPLES'])
+  params:
+    sample_sheet=config['SAMPLE_SHEET'],
+    barcodes_primers=config['BARCODES_PRIMERS']
+  threads: 4
+  resources:
+    mem_mb=32000,
+    time='08:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p demux
+    cat {params.barcodes_primers} | makeblastdb -in - -title "barcodes_primers" -out demux/barcodes_primers -input_type fasta -dbtype nucl
+    gunzip -c {input} | awk '{{if(NR%4==1) {{printf(">%s\n",substr($0,2));}} else if(NR%4==2) print;}}' | blastn -db demux/barcodes_primers -query - -task blastn-short -max_target_seqs 50 -outfmt "6 saccver qaccver slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -num_threads 1 -perc_identity 50 > demux/blast_output.txt
+    mkdir -p demux/out
+    swibrid demultiplex -i {input} -b demux/blast_output.txt -f demux/summary.png --collapse -o demux/out -r demux/stats.csv --split-reads -s {params.sample_sheet} -c 50
+    mkdir -p fastq
+    ln -rfs demux/out/*.fastq.gz fastq
+    mkdir -p info
+    ln -rfs demux/out/*_info.csv info
+    """
+
+
+rule filter:
+  input:
+    fastq='fastq/{sample}.fastq.gz',
+    info='info/{sample}_info.csv'
+  output:
+    fasta='filter/{sample}.fasta',
+    csv='filter/{sample}.csv'
+  params:
+    minlength=config['MINLENGTH'],
+    complete=lambda wildcards: "--only-complete" if 'plasmid' not in wildcards.sample else "",
+    internal=lambda wildcards: "--keep-internal" if 'plasmid' in wildcards.sample else ""
+  threads: 1
+  resources:
+    mem_mb=4000,
+    time='04:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p filter
+    mkdir -p log
+    swibrid filter_reads -i {input.fastq} -o {output.fasta} --info {input.info} --stats {output.csv} --min-length {params.minlength} {params.complete} {params.internal}
+    """
+
+
+rule align:
+  input:
+    'filter/{sample}.fasta'
+  output:
+    maf='align/{sample}.maf',
+    par='align/{sample}.par'
+  params:
+    lastindex=config['LASTINDEX']
+  threads: 4
+  resources:
+    mem_mb=32000,
+    time='72:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p align
+    last-train -P4 {params.lastindex} {input} > {output.par}
+    lastal -P4 -p align/{wildcards.sample}.par {params.lastindex} {input} | last-split -m1e-6 | grep -v "^p" > {output.maf}
+    """
+
+
+rule telo:
+  input:
+    'filter/{sample}.fasta'
+  output:
+    'telo/{sample}.out'
+  params:
+    telo_repeat=config['TELO_REPEAT']
+  threads: 1
+  resources:
+    mem_mb=16000,
+    time='04:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p telo
+    echo -e "qseqid\tslen\tqlen\tpident\tlength\tqstart\tqend\tevalue" > {output}
+    blastn -subject {params.telo_repeat} -query {input} -task blastn-short -outfmt "6 qseqid slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -perc_identity 75 -dust no | uniq >> {output}
+    """
+
+
+rule process:
+  input:
+    maf='align/{sample}.maf',
+    telo='telo/{sample}.out',
+  output:
+    out='process/{sample}.out',
+    stats='process/{sample}.csv',
+    fasta='process/{sample}.fa'
+  params:
+    switch=config['SWITCH'],
+    switch_anno=config['SWITCH_ANNOTATION'],
+    min_cov=lambda wildcards: ".4" if 'plasmid' in wildcards.sample else ".9",
+    blacklist_regions=lambda x: "--blacklist_regions="+config['BLACKLIST_REGIONS'] if 'BLACKLIST_REGIONS' in config else ""
+  threads: 1
+  resources:
+    mem_mb=16000,
+    time='04:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p process
+    swibrid process_last_output --last {input.maf} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --save_sequences {output.fasta} {params.blacklist_regions}
+    """
+
+
+rule select:
+  input:
+    processed='process/{sample}.out',
+    fasta='filter/{sample}.fasta'
+  output:
+    tsv='select/{sample}_results.tsv',
+    bed='select/{sample}_results.bed',
+  params:
+    switch=config['SWITCH'],
+    annotation=config['ANNOTATION'],
+    switch_anno=config['SWITCH_ANNOTATION'],
+  threads: 1
+  resources:
+    mem_mb=16000,
+    time='01:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p select
+    swibrid create_bed --raw_reads {input.fasta} --processed_reads {input.processed} --bed {output.bed} --switch_coords {params.switch} --annotation {params.annotation} --switch_annotation {params.switch_anno} --outfile {output.tsv}
+    """
+
+def increase_mem (wildcards, attempt):
+  return 32000*attempt
+
+def get_partition (wildcards, attempt):
+  return ('medium' if attempt <= 5 else 'highmem')
+
+
+rule msa:
+  input:
+    coords='process/{sample}.out',
+    sequences='process/{sample}.fa',
+  output:
+    msa='msa/{sample}_msa.npz',
+    out='msa/{sample}.csv'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    nmax=config['NMAX']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='48:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p msa
+    swibrid construct_msa --coords {input.coords} --sequences {input.sequences} --msa {output.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --out {output.out} --use_orientation --nmax {params.nmax}
+    """
+
+
+rule gaps:
+  input:
+    msa='msa/{sample}_msa.npz'
+  output:
+    gaps='gaps/{sample}_gaps.npz'
+  params:
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='48:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p gaps
+    swibrid get_gaps --msa {input.msa} -o {output.gaps}
+    """
+
+
+rule graph:
+  input:
+    msa='msa/{sample}_msa.npz',
+    gaps='gaps/{sample}_gaps.npz'
+  output:
+    graph='graph/{sample}_graph.npz'
+  params:
+    nmax=config['NMAX'],
+    n_neighbors=config['N_NEIGHBORS'],
+    max_gap=config['MAX_GAP'],
+  threads: 8
+  resources:
+    mem_mb=increase_mem,
+    time='48:00:00',
+    partition=get_partition,
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p graph
+    swibrid construct_graph --msa {input.msa} --graph {output.graph} --gaps {input.gaps} --max_gap {params.max_gap} --metric cosine --nmax {params.nmax} --use_graph --n_neighbors {params.n_neighbors} --n_threads {threads}
+    """
+
+
+rule linkage:
+  input:
+    graph='graph/{sample}_graph.npz'
+  output:
+    linkage='linkage/{sample}_linkage.npz'
+  params:
+    gbbs_bin=config['GBBS_BIN'],
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='48:00:00',
+    partition=get_partition,
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p linkage
+    swibrid construct_linkage --graph {input.graph} --linkage {output.linkage}  --method weightedavg --gbbs_bin {params.gbbs_bin} 
+    """
+
+
+rule cluster:
+  input:
+    linkage='linkage/{sample}_linkage.npz',
+    info='msa/{sample}.csv'
+  output:
+    cluster='cluster/{sample}_clustering.csv',
+    stats='cluster/{sample}_stats.csv',
+    extrapolation='cluster/{sample}_extrapolation.csv'
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='48:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p cluster
+    swibrid find_clusters -l {input.linkage} -i {input.info} -o {output.cluster} -s {output.stats} -e {output.extrapolation}
+    """
+
+
+rule mutations:
+  input:
+    msa='msa/{sample}_msa.npz',
+    clustering='cluster/{sample}_clustering.csv',
+    last='align/{sample}.par',
+  output:
+    'mutations/{sample}_mutations.txt'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    reference=config['REFERENCE']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='24:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p mutations
+    swibrid find_mutations --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --last {input.last} -o {output}
+    """
+
+
+rule plot_clustering:
+  input:
+    process='process/{sample}.out',
+    info='info/{sample}_info.csv',
+    clustering='cluster/{sample}_clustering.csv',
+    linkage='linkage/{sample}_linkage.npz',
+    extrapolation='cluster/{sample}_extrapolation.csv',
+    msa='msa/{sample}_msa.npz',
+    stats='cluster/{sample}_stats.csv',
+    mutations='mutations/{sample}_mutations.txt'
+  output:
+    'plots/{sample}_reads.png'
+  params:
+    switch=config['SWITCH'],
+    annotation=config['ANNOTATION'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='04:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p plots
+    swibrid plot_clustering --msa {input.msa} --figure {output} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --coords {input.process} --show_inserts --clustering_stats {input.stats} --sample {wildcards.sample} --mutations {input.mutations} --dpi 500
+    """
+
+
+rule QC:
+  input:
+    info='info/{sample}_info.csv',
+    filter='filter/{sample}.csv',
+    process='process/{sample}.csv',
+    clustering='cluster/{sample}_clustering.csv',
+    extrapolation='cluster/{sample}_extrapolation.csv',
+    cluster_stats='cluster/{sample}_stats.csv',
+    gaps='gaps/{sample}_gaps.npz'
+  output:
+    plot='plots/{sample}_QC.png',
+    stats='plots/{sample}_QC.csv'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='04:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p plots
+    swibrid get_QC_plots --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --filter {input.filter} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --extrapolation {input.extrapolation} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch}
+    """
+
+
+rule collect:
+  input:
+    expand("plots/{sample}_QC.csv", sample=config['SAMPLES']),
+  output:
+    csv='collect/{0}_stats.csv'.format(config['STUDY']),
+  params:
+    samples=','.join(config['SAMPLES']),
+  threads: 1
+  resources:
+    mem_mb=8000,
+    time='04:00:00'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p collect
+    swibrid get_stats --samples {params.samples} -o {output}
+    """
+

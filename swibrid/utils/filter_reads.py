@@ -11,7 +11,7 @@ def setup_argparse(parser):
         "--output",
         dest="output",
         default="output",
-        help="""output fasta""",
+        help="""output fasta (.gz)""",
     )
     parser.add_argument("--info", dest="info", help="""read info""")
     parser.add_argument(
@@ -108,7 +108,9 @@ def run(args):
             args,
             stats,
         ),
-        args.output,
+        gzip.open(args.output, "wt")
+        if args.output.endswith(".gz")
+        else args.output,
         "fasta",
     )
 

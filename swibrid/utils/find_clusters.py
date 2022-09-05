@@ -131,7 +131,7 @@ def run(args):
             + [
                 c_opt,
                 len(np.unique(clustering)),
-                get_eff_nclust(clustering, 0.95),
+                get_eff_nclust(clustering),
                 np.sum(np.bincount(clustering) > 1),
                 np.mean(np.bincount(clustering)[np.unique(clustering)] == 1),
             ],

@@ -107,8 +107,8 @@ def setup_argparse(parser):
         help="""minimum matchlen for telomeric repeat matches [25]""",
     )
     parser.add_argument(
-        "--save_sequences",
-        dest="save_sequences",
+        "--sequences",
+        dest="sequences",
         help="""save sequence alignment to reference for pseudo-multiple alignment""",
     )
     parser.add_argument(
@@ -232,6 +232,7 @@ def run(args):
     import pandas as pd
     from collections import defaultdict
     from Bio import SeqIO, Seq, SeqRecord
+    import gzip
     from logzero import logger
     from .helpers import (
         parse_switch_coords,
@@ -638,7 +639,7 @@ def run(args):
 
         outf.write("\n")
 
-        if args.save_sequences is not None:
+        if args.sequences is not None:
             seq = ["-" * (rm[2] - rm[1]) for rm in read_mappings]
             for (
                 read_start,
@@ -666,8 +667,14 @@ def run(args):
 
     outf.close()
 
-    if args.save_sequences is not None:
-        SeqIO.write(sequences, open(args.save_sequences, "w"), "fasta")
+    if args.sequences is not None:
+        SeqIO.write(
+            sequences,
+            gzip.open(args.sequences, "wt")
+            if args.sequences.endswith(".gz")
+            else open(args.sequences, "w"),
+            "fasta",
+        )
 
     if args.stats:
         pd.Series(stats).to_csv(args.stats)

@@ -1,71 +1,76 @@
-import os
-import sys
-import pandas as pd
-import glob
-import re
-from argparse import ArgumentParser
+"""collect stats from different samples"""
 
-parser = ArgumentParser()
-parser.add_argument(
-    "-i",
-    "--indir",
-    dest="indir",
-    help="""input directory with results.tsv and files""",
-)
-parser.add_argument("-o", "--outf", dest="outf", help="""output file (excel)""")
-parser.add_argument("--study", dest="study", help="""name of study""")
-parser.add_argument("--genome", dest="genome", help="""genome assembly""")
-parser.add_argument(
-    "--no_links",
-    dest="no_links",
-    action="store_true",
-    default=False,
-    help="""do not create links in excel""",
-)
 
-args = parser.parse_args()
-
-dfs = [f for f in os.listdir(".") if f.endswith(".tsv")]
-
-if not args.no_links:
-    hub_url = "https://bimsbstatic.mdc-berlin.net/hubs/collab_bobermay_kdelaro/{0}/hub.txt".format(
-        args.study
+def setup_argparse(parser):
+    parser.add_argument(
+        "--samples", dest="samples", help="""comma-separated list of samples"""
     )
-    session_url = "https://bimsbstatic.mdc-berlin.net/hubs/collab_bobermay_kdelaro/{0}_session.txt".format(
-        args.genome
+    parser.add_argument(
+        "--sample_stats",
+        dest="sample_stats",
+        help="""output file with sample_stats""",
     )
-    ucsc_link = (
-        "http://genome.mdc-berlin.net/cgi-bin/hgTracks?"
-        "db={0}&"
-        "hubClear={1}&"
-        "hgS_loadUrlName={2}&"
-        "hsS_doLoadUrl=submit"
-    ).format(args.genome, hub_url, session_url)
+    parser.add_argument(
+        "--inserts", dest="inserts", help="""output file with inserts"""
+    )
+    parser.add_argument(
+        "--cluster_stats",
+        dest="cluster_stats",
+        help="""output file with cluster stats""",
+    )
 
 
-def widen_coords(coords, w):
-    chrom, start, end = re.split("[:-]", coords)
-    return "{0}:{1}-{2}".format(chrom, int(start) - w, int(end) + w)
+def run(args):
 
+    import os
+    import pandas as pd
+    import glob
+    from logzero import logger
+    from openpyxl import Workbook
 
-with pd.ExcelWriter(args.outf) as writer:
-    for rf in glob.glob(os.path.join(args.indir, "*.tsv")):
-        name = rf.split("/")[-1].split("_results.tsv")[0]
-        try:
-            tmp = pd.read_csv(rf, sep="\t", header=0)
-            if not args.no_links:
-                tmp["switch_coords"] = tmp["switch_coords"].apply(
-                    lambda x: '=HYPERLINK("{0}","{1}")'.format(
-                        ucsc_link + "&position=" + widen_coords(x, 100), x
-                    )
+    if args.samples is None:
+        raise Exception("no list of samples given!")
+    samples = args.samples.split(",")
+
+    dfs = dict(
+        (
+            sample,
+            pd.read_csv("plots/" + sample + "_QC.csv", header=None, index_col=0)
+            .squeeze()
+            .dropna(),
+        )
+        for sample in samples
+        if os.path.isfile("plots/" + sample + "_QC.csv")
+    )
+    dfs = dict((k, v[v.index.notnull()]) for k, v in dfs.items())
+    df = pd.concat(dfs.values(), keys=dfs.keys(), axis=1)
+    logger.info("saving sample stats to " + args.sample_stats)
+    df.T.to_csv(args.sample_stats)
+
+    wb = Workbook()
+    with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
+        writer.book = wb
+        for rf in glob.glob(os.path.join("select", "*_results.tsv")):
+            name = rf.split("/")[-1].split("_results.tsv")[0]
+            try:
+                tmp = pd.read_csv(rf, sep="\t", header=0)
+                tmp.to_excel(writer, sheet_name=name, index=False)
+                logger.info("adding inserts for {0}".format(name))
+            except pd.errors.EmptyDataError:
+                logger.warn("no inserts for {0}".format(name))
+                pass
+
+    wb = Workbook()
+    with pd.ExcelWriter(args.cluster_stats, engine="openpyxl") as writer:
+        writer.book = wb
+        for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
+            name = rf.split("/")[-1].split("_analysis.csv")[0]
+            try:
+                tmp = pd.read_csv(rf, header=0, index_col=0).sort_values(
+                    "size", ascending=False
                 )
-                tmp["insert_coords"] = tmp["insert_coords"].apply(
-                    lambda x: '=HYPERLINK("{0}","{1}")'.format(
-                        ucsc_link + "&position=" + widen_coords(x, 100), x
-                    )
-                )
-            tmp.to_excel(writer, sheet_name=name, index=False)
-            sys.stderr.write("adding inserts for {0}\n".format(name))
-        except pd.errors.EmptyDataError:
-            sys.stderr.write("no inserts for {0}\n".format(name))
-            pass
+                tmp.to_excel(writer, sheet_name=name, index=True)
+                logger.info("adding clustering stats for {0}".format(name))
+            except pd.errors.EmptyDataError:
+                logger.warn("no clustering stats for {0}".format(name))
+                pass

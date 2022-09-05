@@ -291,10 +291,11 @@ def shift_coord(coord, cov_int, ignore=False):
     return coord - shift
 
 
-def get_eff_nclust(clustering, cut=0.95):
+def get_eff_nclust(clustering, cut=0.95, min_size=1):
     p = np.bincount(clustering) / len(clustering)
+    step = min_size / len(clustering)
     p[::-1].sort()
-    return np.sum(np.cumsum(p) < cut) + 1
+    return np.sum((np.cumsum(p) < cut) & (p >= step)) + 1
 
 
 def f2(p, x):
@@ -317,3 +318,127 @@ def get_gap_positions(msa):
     pos_right = pos_idx_cps[1:][internal_gaps] + 1
 
     return read_idx, pos_left, pos_right, gap_sizes
+
+
+def vrange(starts, stops):
+    """Create concatenated ranges of integers for multiple start/stop
+
+    Parameters:
+        starts (1-D array_like): starts for each range
+        stops (1-D array_like): stops for each range (same shape as starts)
+
+    Returns:
+        numpy.ndarray: concatenated ranges
+
+    For example:
+
+        >>> starts = [1, 3, 4, 6]
+        >>> stops  = [1, 5, 7, 6]
+        >>> vrange(starts, stops)
+        array([3, 4, 4, 5, 6])
+
+    """
+    import numpy as np
+
+    stops = np.asarray(stops)
+    ll = stops - starts  # Lengths of each range.
+    return np.repeat(stops - ll.cumsum(), ll) + np.arange(ll.sum())
+
+
+def remove_gaps(msa, gaps=None, max_gap=75):
+
+    import numpy as np
+
+    if gaps is None:
+        read_idx, pos_left, pos_right, gap_sizes = get_gap_positions(msa)
+    else:
+        read_idx = gaps["read_idx"]
+        pos_left = gaps["pos_left"]
+        pos_right = gaps["pos_right"]
+        gap_sizes = gaps["gap_size"]
+    remove = gap_sizes <= max_gap
+    gaps_to_remove = gap_sizes[remove]
+    read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
+    pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
+    msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
+    msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
+    vals_replace = np.repeat(
+        np.max(
+            np.array(
+                [
+                    msa_cleaned[(read_idx, pos_left - 1)],
+                    msa_cleaned[(read_idx, pos_right)],
+                ]
+            ),
+            0,
+        )[remove],
+        gaps_to_remove,
+    )
+    msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
+    return msa_cleaned
+
+
+def parse_range(numString: str):
+
+    import itertools
+
+    def expand_range(s: str):
+        z = s.split("-")
+        ll = len(z)
+        if ll == 1:
+            return [int(z[0])]
+        elif ll == 2:
+            return list(range(int(z[0]), int(z[1]) + 1))
+        else:
+            raise IndexError("too many values in range!")
+
+    return sorted(
+        set(itertools.chain(*map(expand_range, numString.split(","))))
+    )
+
+
+def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
+
+    import scipy.sparse
+    import pandas as pd
+
+    take = (mutations["strand_bias"] - 0.5).abs() < max_bias
+    if sum(take) > 0:
+        i = []
+        j = []
+        d = []
+        for _, row in mutations[take].iterrows():
+            for k, x in enumerate("ACGT"):
+                c = "alt_" + x
+                if not pd.isnull(row[c]):
+                    ridx = np.array(list(map(int, row[c].split(","))))
+                    use = ridx < nreads
+                    i.append(ridx[use])
+                    j.append(np.repeat(row["rel_pos"], sum(use)))
+                    d.append(np.repeat(k + 1, sum(use)))
+
+        i = np.concatenate(i)
+        j = np.concatenate(j)
+        d = np.concatenate(d)
+
+        mut = scipy.sparse.csc_matrix(
+            (d, (i, j)), shape=(nreads, npos), dtype=np.int8
+        )
+    else:
+        mut = scipy.sparse.csc_matrix(
+            ([], ([], [])), shape=(nreads, npos), dtype=np.int8
+        )
+
+    return mut
+
+
+def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
+
+    switch_iis = []
+    for rec in anno_recs:
+        start = shift_coord(int(rec[3][1]), cov_int) - eff_start
+        end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+        switch_iis.append(
+            [rec[3][3].upper()] * (end // binsize - start // binsize)
+        )
+    return np.concatenate(switch_iis)

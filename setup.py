@@ -6,8 +6,7 @@ import os.path
 
 from setuptools import setup, find_packages
 
-#import versioneer
-
+import versioneer
 
 def parse_requirements(path):
     """Parse ``requirements.txt`` at ``path``."""
@@ -55,6 +54,7 @@ setup(
     include_package_data=True,
     name="swibrid",
     packages=find_packages(include=["swibrid"]),
-    version='0.0.1',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     zip_safe=False,
 )

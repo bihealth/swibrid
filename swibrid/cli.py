@@ -21,14 +21,18 @@ from .utils import (
     plot_clustering,
     find_mutations,
     get_QC_plots,
-    get_stats,
+    get_gap_stats,
+    get_switch_homology,
     create_bed,
+    get_synthetic_reads,
+    get_unique_clones_bed,
+    analyze_clustering,
+    collect_results,
 )
 
-# from tool import __version__
+from swibrid import __version__
 
-
-def run_nocmd(_, parser):
+def run_nocmd(parser):
     """No command given, print help and ``exit(1)``."""
     parser.print_help()
     parser.exit(1)
@@ -39,7 +43,11 @@ def run_pipeline(args, snake_options):
 
     import os
 
-    snakefile = Path(__file__).parent.joinpath("pipeline.snake")
+    if not args.snakefile:
+        snakefile = Path(__file__).parent.joinpath("pipeline.snake")
+    else:
+        snakefile = args.snakefile
+
     Path("logs").mkdir(exist_ok=True)
     config = YAML(typ="safe").load(open(args.config))
     s_command = """export SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile} --configfile {cfile} -j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10 --use-conda --conda-prefix {conda}""".format(
@@ -59,15 +67,36 @@ def run_pipeline(args, snake_options):
     os.system(command)
 
 
+def run_setup(args):
+    """setup new directory"""
+
+    import os
+
+    snakefile = Path(__file__).parent.joinpath("pipeline.snake")
+    configfile = Path(__file__).parent.joinpath("config.yaml")
+
+    if not os.path.isfile("pipeline.snake") or args.overwrite:
+        logger.info("copying pipeline.snake")
+        os.system("cp -i {0} .".format(snakefile))
+    else:
+        logger.warn("refusing to overwrite pipeline.snake")
+    if not os.path.isfile("config.yaml") or args.overwrite:
+        logger.info("copying config.yaml")
+        os.system("cp -i {0} .".format(configfile))
+    else:
+        logger.warn("refusing to overwrite config.yaml")
+
+
 def main(argv=None):
     """Main entry point before parsing command line arguments."""
 
     description = """
-    main command:
+    main commands:
 
+    swibrid setup                  copy config and snakefile to current directory
     swibrid run                    run the entire pipeline
 
-    subcommands: some steps can be run individually
+    subcommands to run pipeline steps individually:
 
     swibrid demultiplex            demultiplex minION run
     swibrid filter_reads           filter reads
@@ -81,24 +110,28 @@ def main(argv=None):
     swibrid find_mutations         call germline and somatic mutations
     swibrid plot_clustering        plot the read clustering
     swibrid get_QC_plots           get plots for various QC stats
-    swibrid get_stats              get summary stats
+    swibrid get_gap_stats          get breakpoint histogram stats
+    swibrid get_switch_homology    get switch sequence homology
+    swibrid analyze_clustering     analyze clustering results at different cutoffs
+    swibrid collect results        collect results
 
-    optional arguments:
-     -h, --help            show this help message and exit
-     --version             show version information
-     --verbose             Increase verbosity
+    subcommands to create synthetic reads for testing or benchmarking:
+
+    swibrid get_unique_clones_bed  get bed file with unique clones
+    swibrid get_synthetic_reads    create synthetic reads from bed file
     """
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
+        "-v",
         "--verbose",
         action="store_true",
         default=False,
         help="Increase verbosity.",
     )
-    # parser.add_argument("--version", action="version", version="%%(prog)s %s" % __version__)
+    parser.add_argument("--version", action="version", version="%%(prog)s %s" % __version__)
 
     subparsers = parser.add_subparsers(
         dest="cmd",
@@ -107,8 +140,25 @@ def main(argv=None):
         help=argparse.SUPPRESS,
     )
 
+    setup_parser = subparsers.add_parser(
+        "setup", help="main command: setup current directory"
+    )
+    setup_parser.add_argument(
+        "-f",
+        "--overwrite",
+        dest="overwrite",
+        help="""overwrite files if present [no]""",
+    )
+
     pipeline_parser = subparsers.add_parser(
         "run", help="main command: run pipeline"
+    )
+    pipeline_parser.add_argument(
+        "-s",
+        "--snakefile",
+        dest="snakefile",
+        default="pipeline.snake",
+        help="snakefile [pipeline.snake]",
     )
     pipeline_parser.add_argument(
         "-c",
@@ -118,7 +168,6 @@ def main(argv=None):
         help="config file [config.yaml]",
     )
     pipeline_parser.add_argument(
-        "-s",
         "--slurm",
         dest="slurm",
         action="store_true",
@@ -172,8 +221,31 @@ def main(argv=None):
     get_QC_plots.setup_argparse(
         subparsers.add_parser("get_QC_plots", help="step: plot QC results")
     )
-    get_stats.setup_argparse(
-        subparsers.add_parser("get_stats", help="step: get stats")
+    get_gap_stats.setup_argparse(
+        subparsers.add_parser("get_gap_stats", help="step: get gap statistics")
+    )
+    get_switch_homology.setup_argparse(
+        subparsers.add_parser(
+            "get_switch_homology", help="step: get switch sequence homology"
+        )
+    )
+    analyze_clustering.setup_argparse(
+        subparsers.add_parser(
+            "analyze_clustering", help="step: analyze clustering"
+        )
+    )
+    get_synthetic_reads.setup_argparse(
+        subparsers.add_parser(
+            "get_synthetic_reads", help="step: create synthetic reads"
+        )
+    )
+    get_unique_clones_bed.setup_argparse(
+        subparsers.add_parser(
+            "get_unique_clones_bed", help="step: get unique clones from bed"
+        )
+    )
+    collect_results.setup_argparse(
+        subparsers.add_parser("collect_results", help="step: collect results")
     )
 
     args, extra = parser.parse_known_args(argv)
@@ -186,6 +258,7 @@ def main(argv=None):
     loglevel(level=level)
 
     steps = {
+        "setup": run_setup,
         "demultiplex": demultiplex.run,
         "filter_reads": filter_reads.run,
         "process_last_output": process_last_output.run,
@@ -198,7 +271,12 @@ def main(argv=None):
         "find_mutations": find_mutations.run,
         "plot_clustering": plot_clustering.run,
         "get_QC_plots": get_QC_plots.run,
-        "get_stats": get_stats.run,
+        "get_gap_stats": get_gap_stats.run,
+        "get_switch_homology": get_switch_homology.run,
+        "analyze_clustering": analyze_clustering.run,
+        "get_synthetic_reads": get_synthetic_reads.run,
+        "get_unique_clones_bed": get_unique_clones_bed.run,
+        "collect_results": collect_results.run,
     }
 
     if args.cmd == "run":
@@ -206,4 +284,4 @@ def main(argv=None):
     elif args.cmd in steps.keys():
         return steps[args.cmd](args)
     else:
-        return run_nocmd
+        return run_nocmd(parser)

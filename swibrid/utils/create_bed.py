@@ -37,6 +37,11 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
+    parser.add_argument(
+        "--interrupt_for_read",
+        dest="interrupt_for_read",
+        help="""interrupt for specified read(s)""",
+    )
 
 
 def run(args):
@@ -72,11 +77,8 @@ def run(args):
         )
 
     logger.info("reading filtered read matches from " + args.processed_reads)
-    logger.info(
-        "writing coordinates for selected reads to {0}\n\tsummary table to {1}".format(
-            args.bed, args.outfile
-        )
-    )
+    logger.info("writing coordinates for selected reads to " + args.bed)
+    logger.info("writing summary table to " + args.outfile)
 
     bed = open(args.bed, "w")
     out_table = dict()
@@ -87,7 +89,8 @@ def run(args):
         isotype = ls[1]
         mappings = []
         inserts = []
-        for ll in ls[3:]:
+        read_orientation = ls[2]
+        for ll in ls[4:]:
             if "insert" not in ll:
                 coords = decode_coords(ll)
                 mappings.append(coords)
@@ -147,10 +150,7 @@ def run(args):
             if cend < cstart:
                 cstart, cend = cend, cstart
 
-            if insert.group("orientation") == "-":
-                seq = str(raw_reads[read].seq.reverse_complement())
-            else:
-                seq = str(raw_reads[read].seq)
+            seq = str(raw_reads[read].seq)
             istart = int(insert.group("istart"))
             iend = int(insert.group("iend"))
             seq = (
@@ -171,6 +171,12 @@ def run(args):
                 insert_anno=insert_anno,
                 sequence=seq,
             )
+
+            if (
+                args.interrupt_for_read is not None
+                and read in args.interrupt_for_read.split(",")
+            ):
+                return raw_reads[read].seq, ls
 
     bed.close()
 

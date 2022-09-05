@@ -49,6 +49,7 @@ def run(args):
     from Bio import SeqIO
     import scipy.sparse
     from logzero import logger
+    import gzip
     from .helpers import (
         parse_switch_coords,
         read_switch_anno,
@@ -127,7 +128,12 @@ def run(args):
         "reading processed read sequences from {0}".format(args.sequences)
     )
     i, j, x = [], [], []
-    for rec in SeqIO.parse("{0}".format(args.sequences), "fasta"):
+    for rec in SeqIO.parse(
+        gzip.open("{0}".format(args.sequences), "rt")
+        if args.sequences.endswith(".gz")
+        else args.sequences,
+        "fasta",
+    ):
         read = rec.id.rsplit("@", 1)[0]
         if read not in reads:
             continue
@@ -140,6 +146,11 @@ def run(args):
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
         elif min(ne, Ltot) >= max(ns, 0):
+            logger.warn(
+                "coordinates {0}:{1}-{2} partially outside range".format(
+                    chrom, start, end
+                )
+            )
             ne = min(ne, Ltot)
             ns = max(ns, 0)
             if np.isfinite(shift_coord(start, cov_int)) or ne > Ltot:
@@ -151,6 +162,11 @@ def run(args):
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
         else:
+            logger.warn(
+                "coordinates {0}:{1}-{2} outside range".format(
+                    chrom, start, end
+                )
+            )
             continue
         n = read_isotypes.index.get_loc(read)
         # find all the non-gap positions in this part of the read sequence

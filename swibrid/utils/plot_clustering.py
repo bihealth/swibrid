@@ -272,6 +272,7 @@ def run(args):
         decode_insert,
         merge_intervals,
         get_eff_nclust,
+        construct_mut_matrix,
     )
 
     matplotlib.rcParams.update({"font.size": 8})
@@ -332,32 +333,7 @@ def run(args):
     if args.mutations:
         logger.info("adding mutations from {0}".format(args.mutations))
         mutations = pd.read_csv(args.mutations, sep="\t", header=0)
-        take = (mutations["strand_bias"] - 0.5).abs() < 0.25
-        if sum(take) > 0:
-            i = []
-            j = []
-            d = []
-            for _, row in mutations[take].iterrows():
-                for k, x in enumerate("ACGT"):
-                    c = "alt_" + x
-                    if not pd.isnull(row[c]):
-                        ridx = np.array(list(map(int, row[c].split(","))))
-                        use = ridx < nreads
-                        i.append(ridx[use])
-                        j.append(np.repeat(row["rel_pos"], sum(use)))
-                        d.append(np.repeat(k + 1, sum(use)))
-
-            i = np.concatenate(i)
-            j = np.concatenate(j)
-            d = np.concatenate(d)
-
-            mut = scipy.sparse.csc_matrix(
-                (d, (i, j)), shape=msa.shape, dtype=np.int8
-            )
-        else:
-            mut = scipy.sparse.csc_matrix(
-                ([], ([], [])), shape=msa.shape, dtype=np.int8
-            )
+        mut = construct_mut_matrix(mutations, msa.shape[0], msa.shape[1])
 
     logger.info("coloring msa by {0}".format(args.color_by))
     if args.color_by == "cluster":
@@ -538,7 +514,7 @@ def run(args):
             x, y = mut[order_chunk].nonzero()
             # colormap: A is red, C is green, G is blue and T is yellow
             c = np.array(list("wbrgy"))[mut[order_chunk][(x, y)].A1.astype(int)]
-            if len(use) == mut.shape[1]:
+            if args.color_by == 'genotype' and len(use) == mut.shape[1]:
                 show = np.isin(y, np.where(use)[0])
                 x = x[show]
                 y = y[show]

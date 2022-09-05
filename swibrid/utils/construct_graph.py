@@ -121,72 +121,15 @@ def get_adjacency_graph(
         return knn_indices, knn_dists
 
 
-def vrange(starts, stops):
-    """Create concatenated ranges of integers for multiple start/stop
-
-    Parameters:
-        starts (1-D array_like): starts for each range
-        stops (1-D array_like): stops for each range (same shape as starts)
-
-    Returns:
-        numpy.ndarray: concatenated ranges
-
-    For example:
-
-        >>> starts = [1, 3, 4, 6]
-        >>> stops  = [1, 5, 7, 6]
-        >>> vrange(starts, stops)
-        array([3, 4, 4, 5, 6])
-
-    """
-    import numpy as np
-
-    stops = np.asarray(stops)
-    ll = stops - starts  # Lengths of each range.
-    return np.repeat(stops - ll.cumsum(), ll) + np.arange(ll.sum())
-
-
-def remove_gaps(msa, gaps=None, max_gap=75):
-
-    import numpy as np
-    from .helpers import get_gap_positions
-
-    if gaps is None:
-        read_idx, pos_left, pos_right, gap_sizes = get_gap_positions(msa)
-    else:
-        read_idx = gaps["read_idx"]
-        pos_left = gaps["pos_left"]
-        pos_right = gaps["pos_right"]
-        gap_sizes = gaps["gap_size"]
-    remove = gap_sizes <= max_gap
-    gaps_to_remove = gap_sizes[remove]
-    read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
-    pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
-    msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
-    msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
-    vals_replace = np.repeat(
-        np.max(
-            np.array(
-                [
-                    msa_cleaned[(read_idx, pos_left - 1)],
-                    msa_cleaned[(read_idx, pos_right)],
-                ]
-            ),
-            0,
-        )[remove],
-        gaps_to_remove,
-    )
-    msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
-    return msa_cleaned
-
-
 def run(args):
 
     import os
     import sys
     import numpy as np
     import scipy.sparse
+    import scipy.spatial
     from logzero import logger
+    from .helpers import remove_gaps
 
     if not os.path.isfile(args.msa):
         logger.warn(
@@ -233,7 +176,7 @@ def run(args):
     else:
         logger.info(
             "constructing distance matrix of {0} reads with {1} metric".format(
-                msa_cleaned.shape, args.metric
+                msa_cleaned.shape[0], args.metric
             )
         )
         dist = scipy.spatial.distance.pdist(msa_cleaned, metric=args.metric)

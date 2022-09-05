@@ -59,7 +59,6 @@ rule filter:
   shell:
     r"""
     mkdir -p filter
-    mkdir -p log
     swibrid filter_reads -i {input.fastq} -o {output.fasta} --info {input.info} --stats {output.csv} --min-length {params.minlength} {params.complete} {params.internal}
     """
 
@@ -114,7 +113,7 @@ rule process:
   output:
     out='process/{sample}.out',
     stats='process/{sample}.csv',
-    fasta='process/{sample}.fa'
+    fasta='process/{sample}.fasta.gz'
   params:
     switch=config['SWITCH'],
     switch_anno=config['SWITCH_ANNOTATION'],
@@ -129,7 +128,7 @@ rule process:
   shell:
     r"""
     mkdir -p process
-    swibrid process_last_output --last {input.maf} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --save_sequences {output.fasta} {params.blacklist_regions}
+    swibrid process_last_output --last {input.maf} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} {params.blacklist_regions}
     """
 
 
@@ -166,7 +165,7 @@ def get_partition (wildcards, attempt):
 rule msa:
   input:
     coords='process/{sample}.out',
-    sequences='process/{sample}.fa',
+    sequences='process/{sample}.fasta.gz',
   output:
     msa='msa/{sample}_msa.npz',
     out='msa/{sample}.csv'
@@ -300,6 +299,79 @@ rule mutations:
     """
 
 
+rule homology:
+  output:
+    'gaps/homology.npz'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    binsize=config['BINSIZE'],
+    genome=config['REFERENCE']
+  threads: 1
+  resources:
+    mem_mb=32000,
+    time='4:00:00',
+    partition='short'
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p gaps
+    swibrid get_switch_homology --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --binsize {params.binsize} --genome {params.genome} -o {output}
+    """
+
+
+rule gap_stats:
+  input:
+    gaps='gaps/{sample}_gaps.npz',
+    clustering='cluster/{sample}_clustering.csv',
+    stats='cluster/{sample}_stats.csv',
+    homology='gaps/homology.npz'
+  output:
+    'gaps/{sample}_stats.csv'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    binsize=config['BINSIZE'],
+    max_gap=config['MAX_GAP']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='4:00:00',
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    mkdir -p gaps
+    swibrid get_gap_stats -g {input.gaps} -c {input.clustering} -s {input.stats} -b {params.binsize} --max_gap {params.max_gap} --homology {input.homology} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} -o {output}
+    """
+
+
+rule analyze_clustering:
+  input:
+    msa='msa/{sample}_msa.npz',
+    gaps='gaps/{sample}_gaps.npz',
+    clustering='cluster/{sample}_clustering.csv',
+    mutations='mutations/{sample}_mutations.txt',
+  output:
+    'cluster/{sample}_analysis.csv'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    max_gap=config['MAX_GAP']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='04:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  shell:
+    r"""
+    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --mutations {input.mutations} --switch_coords {params.switch} --switch_annotation {params.switch_annotation}
+    """
+
+
 rule plot_clustering:
   input:
     process='process/{sample}.out',
@@ -338,13 +410,16 @@ rule QC:
     clustering='cluster/{sample}_clustering.csv',
     extrapolation='cluster/{sample}_extrapolation.csv',
     cluster_stats='cluster/{sample}_stats.csv',
-    gaps='gaps/{sample}_gaps.npz'
+    clustering_analysis='cluster/{sample}_analysis.csv',
+    gaps='gaps/{sample}_gaps.npz',
+    gap_stats='gaps/{sample}_stats.csv'
   output:
     plot='plots/{sample}_QC.png',
     stats='plots/{sample}_QC.csv'
   params:
     switch=config['SWITCH'],
-    switch_annotation=config['SWITCH_ANNOTATION']
+    switch_annotation=config['SWITCH_ANNOTATION'],
+    max_gap=config['MAX_GAP']
   threads: 1
   resources:
     mem_mb=increase_mem,
@@ -355,15 +430,19 @@ rule QC:
   shell:
     r"""
     mkdir -p plots
-    swibrid get_QC_plots --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --filter {input.filter} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --extrapolation {input.extrapolation} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch}
+    swibrid get_QC_plots --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --filter {input.filter} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --extrapolation {input.extrapolation} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch} --gap_stats {input.gap_stats} --max_gap {params.max_gap} --clustering_analysis {input.clustering_analysis}
     """
 
 
 rule collect:
   input:
     expand("plots/{sample}_QC.csv", sample=config['SAMPLES']),
+    expand("select/{sample}_results.tsv", sample=config['SAMPLES']),
+    expand("cluster/{sample}_analysis.csv", sample=config['SAMPLES']),
   output:
-    csv='collect/{0}_stats.csv'.format(config['STUDY']),
+    sample_stats='collect/{0}_stats.csv'.format(config['STUDY']),
+    inserts='collect/{0}_inserts.xlsx'.format(config['STUDY']),
+    cluster_stats='collect/{0}_clusters.xlsx'.format(config['STUDY'])
   params:
     samples=','.join(config['SAMPLES']),
   threads: 1
@@ -375,6 +454,6 @@ rule collect:
   shell:
     r"""
     mkdir -p collect
-    swibrid get_stats --samples {params.samples} -o {output}
+    swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} --inserts {output.inserts} --cluster_stats {output.cluster_stats}
     """
 

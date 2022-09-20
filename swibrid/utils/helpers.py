@@ -442,3 +442,14 @@ def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
             [rec[3][3].upper()] * (end // binsize - start // binsize)
         )
     return np.concatenate(switch_iis)
+
+
+def calculate_gini(x):
+    """calculate Gini coefficient of array x; see https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python"""
+    import numpy as np
+
+    x = np.asarray(x)
+    sorted_x = np.sort(x)
+    n = len(x)
+    cumx = np.cumsum(sorted_x, dtype=float)
+    return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n

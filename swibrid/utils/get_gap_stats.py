@@ -41,6 +41,11 @@ def setup_argparse(parser):
         dest="homology",
         help="""file with homology values (output of get_switch_homology.py)""",
     )
+    parser.add_argument(
+        "--motifs",
+        dest="motifs",
+        help="""file with motif counts (output of get_switch_motifs.py)""",
+    )
     parser.add_argument("-o", "--out", help="""output file""")
     parser.add_argument(
         "--switch_coords",
@@ -59,26 +64,26 @@ def setup_argparse(parser):
         default="4-7",
         help="""range of kmer sizes, e.g., 3,5-7 [4-7]""",
     )
-    parser.add_argument('-n',
-                        '--ntop',
-                        dest='ntop',
-                        type=int,
-                        default=10,
-                        help="""number of top bins to select""")
     parser.add_argument(
-        '--reference',
-        dest='reference',
-        help="""genome fasta file"""
+        "-n",
+        "--ntop",
+        dest="ntop",
+        type=int,
+        default=10,
+        help="""number of top bins to select""",
     )
     parser.add_argument(
-        '--top_donor',
-        dest='top_donor',
-        help="""output file with top donor sequences"""
+        "--reference", dest="reference", help="""genome fasta file"""
     )
     parser.add_argument(
-        '--top_receiver',
-        dest='top_receiver',
-        help="""output file with top receiver sequences"""
+        "--top_donor",
+        dest="top_donor",
+        help="""output file with top donor sequences""",
+    )
+    parser.add_argument(
+        "--top_receiver",
+        dest="top_receiver",
+        help="""output file with top receiver sequences""",
     )
 
 
@@ -87,6 +92,7 @@ def run(args):
     import numpy as np
     import pandas as pd
     import scipy.sparse
+    import scipy.stats
     import pysam
     import re
     from logzero import logger
@@ -177,6 +183,19 @@ def run(args):
     stats["frac_multiple_breaks"] = bp_hist[multiple_event].sum() / nbreaks
     stats["frac_within_break"] = bp_hist[within_event].sum() / nbreaks
 
+    # check if certain regions in SM break to different isotypes with different frequencies
+    df = {}
+    for isotype in np.unique(switch_iis):
+        for k, b in enumerate(np.where(switch_iis == "SM")[0]):
+            df[(isotype, k)] = bp_hist[switch_iis == isotype][:, b].sum()
+    m = pd.Series(df).unstack(level=0)
+    stats["SM_downstream_bias"] = np.nanmean(
+        [
+            scipy.stats.entropy(m.loc[i], m.sum(0)) / np.log(m.shape[1])
+            for i in m.index
+        ]
+    )
+
     if args.homology:
         homology = np.load(args.homology)
         for n in parse_range(args.range):
@@ -197,37 +216,57 @@ def run(args):
         m2 = np.sum(pos**2 * bps_here) / np.sum(bps_here)
         stats["spread_" + sr] = np.sqrt(m2 - m**2)
 
-    if args.reference:
+    if args.motifs:
 
-        reference = pysam.FastaFile(args.reference)
-        switch_seq = ''.join([
-            reference.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int
-        ])
+        motif_counts = np.load(args.motifs)
 
-        simple_repeats = ['G_C','A_T','TG','CA','TCCA','CAGCC','CAGCT','CACAT','CAGAGA']
-    
-        for repeat in simple_repeats:
-            counts = np.array([sum(1 for _ in re.finditer(repeat.replace("_",'|'), switch_seq[k*binsize:(k+1)*binsize]))
-                               for k in range(len(switch_seq)//binsize)])
-            stats["donor_score_" + repeat] = np.sum(bp_hist.sum(0).A1*counts) / (bp_hist.sum(0).A1.sum() * counts.sum())
-            stats["receiver_score_" + repeat] = np.sum(bp_hist.sum(1).A1*counts) / (bp_hist.sum(1).A1.sum() * counts.sum())
+        for motif in motif_counts.files:
+            counts = motif_counts[motif]
+            stats["donor_score_" + motif] = np.sum(
+                bp_hist.sum(0).A1 * counts
+            ) / (bp_hist.sum(0).A1.sum() * counts.sum())
+            stats["receiver_score_" + motif] = np.sum(
+                bp_hist.sum(1).A1 * counts
+            ) / (bp_hist.sum(1).A1.sum() * counts.sum())
 
     logger.info("saving results to {0}\n".format(args.out))
     pd.Series(stats).to_csv(args.out, header=False)
 
-    if args.top_donor and args.top_receiver:
+    if args.reference and args.top_donor and args.top_receiver:
 
-        top_donor_bins = np.argsort(bp_hist.sum(0).A1)[-args.ntop:]
+        genome = pysam.FastaFile(args.reference)
+
+        switch_seqs = [
+            genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int
+        ]
+        stot = "".join(switch_seqs)
+
+        top_donor_bins = np.argsort(bp_hist.sum(0).A1)[-args.ntop :]
         top_donor_bins.sort()
-        top_donor_seqs=[switch_seq[k*binsize:(k+1)*binsize] for k in top_donor_bins]
-        logger.info('saving top donor sequences to ' + args.top_donor)
-        with open(args.top_donor,'w') as outf:
-            outf.write('\n'.join('>donor_{0}\n{1}'.format(k+1,s) for k,s in enumerate(top_donor_seqs))+'\n')
+        top_donor_seqs = [
+            stot[k * binsize : (k + 1) * binsize] for k in top_donor_bins
+        ]
+        logger.info("saving top donor sequences to " + args.top_donor)
+        with open(args.top_donor, "w") as outf:
+            outf.write(
+                "\n".join(
+                    ">donor_{0}\n{1}".format(k + 1, s)
+                    for k, s in enumerate(top_donor_seqs)
+                )
+                + "\n"
+            )
 
-        top_receiver_bins = np.argsort(bp_hist.sum(1).A1)[-args.ntop:]
+        top_receiver_bins = np.argsort(bp_hist.sum(1).A1)[-args.ntop :]
         top_receiver_bins.sort()
-        top_receiver_seqs=[switch_seq[k*binsize:(k+1)*binsize] for k in top_receiver_bins]
-        logger.info('saving top receiver sequences to ' + args.top_receiver)
-        with open(args.top_receiver,'w') as outf:
-            outf.write('\n'.join('>receiver_{0}\n{1}'.format(k+1,s) for k,s in enumerate(top_receiver_seqs))+'\n')
-    
+        top_receiver_seqs = [
+            stot[k * binsize : (k + 1) * binsize] for k in top_receiver_bins
+        ]
+        logger.info("saving top receiver sequences to " + args.top_receiver)
+        with open(args.top_receiver, "w") as outf:
+            outf.write(
+                "\n".join(
+                    ">receiver_{0}\n{1}".format(k + 1, s)
+                    for k, s in enumerate(top_receiver_seqs)
+                )
+                + "\n"
+            )

@@ -8,6 +8,7 @@ from setuptools import setup, find_packages
 
 import versioneer
 
+
 def parse_requirements(path):
     """Parse ``requirements.txt`` at ``path``."""
     requirements = []
@@ -23,17 +24,17 @@ def parse_requirements(path):
     return requirements
 
 
-#with open("README.rst") as readme_file:
+# with open("README.rst") as readme_file:
 #    readme = readme_file.read()
 
-#with open("HISTORY.rst") as history_file:
+# with open("HISTORY.rst") as history_file:
 #    history = history_file.read()
 
-#test_requirements = parse_requirements("requirements/test.txt")
+# test_requirements = parse_requirements("requirements/test.txt")
 # Use special requirements for RTD ("dash" instead of "dash[testing]").
-#if os.environ.get("READTHEDOCS", False):
+# if os.environ.get("READTHEDOCS", False):
 #    install_requirements = parse_requirements("requirements/rtd.txt")
-#else:
+# else:
 #    install_requirements = parse_requirements("requirements/base.txt")
 
 setup(

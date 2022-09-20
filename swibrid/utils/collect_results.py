@@ -35,12 +35,14 @@ def run(args):
     dfs = dict(
         (
             sample,
-            pd.read_csv("plots/" + sample + "_QC.csv", header=None, index_col=0)
+            pd.read_csv(
+                "plots/" + sample + "_summary.csv", header=None, index_col=0
+            )
             .squeeze()
             .dropna(),
         )
         for sample in samples
-        if os.path.isfile("plots/" + sample + "_QC.csv")
+        if os.path.isfile("plots/" + sample + "_summary.csv")
     )
     dfs = dict((k, v[v.index.notnull()]) for k, v in dfs.items())
     df = pd.concat(dfs.values(), keys=dfs.keys(), axis=1)
@@ -50,8 +52,8 @@ def run(args):
     wb = Workbook()
     with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
         writer.book = wb
-        for rf in glob.glob(os.path.join("select", "*_results.tsv")):
-            name = rf.split("/")[-1].split("_results.tsv")[0]
+        for rf in glob.glob(os.path.join("inserts", "*_inserts.tsv")):
+            name = rf.split("/")[-1].split("_inserts.tsv")[0]
             try:
                 tmp = pd.read_csv(rf, sep="\t", header=0)
                 tmp.to_excel(writer, sheet_name=name, index=False)

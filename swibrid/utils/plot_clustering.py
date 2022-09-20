@@ -514,7 +514,7 @@ def run(args):
             x, y = mut[order_chunk].nonzero()
             # colormap: A is red, C is green, G is blue and T is yellow
             c = np.array(list("wbrgy"))[mut[order_chunk][(x, y)].A1.astype(int)]
-            if args.color_by == 'genotype' and len(use) == mut.shape[1]:
+            if args.color_by == "genotype" and len(use) == mut.shape[1]:
                 show = np.isin(y, np.where(use)[0])
                 x = x[show]
                 y = y[show]

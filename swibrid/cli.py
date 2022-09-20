@@ -20,9 +20,10 @@ from .utils import (
     find_clusters,
     plot_clustering,
     find_mutations,
-    get_QC_plots,
+    get_summary,
     get_gap_stats,
     get_switch_homology,
+    get_switch_motifs,
     create_bed,
     get_synthetic_reads,
     get_unique_clones_bed,
@@ -31,6 +32,7 @@ from .utils import (
 )
 
 from swibrid import __version__
+
 
 def run_nocmd(parser):
     """No command given, print help and ``exit(1)``."""
@@ -109,9 +111,10 @@ def main(argv=None):
     swibrid find_clusters          get read clustering from linkage
     swibrid find_mutations         call germline and somatic mutations
     swibrid plot_clustering        plot the read clustering
-    swibrid get_QC_plots           get plots for various QC stats
+    swibrid get_summary            get sample summary stats and plot
     swibrid get_gap_stats          get breakpoint histogram stats
     swibrid get_switch_homology    get switch sequence homology
+    swibrid get_switch_motifs      get switch sequence motifs
     swibrid analyze_clustering     analyze clustering results at different cutoffs
     swibrid collect results        collect results
 
@@ -131,7 +134,9 @@ def main(argv=None):
         default=False,
         help="Increase verbosity.",
     )
-    parser.add_argument("--version", action="version", version="%%(prog)s %s" % __version__)
+    parser.add_argument(
+        "--version", action="version", version="%%(prog)s %s" % __version__
+    )
 
     subparsers = parser.add_subparsers(
         dest="cmd",
@@ -218,8 +223,10 @@ def main(argv=None):
     plot_clustering.setup_argparse(
         subparsers.add_parser("plot_clustering", help="step: plot clustering")
     )
-    get_QC_plots.setup_argparse(
-        subparsers.add_parser("get_QC_plots", help="step: plot QC results")
+    get_summary.setup_argparse(
+        subparsers.add_parser(
+            "get_summary", help="step: get sample summary and plot"
+        )
     )
     get_gap_stats.setup_argparse(
         subparsers.add_parser("get_gap_stats", help="step: get gap statistics")
@@ -227,6 +234,11 @@ def main(argv=None):
     get_switch_homology.setup_argparse(
         subparsers.add_parser(
             "get_switch_homology", help="step: get switch sequence homology"
+        )
+    )
+    get_switch_motifs.setup_argparse(
+        subparsers.add_parser(
+            "get_switch_motifs", help="step: get switch sequence motifs"
         )
     )
     analyze_clustering.setup_argparse(
@@ -270,9 +282,10 @@ def main(argv=None):
         "find_clusters": find_clusters.run,
         "find_mutations": find_mutations.run,
         "plot_clustering": plot_clustering.run,
-        "get_QC_plots": get_QC_plots.run,
+        "get_summary": get_summary.run,
         "get_gap_stats": get_gap_stats.run,
         "get_switch_homology": get_switch_homology.run,
+        "get_switch_motifs": get_switch_motifs.run,
         "analyze_clustering": analyze_clustering.run,
         "get_synthetic_reads": get_synthetic_reads.run,
         "get_unique_clones_bed": get_unique_clones_bed.run,

@@ -38,6 +38,9 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
+    parser.add_argument(
+        "--inserts", dest="inserts", help="""results.tsv file with inserts"""
+    )
 
 
 def run(args):
@@ -56,6 +59,10 @@ def run(args):
         construct_mut_matrix,
         remove_gaps,
         get_switch_iis,
+        decode_coords,
+        interval_length,
+        merge_intervals,
+        intersect_intervals,
     )
 
     (
@@ -76,7 +83,7 @@ def run(args):
     )
     avg_isotype = (
         clustering.groupby("cluster")["isotype"]
-        .agg(pd.Series.mode)
+        .agg(lambda x: pd.Series.mode(x)[0])
         .loc[clusters]
     )
 
@@ -108,6 +115,142 @@ def run(args):
     tmp.eliminate_zeros()
     mut_spread = np.sum(tmp > 0, 1).A1 / mut_positions
 
+    try:
+        inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
+    except pd.errors.EmptyDataError:
+        inserts = None
+
+    if inserts:
+
+        logger.info("checking inserts")
+
+        def get_insert_isotype(x):
+            left_isotype = ",".join(
+                rec[3][3]
+                for rec in intersect_intervals(
+                    [
+                        (
+                            switch_chrom,
+                            x["insert_pos_left"],
+                            x["insert_pos_left"] + 1,
+                        )
+                    ],
+                    switch_anno,
+                    loj=True,
+                )
+            )
+            right_isotype = ",".join(
+                rec[3][3]
+                for rec in intersect_intervals(
+                    [
+                        (
+                            switch_chrom,
+                            x["insert_pos_right"],
+                            x["insert_pos_right"] + 1,
+                        )
+                    ],
+                    switch_anno,
+                    loj=True,
+                )
+            )
+            return left_isotype + "_" + right_isotype
+
+        def aggregate_inserts(x):
+            import functools
+
+            insert_union = interval_length(
+                merge_intervals(
+                    [
+                        ("", y["insert_left"], y["insert_right"])
+                        for _, y in x.iterrows()
+                    ]
+                )
+            )
+            insert_intersection = interval_length(
+                functools.reduce(
+                    intersect_intervals,
+                    (
+                        [("", y["insert_left"], y["insert_right"])]
+                        for _, y in x.iterrows()
+                    ),
+                )
+            )
+            insert_overlap = insert_intersection / insert_union
+
+            pos_union = (
+                interval_length(
+                    merge_intervals(
+                        [
+                            ("", y["insert_pos_left"], y["insert_pos_right"])
+                            for _, y in x.iterrows()
+                        ]
+                    )
+                )
+                + 1
+            )
+            pos_intersection = (
+                interval_length(
+                    functools.reduce(
+                        intersect_intervals,
+                        (
+                            [("", y["insert_pos_left"], y["insert_pos_right"])]
+                            for _, y in x.iterrows()
+                        ),
+                    )
+                )
+                + 1
+            )
+            pos_overlap = pos_intersection / pos_union
+
+            insert_len = (x["insert_right"] - x["insert_left"]).mean()
+            gap_len = (x["insert_pos_right"] - x["insert_pos_left"]).mean()
+            main_isotype = x["insert_isotype"].mode()[0]
+            return pd.Series(
+                {
+                    "insert_overlap": insert_overlap,
+                    "insert_pos_overlap": pos_overlap,
+                    "insert_length": insert_len,
+                    "insert_gap_length": gap_len,
+                    "insert_pos_isotype": main_isotype,
+                }
+            )
+
+        insert_coords = pd.DataFrame(
+            inserts["insert_coords"].apply(decode_coords).tolist(),
+            columns=["chrom", "insert_left", "insert_right", "."],
+            index=inserts.index,
+        ).drop(["chrom", "."], axis=1)
+        insert_pos = pd.DataFrame(
+            inserts["insert_pos"].apply(decode_coords).tolist(),
+            columns=["chrom", "insert_pos_left", "insert_pos_right", "."],
+            index=inserts.index,
+        ).drop(["chrom", "."], axis=1)
+
+        inserts = pd.concat([inserts, insert_coords, insert_pos], axis=1)
+        inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
+
+        tmp = pd.concat([clustering, inserts], axis=1)
+        insert_frequency = (
+            tmp.groupby("cluster")["insert"]
+            .agg(lambda x: np.mean(~pd.isnull(x)))
+            .loc[clusters]
+        )
+        insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
+
+    else:
+
+        insert_stats = pd.DataFrame(
+            [],
+            columns=[
+                "insert_overlap",
+                "insert_pos_overlap",
+                "insert_length",
+                "insert_gap_length",
+                "insert_pos_isotype",
+            ],
+        )
+        insert_frequency = 0
+
     df = pd.DataFrame(
         {
             "size": csize,
@@ -115,9 +258,11 @@ def run(args):
             "length": cluster_length,
             "break_spread": break_spread,
             "mut_spread": mut_spread,
+            "insert_frequency": insert_frequency,
         },
         index=clusters,
     )
+    df = pd.concat([df, insert_stats], axis=1)
 
     switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, 1)
     for isotype in np.unique(switch_iis):

@@ -178,9 +178,13 @@ def run(args):
     if np.unique(np.vstack([i, j]), axis=1).shape[1] < len(i):
         raise Exception("indices appear multiple times!\n")
 
-    msa = scipy.sparse.coo_matrix(
+    msa = scipy.sparse.csr_matrix(
         (x, (i, j)), shape=(nreads, Ltot), dtype=np.int8
     )
+
+    use = msa.sum(1).A1 > 0
+    logger.info("removing {0} reads without coverage".format((~use).sum()))
+    msa = msa[use].tocoo()
 
     logger.info("saving msa to {0}".format(args.msa))
     scipy.sparse.save_npz(args.msa, msa)
@@ -205,4 +209,4 @@ def run(args):
         )
     )
 
-    read_info.to_csv(args.out)
+    read_info[use].to_csv(args.out)

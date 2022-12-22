@@ -85,6 +85,11 @@ def setup_argparse(parser):
         dest="top_receiver",
         help="""output file with top receiver sequences""",
     )
+    parser.add_argument(
+        "--use_clones",
+        dest="use_clones",
+        help="""comma-separated list of clones to use""",
+    )
 
 
 def run(args):
@@ -122,19 +127,25 @@ def run(args):
     nreads = gaps["read_idx"].max() + 1
 
     if args.clustering:
+        logger.info("reading clustering from " + args.clustering)
         clustering = pd.read_csv(args.clustering, header=0, index_col=0)
         clustering = clustering[~clustering["cluster"].isna()]
+        nreads = clustering.shape[0]
         stats = pd.read_csv(
-            args.clustering_stats, header=None, index_col=0
+            args.clustering_stats, header=0, index_col=0
         ).squeeze()
-        n_eff = stats["eff_nclusters"].astype(int)
-        clones = (
-            clustering["cluster"]
-            .dropna()
-            .astype(int)
-            .value_counts()
-            .index[:n_eff]
-        )
+        neff = stats["eff_nclusters"].astype(int)
+        if args.use_clones:
+            clones = list(map(int, args.use_clones.split(",")))
+        else:
+            clones = (
+                clustering["cluster"]
+                .dropna()
+                .astype(int)
+                .value_counts()
+                .index[:neff]
+            )
+        logger.info("using {0} clones".format(len(clones)))
         nc = clustering["cluster"].dropna().astype(int).value_counts()
         singletons = nc.index[nc == 1]
         w = 1.0 / nc.loc[clustering["cluster"].values]
@@ -189,11 +200,16 @@ def run(args):
         for k, b in enumerate(np.where(switch_iis == "SM")[0]):
             df[(isotype, k)] = bp_hist[switch_iis == isotype][:, b].sum()
     m = pd.Series(df).unstack(level=0)
-    stats["SM_downstream_bias"] = np.nanmean(
-        [
-            scipy.stats.entropy(m.loc[i], m.sum(0)) / np.log(m.shape[1])
-            for i in m.index
-        ]
+    stats["SM_downstream_bias"] = (
+        np.nansum(
+            [
+                m.loc[i].sum()
+                * scipy.stats.entropy(m.loc[i], m.sum(0))
+                / np.log(m.shape[1])
+                for i in m.index
+            ]
+        )
+        / m.sum().sum()
     )
 
     if args.homology:

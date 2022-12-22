@@ -120,7 +120,7 @@ def intersect_intervals(intervals1, intervals2, loj=False):
 
 
 def interval_length(intervals):
-    return sum(i[2] - i[1] for i in intervals)
+    return sum((max(i[2], i[1]) - min(i[2], i[1])) for i in intervals)
 
 
 def p_adjust_bh(p):

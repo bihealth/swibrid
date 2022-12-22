@@ -386,7 +386,7 @@ rule analyze_clustering:
   threads: 1
   resources:
     mem_mb=increase_mem,
-    time='04:00:00',
+    time='48:00:00',
     partition=get_partition
   conda:
     config['ENV']
@@ -471,7 +471,7 @@ rule collect:
     samples=','.join(config['SAMPLES']),
   threads: 1
   resources:
-    mem_mb=8000,
+    mem_mb=32000,
     time='04:00:00'
   conda:
     config['ENV']

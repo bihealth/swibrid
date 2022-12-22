@@ -36,13 +36,13 @@ def run(args):
         (
             sample,
             pd.read_csv(
-                "plots/" + sample + "_summary.csv", header=None, index_col=0
+                "stats/" + sample + "_summary.csv", header=None, index_col=0
             )
             .squeeze()
             .dropna(),
         )
         for sample in samples
-        if os.path.isfile("plots/" + sample + "_summary.csv")
+        if os.path.isfile("stats/" + sample + "_summary.csv")
     )
     dfs = dict((k, v[v.index.notnull()]) for k, v in dfs.items())
     df = pd.concat(dfs.values(), keys=dfs.keys(), axis=1)

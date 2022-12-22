@@ -93,9 +93,6 @@ def run(args):
     msa = scipy.sparse.load_npz(args.msa)
     logger.info("removing gaps > {0} from MSA".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
-    logger.info("adding mutations from {0}".format(args.mutations))
-    mutations = pd.read_csv(args.mutations, sep="\t", header=0)
-    mut = construct_mut_matrix(mutations, msa.shape[0], msa.shape[1])
 
     mm = scipy.sparse.csr_matrix(
         (1.0 / csize[cinv], (cinv, np.arange(len(cinv)))),
@@ -107,20 +104,45 @@ def run(args):
     cluster_length = avg_msa.sum(1)
     break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / cluster_length
 
-    logger.info("averaging mutations")
-    avg_mut = mm.dot(mut > 0)
-    mut_positions = (avg_mut > 0).sum(1).A1
-    tmp = avg_mut.copy()
-    tmp.data[(tmp.data <= 0.05) | (tmp.data >= 0.95)] = 0
-    tmp.eliminate_zeros()
-    mut_spread = np.sum(tmp > 0, 1).A1 / mut_positions
+    if args.mutations is not None:
+        logger.info("adding mutations from {0}".format(args.mutations))
+        mutations = pd.read_csv(args.mutations, sep="\t", header=0)
+        mut = construct_mut_matrix(mutations, msa.shape[0], msa.shape[1])
+        logger.info("averaging mutations")
+        avg_mut = mm.dot(mut > 0)
+        mut_positions = (avg_mut > 0).sum(1).A1
+        tmp = avg_mut.copy()
+        tmp.data[(tmp.data <= 0.05) | (tmp.data >= 0.95)] = 0
+        tmp.eliminate_zeros()
+        mut_spread = np.sum(tmp > 0, 1).A1 / mut_positions
+
+    else:
+        mut_spread = np.zeros(len(clusters))
+
+    logger.info("analyzing GC content")
+    GC = ((np.abs(msa) == 2).sum(1).A1 + (np.abs(msa) == 3).sum(1).A1) / (
+        msa != 0
+    ).sum(1).A1
+    cluster_GC = mm.dot(GC)
 
     try:
         inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
     except pd.errors.EmptyDataError:
         inserts = None
 
-    if inserts:
+    insert_stats = pd.DataFrame(
+        [],
+        columns=[
+            "insert_overlap",
+            "insert_pos_overlap",
+            "insert_length",
+            "insert_gap_length",
+            "insert_pos_isotype",
+        ],
+    )
+    insert_frequency = 0
+
+    if inserts is not None:
 
         logger.info("checking inserts")
 
@@ -158,11 +180,12 @@ def run(args):
         def aggregate_inserts(x):
             import functools
 
+            insert_coords = x[["insert_left", "insert_right"]].drop_duplicates()
             insert_union = interval_length(
                 merge_intervals(
                     [
                         ("", y["insert_left"], y["insert_right"])
-                        for _, y in x.iterrows()
+                        for _, y in insert_coords.iterrows()
                     ]
                 )
             )
@@ -171,18 +194,21 @@ def run(args):
                     intersect_intervals,
                     (
                         [("", y["insert_left"], y["insert_right"])]
-                        for _, y in x.iterrows()
+                        for _, y in insert_coords.iterrows()
                     ),
                 )
             )
             insert_overlap = insert_intersection / insert_union
 
+            insert_pos = x[
+                ["insert_pos_left", "insert_pos_right"]
+            ].drop_duplicates()
             pos_union = (
                 interval_length(
                     merge_intervals(
                         [
                             ("", y["insert_pos_left"], y["insert_pos_right"])
-                            for _, y in x.iterrows()
+                            for _, y in insert_pos.iterrows()
                         ]
                     )
                 )
@@ -194,7 +220,7 @@ def run(args):
                         intersect_intervals,
                         (
                             [("", y["insert_pos_left"], y["insert_pos_right"])]
-                            for _, y in x.iterrows()
+                            for _, y in insert_pos.iterrows()
                         ),
                     )
                 )
@@ -225,6 +251,10 @@ def run(args):
             columns=["chrom", "insert_pos_left", "insert_pos_right", "."],
             index=inserts.index,
         ).drop(["chrom", "."], axis=1)
+        (
+            insert_pos["insert_pos_left"],
+            insert_pos["insert_pos_right"],
+        ) = insert_pos.min(axis=1) - 1, insert_pos.max(axis=1)
 
         inserts = pd.concat([inserts, insert_coords, insert_pos], axis=1)
         inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
@@ -235,27 +265,17 @@ def run(args):
             .agg(lambda x: np.mean(~pd.isnull(x)))
             .loc[clusters]
         )
-        insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
-
-    else:
-
-        insert_stats = pd.DataFrame(
-            [],
-            columns=[
-                "insert_overlap",
-                "insert_pos_overlap",
-                "insert_length",
-                "insert_gap_length",
-                "insert_pos_isotype",
-            ],
-        )
-        insert_frequency = 0
+        if tmp.dropna().shape[0] > 0:
+            insert_stats = (
+                tmp.dropna().groupby("cluster").apply(aggregate_inserts)
+            )
 
     df = pd.DataFrame(
         {
             "size": csize,
             "isotype": avg_isotype,
             "length": cluster_length,
+            "GC": cluster_GC,
             "break_spread": break_spread,
             "mut_spread": mut_spread,
             "insert_frequency": insert_frequency,

@@ -52,16 +52,18 @@ def run_pipeline(args, snake_options):
 
     Path("logs").mkdir(exist_ok=True)
     config = YAML(typ="safe").load(open(args.config))
-    s_command = """export SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile} --configfile {cfile} -j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10 --use-conda --conda-prefix {conda}""".format(
-        sfile=snakefile, cfile=args.config, conda=config["CONDA"]
+    s_command = """export SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile} --configfile {cfile} {snakemake_options}""".format(
+        sfile=snakefile, cfile=args.config, snakemake_options=config["SNAKEOPTS"]
     )
     s_command += " " + " ".join(snake_options)
     if args.slurm:
-        s_command = """#!/bin/bash\n""" + s_command + " --profile=cubi-v1\n"
+        s_command = """#!/bin/bash\n""" + s_command + " --profile=cubi-dev\n"
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "sbatch -t 168:00:00 --mem=4G -n 1 -p medium run_pipeline.sh"
+        command = "sbatch -t 168:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
+            queue=args.queue
+        )
     else:
         command = s_command
     # run
@@ -177,6 +179,12 @@ def main(argv=None):
         dest="slurm",
         action="store_true",
         help="submit to slurm",
+    )
+    pipeline_parser.add_argument(
+        "--queue",
+        dest="queue",
+        default="medium",
+        help="slurm queue [medium]",
     )
     pipeline_parser.add_argument(
         "snake_options",

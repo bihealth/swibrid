@@ -1,5 +1,5 @@
 ENV: "swibrid"
-CONDA: "$HOME/miniconda/envs"
+SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10 --use-conda --conda-prefix ${HOME}/miniconda/envs"
 STUDY: "test_study"
 INPUT: ""
 SAMPLE_SHEET: ""

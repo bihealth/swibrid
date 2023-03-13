@@ -129,7 +129,7 @@ def run(args):
     logger.info("removing gaps > {0} from MSA".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
     logger.info("averaging cleaned MSA")
-    avg_msa = mm.dot(np.abs(msa_cleaned))
+    avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
     break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
 
     if args.mutations is not None:

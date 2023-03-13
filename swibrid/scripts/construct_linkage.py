@@ -110,10 +110,11 @@ def run(args):
         import sparsecluster
 
         logger.info(
-            "running sparsecluster hierarchical clustering of with {0} metric and {1} method for {2} nearest neighbors".format(
+            "running sparsecluster hierarchical clustering of {3} reads with {0} metric and {1} method for {2} nearest neighbors".format(
                 args.metric,
                 args.method,
                 args.n_neighbors,
+                msa_cleaned.shape[0]
             )
         )
         Z = sparsecluster.linkage(msa_cleaned, 
@@ -128,9 +129,10 @@ def run(args):
         import fastcluster
 
         logger.info(
-            "running fastcluster hierarchical clustering of with {0} metric and {1} method".format(
+            "running fastcluster hierarchical clustering of {2} reads with {0} metric and {1} method".format(
                 args.metric,
-                args.method
+                args.method,
+                msa_cleaned.shape[0]
             )
         )
         Z = fastcluster.linkage(msa_cleaned, metric=args.metric, method=args.method)

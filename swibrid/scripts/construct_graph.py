@@ -62,63 +62,51 @@ def setup_argparse(parser):
         help="""switch to graph-based clustering if more than nmax_full reads [50000]""",
     )
     parser.add_argument(
+        "--n_spike",
+        dest="n_spike",
+        type=int,
+        default=0,
+        help="""compute full distances for these points in addition to the nearest neighbors [0]"""
+    )
+    parser.add_argument(
         "--nmax", dest="nmax", type=int, help="""use only nmax reads"""
     )
 
 
-def get_sparse_matrix_from_knn(knn_indices, knn_dists, min_dist=1.0e-10):
-
-    import numpy as np
-    import scipy.sparse
-
-    nnodes, nneighbors = knn_indices.shape
-    ii = np.repeat(np.arange(nnodes), nneighbors)
-    jj = knn_indices.flatten("C")
-    xx = knn_dists.flatten("C")
-    ii, jj = np.minimum(ii, jj), np.maximum(ii, jj)
-    # take unique non-diagonal non-negative elements
-    take = np.intersect1d(
-        np.unique(np.vstack([ii, jj]).T, axis=0, return_index=True)[1],
-        np.where((ii < jj) & (ii >= 0))[0],
-    )
-    # make symmetric
-    ii, jj = np.concatenate([ii[take], jj[take]]), np.concatenate(
-        [jj[take], ii[take]]
-    )
-    xx = np.maximum(np.concatenate([xx[take], xx[take]]), min_dist)
-
-    result = scipy.sparse.coo_matrix((xx, (ii, jj)), shape=(nnodes, nnodes))
-    # result.eliminate_zeros()
-    return result.tocsr()
-
-
 def get_adjacency_graph(
-    xx,
+    X,
     n_neighbors=10,
     random_state=0,
     metric="jaccard",
-    angular=False,
-    n_jobs=-1,
-    return_matrix=False,
-):
+    n_jobs=-1
+    ):
 
-    from umap.umap_ import nearest_neighbors
+    # taken and modified from umap.umap_.nearest_neighbors
 
-    knn_indices, knn_dists, forest = nearest_neighbors(
-        xx,
-        n_neighbors,
-        random_state=random_state,
+    from pynndescent import NNDescent
+    import numpy as np
+
+    # TODO: Hacked values for now
+    n_trees = min(64, 5 + int(round((X.shape[0]) ** 0.5 / 20.0)))
+    n_iters = max(5, int(round(np.log2(X.shape[0]))))
+
+    knn_search_index = NNDescent(
+        X,
+        n_neighbors=n_neighbors,
         metric=metric,
         metric_kwds={},
-        angular=angular,
+        random_state=random_state,
+        n_trees=n_trees,
+        n_iters=n_iters,
+        max_candidates=60,
+        low_memory=True,
         n_jobs=n_jobs,
         verbose=False,
+        compressed=False,
     )
+    knn_indices, knn_dists = knn_search_index.neighbor_graph
 
-    if return_matrix:
-        return get_sparse_matrix_from_knn(knn_indices, knn_dists)
-    else:
-        return knn_indices, knn_dists
+    return knn_indices, knn_dists
 
 
 def run(args):
@@ -129,7 +117,7 @@ def run(args):
     import scipy.sparse
     import scipy.spatial
     from logzero import logger
-    from .helpers import remove_gaps
+    from .utils import remove_gaps
 
     if not os.path.isfile(args.msa):
         logger.warn(
@@ -169,8 +157,25 @@ def run(args):
             n_neighbors=args.n_neighbors,
             n_jobs=args.n_threads,
             metric=args.metric,
-            return_matrix=False,
         )
+
+        if args.n_spike > 0:
+
+            logger.info(
+                "computing full distance matrix for {0} additional reads".format(args.n_spike)
+                )
+
+            ii = np.random.choice(msa_cleaned.shape[0], args.n_spike)
+            n = len(ii)
+            dd = scipy.spatial.distance.pdist(msa_cleaned[ii], metric=args.metric)
+            sinds = -1 * np.ones((msa_cleaned.shape[0],n)).astype(int)
+            sinds[ii] = np.tile(ii, n).reshape(n, n)
+            sdists = np.zeros((msa_cleaned.shape[0], n))
+            sdists[ii] = scipy.spatial.distance.squareform(dd)
+            
+            knn_inds = np.hstack([knn_inds, sinds])
+            knn_dists = np.hstack([knn_dists, sdists])
+
         logger.info("saving nearest neighbor graph to {0}".format(args.graph))
         np.savez(args.graph, knn_inds=knn_inds, knn_dists=knn_dists)
     else:

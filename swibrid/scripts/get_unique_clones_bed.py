@@ -21,7 +21,7 @@ def run(args):
     import sys
     from logzero import logger
     import pandas as pd
-    from .helpers import get_eff_nclust
+    from .utils import get_eff_nclust
 
     logger.info("reading clustering from " + args.clustering)
     clustering = pd.read_csv(args.clustering, header=0)

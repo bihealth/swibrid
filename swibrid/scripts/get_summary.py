@@ -67,6 +67,12 @@ def setup_argparse(parser):
         dest="use_clones",
         help="""comma-separated list of clones to use""",
     )
+    parser.add_argument(
+        "--use_weights",
+        dest="use_weights",
+        default='inverse',
+        help="""use different cluster weights ("inverse" | "uniform" | "adjusted") [inverse]"""
+    )
 
 
 def run(args):
@@ -84,7 +90,7 @@ def run(args):
 
     from logzero import logger
 
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         get_switch_coverage,
         decode_coords,
@@ -92,6 +98,7 @@ def run(args):
         merge_intervals,
         shift_coord,
         calculate_gini,
+        weighted_avg_and_std,
         ncodes,
         f2,
     )
@@ -121,17 +128,15 @@ def run(args):
         .squeeze()
         .rename({"nreads": "mapped"})
     )
-    logger.info("reading clustering stats")
-    stats["cluster"] = pd.read_csv(
-        args.cluster_stats, index_col=0, header=0
-    ).squeeze()
-    stats = pd.concat(stats.values(), axis=0)
-
-    logger.info("reading clustering")
+    logger.info("reading clustering, clustering stats, clustering analysis")
     clustering = pd.read_csv(args.clustering, index_col=0, header=0)
     clustering_analysis = pd.read_csv(
         args.clustering_analysis, index_col=0, header=0
     )
+    stats["cluster"] = pd.read_csv(
+        args.cluster_stats, index_col=0, header=0
+    ).squeeze()
+    stats = pd.concat(stats.values(), axis=0)
 
     neff = stats["eff_nclusters"].astype(int)
     if args.use_clones:
@@ -142,21 +147,32 @@ def run(args):
         ]
     logger.info("using {0} clones".format(len(clones)))
 
+    if args.use_weights == 'inverse':
+        logger.info('using inverse weights')
+        w = np.ones(len(clones))
+    elif args.use_weights == 'uniform':
+        logger.info('using uniform weights')
+        w = clustering_analysis.loc[clones, 'size']
+    elif args.use_weights == 'adjusted':
+        logger.info('using adjusted weights')
+        w = clustering_analysis.loc[clones, 'adj_size']
+
     stats["nclusters_used"] = len(clones)
     stats["clustered"] = sum(~clustering["cluster"].isna())
-    stats["mean_length"] = clustering_analysis.loc[clones, "length"].mean()
-    stats["std_length"] = clustering_analysis.loc[clones, "length"].std()
-    stats["mean_GC"] = clustering_analysis.loc[clones, "GC"].mean()
-    stats["std_GC"] = clustering_analysis.loc[clones, "GC"].std()
+    stats["mean_length"], stats["std_length"] = weighted_avg_and_std (clustering_analysis.loc[clones, "length"], w)
+    stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std (clustering_analysis.loc[clones, "GC"], w)
     stats["mean_cluster_size"] = clustering_analysis.loc[clones, "size"].mean()
-    stats["median_cluster_size"] = clustering_analysis.loc[clones, "size"].median()
     stats["std_cluster_size"] = clustering_analysis.loc[clones, "size"].std()
+    stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
+    stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
+
     stats["cluster_gini"] = calculate_gini(
-        clustering["cluster"][clustering["cluster"].isin(clones)]
+        clustering["cluster"][clustering["cluster"].isin(clones)],
     )
     stats["cluster_entropy"] = scipy.stats.entropy(
         clustering_analysis.loc[clones, "size"]
     ) / np.log(len(clones))
+    stats["cluster_inverse_simpson"] = 1. / ((clustering_analysis.loc[clones, "size"] / clustering_analysis.loc[clones, "size"].sum())**2).sum()
 
     stats["PCR_length_bias"] = scipy.stats.linregress(
         clustering_analysis.loc[clones, "length"],
@@ -305,7 +321,7 @@ def run(args):
             alt.append(np.argmax(c))
             padj.append(row["padj_clust"])
 
-        mm = pd.crosstab(ref, alt).values
+        mm = pd.crosstab(ref,alt).reindex(index=range(4),columns=range(4)).fillna(0).astype(int).values
 
         mut_stats = pd.Series(
             {
@@ -441,6 +457,12 @@ def run(args):
             bins=np.geomspace(1, stats["clustered"], 50),
             histtype="stepfilled",
             label="top 95%",
+        )
+        ax.hist(
+            clustering_analysis["adj_size"].dropna(), 
+            bins=np.geomspace(1, stats["clustered"], 50),
+            histtype="stepfilled",
+            label="adjusted",
         )
         ax.set_yscale("log")
         ax.set_xscale("log")

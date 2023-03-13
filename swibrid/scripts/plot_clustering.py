@@ -82,6 +82,19 @@ def setup_argparse(parser):
         help="""width of figure in inches [8]""",
     )
     parser.add_argument(
+        "--linkage_border",
+        dest="linkage_border",
+        type=float,
+        default=.1,
+        help="""fraction of figure used for dendrogram [.1]""",
+    )
+    parser.add_argument(
+        "--cutoff_color",
+        dest="cutoff_color",
+        default='r',
+        help="""color of dendrogram cutoff line [r]"""
+    )
+    parser.add_argument(
         "--mutations",
         dest="mutations",
         help="""file with mutation info (from find_mutations.py)""",
@@ -105,6 +118,17 @@ def setup_argparse(parser):
         type=int,
         help="""plot image in chunks of reads of this size [5000]""",
     )
+    parser.add_argument(
+        "--plot_circles",
+        dest="plot_circles",
+        help="""plot another graph displaying circular packing of clusters"""
+    )
+    parser.add_argument(
+        "--cmax",
+        dest="cmax",
+        type=float,
+        help="""maximum height in dendrogram plot""",
+    )
 
 
 def fit_cutoff(cc, nn, method="fit"):
@@ -112,7 +136,7 @@ def fit_cutoff(cc, nn, method="fit"):
     import scipy
     import pandas as pd
     import numpy as np
-    from .helpers import res2
+    from .utils import res2
 
     cc = np.asarray(cc)
     nn = np.asarray(nn)
@@ -262,7 +286,7 @@ def run(args):
     from matplotlib import pyplot as plt
     from matplotlib.collections import LineCollection
     from logzero import logger
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         intersect_intervals,
@@ -431,7 +455,7 @@ def run(args):
 
     bottom = 0.2 / figsize[1]
     height = args.fig_height / figsize[1]
-    linkage_border = 0.1 if args.linkage else 0.01
+    linkage_border = args.linkage_border if args.linkage else 0.01
     insert_border = 0.2 if args.show_inserts else 0.01
     left = linkage_border
     width = 1 - linkage_border - insert_border
@@ -456,22 +480,25 @@ def run(args):
             )
 
             if cutoff:
-                ax.axvline(cutoff, color="r", lw=0.5)
+                ax.axvline(cutoff, color=args.cutoff_color, lw=0.5)
 
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             ax.spines["left"].set_visible(False)
             ax.spines["bottom"].set_visible(False)
-            ax.set_xlim([Z[:, 2].max(), 1 / nreads])
-            ax.set_xscale(
-                "function", functions=(lambda x: x ** (1 / 2), lambda x: x**2)
-            )
+            if args.cmax is None:
+                ax.set_xlim([Z[:, 2].max(), 0])
+                ax.set_xscale(
+                    "function", functions=(lambda x: x ** (1 / 2), lambda x: x**2)
+                )
+            else:
+                ax.set_xlim([args.cmax, 0])
             ax.set_ylim(ax.get_ylim()[::-1])
             ax.set_xticks([])
             ax.set_yticks([])
-        order = L["leaves"]
-        if len(order) != nreads:
-            raise Exception("linkage does not fit to clustering and/or msa!")
+            order = L["leaves"]
+            if len(order) != nreads:
+                raise Exception("linkage does not fit to clustering and/or msa!")
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
@@ -710,5 +737,41 @@ def run(args):
         fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
 
     if args.figure is not None:
-        logger.info("saving figure to {0}\n".format(args.figure))
+        logger.info("saving figure to {0}".format(args.figure))
         fig.savefig(args.figure, dpi=args.dpi)
+
+    if args.plot_circles is not None:
+
+        if not args.color_by == 'cluster':
+            logger.error("can't create bubble chart when not coloring by cluster!")
+        logger.info("creating bubble chart")
+
+        if nclust < 500:
+            import circlify
+            circles = circlify.circlify(
+                clustering["cluster"].value_counts().tolist(), 
+                show_enclosure=False, 
+                target_enclosure=circlify.Circle(x=0, y=0, r=1)
+            )
+        else:
+            import packcircles
+            circles = packcircles.pack(np.sqrt(clustering["cluster"].value_counts())[::-1].tolist())
+
+        figsize = (args.fig_height + 0.5, args.fig_height + 0.5)
+        fig = plt.figure(figsize=figsize)
+        fig.clf()
+
+        ax = fig.add_axes([bottom, bottom, width, width])
+        ax.axis('off')
+
+        lim=0
+        for n, (x, y, r) in enumerate(circles):
+            ax.add_patch(plt.Circle((x, y), r, facecolor=cmap(nclust - n - 1), edgecolor='k', linewidth=.25, clip_on=False))
+            m = max(abs(x) + r, abs(y) + r)
+            if m > lim:
+                lim = m
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+            
+        logger.info("saving bubble chart to " + args.plot_circles)
+        fig.savefig(args.plot_circles, dpi=args.dpi)

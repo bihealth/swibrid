@@ -23,6 +23,11 @@ def setup_argparse(parser):
         help="""find_clusters.py output file""",
     )
     parser.add_argument(
+        "--clustering_stats",
+        dest="clustering_stats",
+        help="""file with clustering stats""",
+    )
+    parser.add_argument(
         "--mutations",
         dest="mutations",
         help="""file with mutation info (from find_mutations.py)""",
@@ -41,6 +46,12 @@ def setup_argparse(parser):
     parser.add_argument(
         "--inserts", dest="inserts", help="""results.tsv file with inserts"""
     )
+    parser.add_argument(
+        "--adjust_size", 
+        dest="adjust_size",
+        action="store_true",
+        help="""calculate cluster size adjusted for fragment length and QC content"""
+    )
 
 
 def run(args):
@@ -52,7 +63,7 @@ def run(args):
 
     from logzero import logger
 
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         get_switch_coverage,
         read_switch_anno,
@@ -63,6 +74,7 @@ def run(args):
         interval_length,
         merge_intervals,
         intersect_intervals,
+        ncodes
     )
 
     (
@@ -81,6 +93,11 @@ def run(args):
     clusters, cinv, csize = np.unique(
         clustering["cluster"].dropna(), return_inverse=True, return_counts=True
     )
+    mm = scipy.sparse.csr_matrix(
+        (1.0 / csize[cinv], (cinv, np.arange(len(cinv)))),
+        shape=(len(clusters), len(cinv)),
+    )
+
     avg_isotype = (
         clustering.groupby("cluster")["isotype"]
         .agg(lambda x: pd.Series.mode(x)[0])
@@ -89,20 +106,31 @@ def run(args):
 
     logger.info("loading gaps from " + args.gaps)
     gaps = np.load(args.gaps)
+
     logger.info("loading MSA from " + args.msa)
     msa = scipy.sparse.load_npz(args.msa)
+
+    logger.info("getting cluster consensus sequences")
+
+    nogap = mm.dot(msa!=0)
+    means = dict((n,mm.dot(msa == c)) for n,c in ncodes.items())
+
+    cluster_seq = []
+    cluster_length = []
+    cluster_GC = []
+    for n, clust in enumerate(clusters):
+        pos = np.where(nogap[n].todense().A1 > .5)[0]
+        cons = np.vstack([means[c][n,pos].todense() for c in 'acgtACGT']).argmax(0).A1
+        seq = ''.join('acgtACGT'[c] for c in cons)
+        cluster_seq.append(seq)
+        cluster_length.append(len(seq))
+        cluster_GC.append((seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq))
+
     logger.info("removing gaps > {0} from MSA".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
-
-    mm = scipy.sparse.csr_matrix(
-        (1.0 / csize[cinv], (cinv, np.arange(len(cinv)))),
-        shape=(len(clusters), len(cinv)),
-    )
-
-    logger.info("averaging MSA")
+    logger.info("averaging cleaned MSA")
     avg_msa = mm.dot(np.abs(msa_cleaned))
-    cluster_length = avg_msa.sum(1)
-    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / cluster_length
+    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
 
     if args.mutations is not None:
         logger.info("adding mutations from {0}".format(args.mutations))
@@ -118,12 +146,6 @@ def run(args):
 
     else:
         mut_spread = np.zeros(len(clusters))
-
-    logger.info("analyzing GC content")
-    GC = ((np.abs(msa) == 2).sum(1).A1 + (np.abs(msa) == 3).sum(1).A1) / (
-        msa != 0
-    ).sum(1).A1
-    cluster_GC = mm.dot(GC)
 
     try:
         inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
@@ -274,6 +296,7 @@ def run(args):
         {
             "size": csize,
             "isotype": avg_isotype,
+            "sequence": cluster_seq,
             "length": cluster_length,
             "GC": cluster_GC,
             "break_spread": break_spread,
@@ -287,6 +310,33 @@ def run(args):
     switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, 1)
     for isotype in np.unique(switch_iis):
         df["length_" + isotype] = avg_msa[:, switch_iis == isotype].sum(1)
+
+    if args.adjust_size:
+        logger.info("calculating adjusted cluster size")
+        from sklearn import linear_model
+        stats = pd.read_csv(
+            args.clustering_stats, header=0, index_col=0
+        ).squeeze()
+        neff = stats["eff_nclusters"].astype(int)
+        clones = (
+            clustering["cluster"]
+            .dropna()
+            .astype(int)
+            .value_counts()
+            .index[:neff]
+        )
+
+        X = df.loc[clones][['length','GC']].values
+        y = df.loc[clones]['size'].values
+        lr = linear_model.LinearRegression()
+        lr.fit(X, np.log(y))
+
+        tmp = y / np.exp(np.dot(X,lr.coef_))
+        df.loc[clones,'adj_size'] = y.sum() * tmp / tmp.sum()
+    
+    else:
+
+        df['adj_size'] = df['size']
 
     logger.info("saving results to " + args.output)
     df.to_csv(args.output)

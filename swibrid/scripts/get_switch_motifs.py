@@ -42,7 +42,7 @@ def run(args):
     import pysam
     import numpy as np
     import re
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         get_switch_coverage,

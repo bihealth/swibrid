@@ -51,7 +51,7 @@ def run(args):
     from collections import defaultdict
     from Bio import SeqIO
     from logzero import logger
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         intersect_intervals,
         decode_coords,

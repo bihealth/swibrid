@@ -9,7 +9,7 @@ from logzero import logger, loglevel
 from pathlib import Path
 from ruamel.yaml import YAML
 
-from .utils import (
+from .scripts import (
     demultiplex,
     filter_reads,
     process_last_output,
@@ -52,7 +52,7 @@ def run_pipeline(args, snake_options):
 
     Path("logs").mkdir(exist_ok=True)
     config = YAML(typ="safe").load(open(args.config))
-    s_command = """export SBATCH_DEFAULTS=" --output=logs/%x-%j.log"\nsnakemake --snakefile {sfile} --configfile {cfile} {snakemake_options}""".format(
+    s_command = """snakemake --snakefile {sfile} --configfile {cfile} {snakemake_options}""".format(
         sfile=snakefile, cfile=args.config, snakemake_options=config["SNAKEOPTS"]
     )
     s_command += " " + " ".join(snake_options)

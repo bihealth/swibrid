@@ -16,7 +16,7 @@ def run(args):
     import numpy as np
     import scipy.sparse
     from logzero import logger
-    from .helpers import get_gap_positions
+    from .utils import get_gap_positions
 
     if not os.path.isfile(args.msa):
         logger.warn(

@@ -234,7 +234,7 @@ def run(args):
     from Bio import SeqIO, Seq, SeqRecord
     import gzip
     from logzero import logger
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         intersect_intervals,

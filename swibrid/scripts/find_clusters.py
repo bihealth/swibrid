@@ -67,7 +67,7 @@ def fit_cutoff(cc, nn, method="fit"):
     nmin = np.min(nn)
     nmax = np.max(nn)
     if method == "fit":
-        from .helpers import res2
+        from .utils import res2
 
         p0 = [nmax, 0, nmin, np.log(nmax / nmin) / (cmax - cmin)]
         opt2 = scipy.optimize.least_squares(
@@ -102,7 +102,7 @@ def run(args):
     import scipy.cluster.hierarchy
     import scipy.optimize
     from logzero import logger
-    from .helpers import get_eff_nclust
+    from .utils import get_eff_nclust
 
     cutoffs = np.linspace(args.cmin, args.cmax, args.nc)
     logger.info("loading linkage from {0}".format(args.linkage))

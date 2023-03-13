@@ -50,7 +50,7 @@ def run(args):
     import scipy.sparse
     from logzero import logger
     import gzip
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         get_switch_coverage,

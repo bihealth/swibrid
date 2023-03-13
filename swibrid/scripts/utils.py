@@ -345,9 +345,10 @@ def vrange(starts, stops):
     return np.repeat(stops - ll.cumsum(), ll) + np.arange(ll.sum())
 
 
-def remove_gaps(msa, gaps=None, max_gap=75):
+def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
 
     import numpy as np
+    import scipy.sparse
 
     if gaps is None:
         read_idx, pos_left, pos_right, gap_sizes = get_gap_positions(msa)
@@ -360,20 +361,24 @@ def remove_gaps(msa, gaps=None, max_gap=75):
     gaps_to_remove = gap_sizes[remove]
     read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
     pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
-    msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
-    msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
-    vals_replace = np.repeat(
-        np.max(
-            np.array(
-                [
-                    msa_cleaned[(read_idx, pos_left - 1)],
-                    msa_cleaned[(read_idx, pos_right)],
-                ]
-            ),
-            0,
-        )[remove],
-        gaps_to_remove,
-    )
+
+    if return_sparse:
+        msa_cleaned = scipy.sparse.csr_matrix((np.sign(msa.data), (msa.row, msa.col)), 
+                                          shape=msa.shape, dtype=np.int8)
+        vals_replace = np.repeat(
+            np.max(np.array([msa_cleaned[(read_idx, pos_left - 1)].A1,
+                             msa_cleaned[(read_idx, pos_right)].A1]),
+                   0,)[remove],
+            gaps_to_remove)   
+    else:
+        msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
+        msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
+        vals_replace = np.repeat(
+            np.max(np.array([msa_cleaned[(read_idx, pos_left - 1)],
+                             msa_cleaned[(read_idx, pos_right)]]),
+                   0,)[remove],
+            gaps_to_remove)
+
     msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
     return msa_cleaned
 
@@ -444,12 +449,36 @@ def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
     return np.concatenate(switch_iis)
 
 
-def calculate_gini(x):
+def calculate_gini(x, w=None):
     """calculate Gini coefficient of array x; see https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python"""
     import numpy as np
 
     x = np.asarray(x)
-    sorted_x = np.sort(x)
-    n = len(x)
-    cumx = np.cumsum(sorted_x, dtype=float)
-    return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n
+    if w is not None:
+        w = np.asarray(w)
+        sorted_indices = np.argsort(x)
+        sorted_x = x[sorted_indices]
+        sorted_w = w[sorted_indices]
+        # Force float dtype to avoid overflows
+        cumw = np.cumsum(sorted_w, dtype=float)
+        cumxw = np.cumsum(sorted_x * sorted_w, dtype=float)
+        return (np.sum(cumxw[1:] * cumw[:-1] - cumxw[:-1] * cumw[1:]) / 
+                (cumxw[-1] * cumw[-1]))
+    else:
+        sorted_x = np.sort(x)
+        n = len(x)
+        cumx = np.cumsum(sorted_x, dtype=float)
+        return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n
+
+def weighted_avg_and_std(values, weights):
+    """
+    Return the weighted average and standard deviation.
+
+    values, weights -- Numpy ndarrays with the same shape.
+    taken from https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
+    """
+    average = np.average(values, weights=weights)
+    # Fast and numerically precise:
+    variance = np.average((values-average)**2, weights=weights)
+    return (average, np.sqrt(variance))
+

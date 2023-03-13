@@ -147,7 +147,7 @@ def run(args):
     import pysam
     from Bio import SeqIO, Seq, SeqRecord
     from logzero import logger
-    from .helpers import parse_LAST_pars
+    from .utils import parse_LAST_pars
 
     np.random.seed(args.seed)
 

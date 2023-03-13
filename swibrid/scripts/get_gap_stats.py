@@ -22,6 +22,12 @@ def setup_argparse(parser):
         help="""file with clustering stats""",
     )
     parser.add_argument(
+        "-a",
+        "--clustering_analysis",
+        dest="clustering_analysis",
+        help="""file with clustering analysis""",
+    )
+    parser.add_argument(
         "-b",
         "--binsize",
         dest="binsize",
@@ -88,7 +94,13 @@ def setup_argparse(parser):
     parser.add_argument(
         "--use_clones",
         dest="use_clones",
-        help="""comma-separated list of clones to use""",
+        help="""comma-separated list of clones to use or 'all' (default: top 95% of clusters excluding singletons)""",
+    )
+    parser.add_argument(
+        "--use_weights",
+        dest="use_weights",
+        default='inverse',
+        help="""use different cluster weights ("inverse" | "uniform" | "adjusted") [inverse]"""
     )
 
 
@@ -101,7 +113,7 @@ def run(args):
     import pysam
     import re
     from logzero import logger
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         get_switch_coverage,
@@ -131,12 +143,20 @@ def run(args):
         clustering = pd.read_csv(args.clustering, header=0, index_col=0)
         clustering = clustering[~clustering["cluster"].isna()]
         nreads = clustering.shape[0]
+        logger.info("reading clustering stats from " + args.clustering_stats)
         stats = pd.read_csv(
             args.clustering_stats, header=0, index_col=0
         ).squeeze()
+        logger.info("reading clustering analysis from " + args.clustering_analysis)
+        analysis = pd.read_csv(
+            args.clustering_analysis, header=0, index_col=0
+        )
         neff = stats["eff_nclusters"].astype(int)
         if args.use_clones:
-            clones = list(map(int, args.use_clones.split(",")))
+            if args.use_clones == "all":
+                clones = clustering['cluster'].astype(int).unique()
+            else:
+                clones = list(map(int, args.use_clones.split(",")))
         else:
             clones = (
                 clustering["cluster"]
@@ -148,7 +168,15 @@ def run(args):
         logger.info("using {0} clones".format(len(clones)))
         nc = clustering["cluster"].dropna().astype(int).value_counts()
         singletons = nc.index[nc == 1]
-        w = 1.0 / nc.loc[clustering["cluster"].values]
+        if args.use_weights == 'inverse':
+            logger.info('using inverse weights')
+            w = 1.0 / nc.loc[clustering["cluster"].values]
+        elif args.use_weights == 'uniform':
+            logger.info('using uniform weights')
+            w = pd.Series(1, index=np.arange(nreads))
+        elif args.use_weights == 'adjusted':
+            logger.info('using adjusted weights')
+            w = analysis.loc[clustering['cluster'].values,'adj_size'] / analysis.loc[clustering['cluster'].values,'size']
         w[~w.index.isin(clones) | w.index.isin(singletons)] = 0
         weights = pd.Series(w.values / w.sum(), index=np.arange(nreads))
     else:

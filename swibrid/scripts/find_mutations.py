@@ -68,7 +68,7 @@ def run(args):
     import scipy.stats
     import pysam
     from logzero import logger
-    from .helpers import (
+    from .utils import (
         parse_switch_coords,
         read_switch_anno,
         get_switch_coverage,

@@ -3,9 +3,7 @@
 
 def setup_argparse(parser):
 
-    parser.add_argument(
-        "--raw_reads", dest="raw_reads", help="""fasta file with minION reads"""
-    )
+    parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with minION reads""")
     parser.add_argument(
         "--processed_reads",
         dest="processed_reads",
@@ -72,9 +70,7 @@ def run(args):
     annotation = defaultdict(list)
     for line in open(args.annotation):
         ls = line.strip("\n").split("\t")
-        annotation[ls[0]].append(
-            (ls[0], int(ls[1]), int(ls[2])) + tuple(ls[3:])
-        )
+        annotation[ls[0]].append((ls[0], int(ls[1]), int(ls[2])) + tuple(ls[3:]))
 
     logger.info("reading filtered read matches from " + args.processed_reads)
     logger.info("writing coordinates for selected reads to " + args.bed)
@@ -132,18 +128,12 @@ def run(args):
             ):
                 insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
             if len(insert_anno) == 0 or insert_anno == set("."):
-                insert_anno = "{0}:{1}-{2}".format(
-                    insert_chrom, insert_start, insert_end
-                )
+                insert_anno = "{0}:{1}-{2}".format(insert_chrom, insert_start, insert_end)
             else:
                 insert_anno = "|".join(insert_anno)
 
             bed_str = "{0}\t{1}\t{2}\t{3}\t0\t.\t{1}\t{2}\t0,0,0\t1\t{4},\t0,\n"
-            bed.write(
-                bed_str.format(
-                    insert_chrom, insert_start, insert_end, read, insert_len
-                )
-            )
+            bed.write(bed_str.format(insert_chrom, insert_start, insert_end, read, insert_len))
 
             cstart = int(insert.group("switch_left")) - 1
             cend = int(insert.group("switch_right")) + 1
@@ -153,29 +143,18 @@ def run(args):
             seq = str(raw_reads[read].seq)
             istart = int(insert.group("istart"))
             iend = int(insert.group("iend"))
-            seq = (
-                seq[:istart].lower()
-                + seq[istart:iend].upper()
-                + seq[iend:].lower()
-            )
+            seq = seq[:istart].lower() + seq[istart:iend].upper() + seq[iend:].lower()
             out_table[read] = dict(
                 read=read,
                 isotype=isotype,
-                switch_coords="{0}:{1}-{2}".format(
-                    switch_chrom, tstart + 1, tend
-                ),
+                switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
                 insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
-                insert_coords="{0}:{1}-{2}".format(
-                    insert_chrom, insert_start + 1, insert_end
-                ),
+                insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
                 insert_anno=insert_anno,
                 sequence=seq,
             )
 
-            if (
-                args.interrupt_for_read is not None
-                and read in args.interrupt_for_read.split(",")
-            ):
+            if args.interrupt_for_read is not None and read in args.interrupt_for_read.split(","):
                 return raw_reads[read].seq, ls
 
     bed.close()

@@ -144,28 +144,16 @@ def parse_maf(maf_input, min_gap=50):
 
             new_ref_gaps = ref.seq[pos : m.start()].count("-")
             ref_start = ref.annotations["start"] + pos - num_ref_gaps
-            ref_end = (
-                ref.annotations["start"]
-                + m.start()
-                - num_ref_gaps
-                - new_ref_gaps
-            )
+            ref_end = ref.annotations["start"] + m.start() - num_ref_gaps - new_ref_gaps
 
             new_read_gaps = read_part.seq[pos : m.start()].count("-")
             read_start = read_part.annotations["start"] + pos - num_read_gaps
-            read_end = (
-                read_part.annotations["start"]
-                + m.start()
-                - num_read_gaps
-                - new_read_gaps
-            )
+            read_end = read_part.annotations["start"] + m.start() - num_read_gaps - new_read_gaps
 
             # get sequence of read at non-gap positions in ref
             ref_seq = ref.seq[pos : m.start()]
             aligned_seq = "".join(
-                x
-                for k, x in enumerate(read_part.seq[pos : m.start()])
-                if ref_seq[k] != "-"
+                x for k, x in enumerate(read_part.seq[pos : m.start()]) if ref_seq[k] != "-"
             )
 
             chnk = (
@@ -188,24 +176,15 @@ def parse_maf(maf_input, min_gap=50):
 
         new_ref_gaps = ref.seq[pos:].count("-")
         ref_start = ref.annotations["start"] + pos - num_ref_gaps
-        ref_end = (
-            ref.annotations["start"] + len(ref) - num_ref_gaps - new_ref_gaps
-        )
+        ref_end = ref.annotations["start"] + len(ref) - num_ref_gaps - new_ref_gaps
 
         new_read_gaps = read_part.seq[pos:].count("-")
         read_start = read_part.annotations["start"] + pos - num_read_gaps
-        read_end = (
-            read_part.annotations["start"]
-            + len(ref)
-            - num_read_gaps
-            - new_read_gaps
-        )
+        read_end = read_part.annotations["start"] + len(ref) - num_read_gaps - new_read_gaps
 
         # get sequence of read at non-gap positions in ref
         ref_seq = ref.seq[pos:]
-        aligned_seq = "".join(
-            x for k, x in enumerate(read_part.seq[pos:]) if ref_seq[k] != "-"
-        )
+        aligned_seq = "".join(x for k, x in enumerate(read_part.seq[pos:]) if ref_seq[k] != "-")
 
         chnk = (
             read_start,
@@ -229,6 +208,7 @@ def parse_maf(maf_input, min_gap=50):
 def run(args):
 
     import operator
+    import numpy as np
     import pandas as pd
     from collections import defaultdict
     from Bio import SeqIO, Seq, SeqRecord
@@ -275,6 +255,7 @@ def run(args):
         "orientation_mismatch": 0,
         "inversions": 0,
         "low_cov": 0,
+        "switch_order": 0,
         "small_gap": 0,
     }
 
@@ -330,9 +311,7 @@ def run(args):
                 )
             # find read parts that map elsewhere (including parts on the switch chromosome itself)
             elif (
-                ref_chrom != switch_chrom
-                or ref_end < switch_start
-                or ref_start > switch_end
+                ref_chrom != switch_chrom or ref_end < switch_start or ref_start > switch_end
             ) and ref_len > args.min_insert_match:
                 inserts.append(
                     (
@@ -349,13 +328,8 @@ def run(args):
         if args.telo and read in telo.index:
             telo_matches = []
             for _, df in telo.loc[[read]].iterrows():
-                if (
-                    df["pident"] > args.telo_cutoff
-                    and df["length"] > args.min_telo_matchlen
-                ):
-                    telo_matches.append(
-                        ("telo", int(df["qstart"]) - 1, int(df["qend"]))
-                    )
+                if df["pident"] > args.telo_cutoff and df["length"] > args.min_telo_matchlen:
+                    telo_matches.append(("telo", int(df["qstart"]) - 1, int(df["qend"])))
             for _, read_start, read_end in merge_intervals(telo_matches):
                 tot_len = read_end - read_start
                 inserts.append((read_start, read_end, "telomer", 0, tot_len, 1))
@@ -390,10 +364,7 @@ def run(args):
             )
         )
 
-        if (
-            read_overlap > args.max_switch_overlap
-            or ref_overlap > args.max_switch_overlap
-        ):
+        if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
             stats["orientation_mismatch"] += 1
             use = False
 
@@ -410,33 +381,20 @@ def run(args):
             for insert in inserts:
 
                 # ignore inserts at beginning or ends of reads
-                if insert[0] < min(sw[0] for sw in switch_matches) or insert[
-                    1
-                ] > max(sw[1] for sw in switch_matches):
-                    continue
-
-                # ignore inserts in blacklist regions
-                if (
-                    interval_length(
-                        intersect_intervals([insert[2:5]], blacklist_regions)
-                    )
-                    > 0
+                if insert[0] < min(sw[0] for sw in switch_matches) or insert[1] > max(
+                    sw[1] for sw in switch_matches
                 ):
                     continue
 
+                # ignore inserts in blacklist regions
+                if interval_length(intersect_intervals([insert[2:5]], blacklist_regions)) > 0:
+                    continue
+
                 # get adjoining switch matches (along the read)
-                # index of insert in list of switch_matches (along the read)
-                # ii=bisect.bisect([sw[0] for sw in switch_matches],insert[0])
-                # switch_left=min(switch_matches[ii-1:ii+1],key=operator.itemgetter(0))
-                # switch_right=max(switch_matches[ii-1:ii+1],key=operator.itemgetter(0))
                 # left: last match starting before insert
-                switch_left = [
-                    sm for sm in switch_matches if sm[0] <= insert[0]
-                ][-1]
+                switch_left = [sm for sm in switch_matches if sm[0] <= insert[0]][-1]
                 # right: first match ending after insert
-                switch_right = [
-                    sm for sm in switch_matches if sm[1] >= insert[1]
-                ][0]
+                switch_right = [sm for sm in switch_matches if sm[1] >= insert[1]][0]
 
                 # separate match if an insert falls completely within a switch match
                 if (
@@ -456,24 +414,19 @@ def run(args):
                         insert[0],
                         switch_left[2],
                         switch_left[3],
-                        switch_left[3]
-                        + insert[0]
-                        - switch_left[0]
-                        + extra // 2,
+                        switch_left[3] + insert[0] - switch_left[0] + extra // 2,
                         switch_left[5],
                     )
                     switch_right = (
                         insert[1],
                         switch_left[1],
                         switch_left[2],
-                        switch_left[4]
-                        - (switch_left[1] - insert[1])
-                        - extra // 2,
+                        switch_left[4] - (switch_left[1] - insert[1]) - extra // 2,
                         switch_left[4],
                         switch_left[5],
                     )
                 elif switch_left[1] > insert[1] or switch_right[0] < insert[0]:
-                    raise Exception("huh?")
+                    raise Exception("interval error for insert-adjoining switch matches!")
 
                 # number of unmapped bases in read between switch parts and inserts
                 gaps = (switch_right[0] - insert[1], insert[0] - switch_left[1])
@@ -533,6 +486,7 @@ def run(args):
                 key=lambda x: x[1],
             )
         ]
+
         # check that mapped regions on the genome are not much shorter than mapped parts of the read
         if sum(sm[4] - sm[3] for sm in switch_matches) < 0.7 * sum(
             sm[1] - sm[0] for sm in switch_matches
@@ -547,9 +501,7 @@ def run(args):
                 switch_maps[rec[3][3]].append((rec[1], rec[2]))
 
         gaps = [
-            val[i][1] - val[i - 1][0]
-            for val in switch_maps.values()
-            for i in range(1, len(val))
+            val[i][1] - val[i - 1][0] for val in switch_maps.values() for i in range(1, len(val))
         ]
         if len(gaps) > 0 and min(gaps) < args.min_gap:
             stats["small_gap"] += 1
@@ -565,19 +517,21 @@ def run(args):
             stats["low_cov"] += 1
             use = False
 
-        if (
-            args.interrupt_for_read is not None
-            and read in args.interrupt_for_read.split(",")
-        ):
+        # check that switch matches are in consistent order along the read and the genome
+        read_order = np.argsort([sm[0] for sm in switch_matches])
+        genomic_order = np.argsort([sm[3] for sm in switch_matches])
+        if not ((read_order == genomic_order).all() or (read_order == genomic_order[::-1]).all()):
+            stats["switch_order"] += 1
+            use = False
+
+        if args.interrupt_for_read is not None and read in args.interrupt_for_read.split(","):
             raise Exception("breaking for read {0}".format(read))
 
         if not use:
             continue
 
         # isotype
-        last_map = (
-            read_mappings[-1] if switch_orientation == "+" else read_mappings[0]
-        )
+        last_map = read_mappings[-1] if switch_orientation == "+" else read_mappings[0]
         tmp = intersect_intervals(
             [
                 (
@@ -602,9 +556,7 @@ def run(args):
             )
         )
         for chrom, start, end, orientation in read_mappings:
-            outf.write(
-                "\t{0}:{1}-{2}:{3}".format(chrom, start, end, orientation)
-            )
+            outf.write("\t{0}:{1}-{2}:{3}".format(chrom, start, end, orientation))
         for (
             chrom,
             start,
@@ -618,10 +570,7 @@ def run(args):
             orientation,
         ) in filtered_inserts:
             outf.write(
-                (
-                    "\tinsert_{0}:{1}_{2}_{3}-{4}_{5}_"
-                    "{6}:{7}-{8}_{9}_{10}:{11}"
-                ).format(
+                ("\tinsert_{0}:{1}_{2}_{3}-{4}_{5}_" "{6}:{7}-{8}_{9}_{10}:{11}").format(
                     switch_chrom,
                     left,
                     gapl,

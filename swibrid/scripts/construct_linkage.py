@@ -8,6 +8,7 @@ def setup_argparse(parser):
         help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
     parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
+    parser.add_argument("--distances", dest="distances", help="""distance matrix""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
@@ -27,9 +28,7 @@ def setup_argparse(parser):
         default="complete",
         help="""clustering method for hierarchical clustering [complete]""",
     )
-    parser.add_argument(
-        "--linkage", dest="linkage", help="""output file contains linkage"""
-    )
+    parser.add_argument("--linkage", dest="linkage", help="""output file contains linkage""")
     parser.add_argument(
         "--use_sparse",
         dest="use_sparse",
@@ -56,11 +55,9 @@ def setup_argparse(parser):
         dest="n_backup",
         type=int,
         default=0,
-        help="""save full distances for these points in addition to the nearest neighbors [0]"""
+        help="""save full distances for these points in addition to the nearest neighbors [0]""",
     )
-    parser.add_argument(
-        "--nmax", dest="nmax", type=int, help="""use only nmax reads"""
-    )
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
     parser.add_argument(
         "--ignore_unused_positions",
         dest="ignore_unused_positions",
@@ -81,9 +78,7 @@ def run(args):
     from .utils import remove_gaps
 
     if not os.path.isfile(args.msa):
-        logger.warn(
-            "no msa at {0}; run construct_msa.py first!".format(args.msa)
-        )
+        logger.warn("no msa at {0}; run construct_msa.py first!".format(args.msa))
         sys.exit(1)
 
     logger.info("loading msa from {0}".format(args.msa))
@@ -97,12 +92,10 @@ def run(args):
     gaps = np.load(args.gaps)
 
     logger.info("removing gaps > {0} from msa".format(args.max_gap))
-    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap, return_sparse=args.use_sparse)
+    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
     if args.ignore_unused_positions:
         used = msa_cleaned.sum(0) > 0
-        logger.info(
-            "ignoring {0}/{1} unused positions".format(np.sum(~used), len(used))
-        )
+        logger.info("ignoring {0}/{1} unused positions".format(np.sum(~used), len(used)))
         msa_cleaned = msa_cleaned[:, used]
 
     if args.use_sparse:
@@ -111,33 +104,48 @@ def run(args):
 
         logger.info(
             "running sparsecluster hierarchical clustering of {3} reads with {0} metric and {1} method for {2} nearest neighbors".format(
-                args.metric,
-                args.method,
-                args.n_neighbors,
-                msa_cleaned.shape[0]
+                args.metric, args.method, args.n_neighbors, msa_cleaned.shape[0]
             )
         )
-        Z = sparsecluster.linkage(msa_cleaned, 
-                                  metric=args.metric, 
-                                  method=args.method,
-                                  n_neighbors = args.n_neighbors,
-                                  n_backup = args.n_backup,
-                                  n_jobs = args.n_threads)
-        
+        if args.distances is not None and os.path.isfile(args.distances):
+            logger.info("loading distance matrix from {0}".format(args.distances))
+            dist = scipy.sparse.load_npz(args.distances)
+            Z = sparsecluster.linkage(
+                msa_cleaned,
+                dist=dist,
+                metric=args.metric,
+                method=args.method,
+                n_neighbors=args.n_neighbors,
+                n_backup=args.n_backup,
+                n_jobs=args.n_threads,
+                verbose=True,
+            )
+        else:
+            Z = sparsecluster.linkage(
+                msa_cleaned,
+                metric=args.metric,
+                method=args.method,
+                n_neighbors=args.n_neighbors,
+                n_backup=args.n_backup,
+                n_jobs=args.n_threads,
+                verbose=True,
+            )
+
     else:
 
         import fastcluster
 
         logger.info(
             "running fastcluster hierarchical clustering of {2} reads with {0} metric and {1} method".format(
-                args.metric,
-                args.method,
-                msa_cleaned.shape[0]
+                args.metric, args.method, msa_cleaned.shape[0]
             )
         )
-        Z = fastcluster.linkage(msa_cleaned, metric=args.metric, method=args.method)
+        if args.distances is not None and os.path.isfile(args.distances):
+            logger.info("loading distance matrix from {0}".format(args.distances))
+            dist = np.load(args.distances)["dist"]
+            Z = fastcluster.linkage(dist, metric=args.metric, method=args.method)
+        else:
+            Z = fastcluster.linkage(msa_cleaned.todense(), metric=args.metric, method=args.method)
 
     logger.info("saving linkage to {0}\n".format(args.linkage))
     np.savez(args.linkage, Z=Z)
-
-      

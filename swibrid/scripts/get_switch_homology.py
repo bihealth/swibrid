@@ -3,9 +3,7 @@
 
 def setup_argparse(parser):
 
-    parser.add_argument(
-        "-g", "--genome", dest="genome", help="""genome fasta file"""
-    )
+    parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -25,9 +23,7 @@ def setup_argparse(parser):
         default=100,
         help="""binsize [100]""",
     )
-    parser.add_argument(
-        "-o", "--output", dest="output", help="""output file (npz)"""
-    )
+    parser.add_argument("-o", "--output", dest="output", help="""output file (npz)""")
     parser.add_argument(
         "--range",
         dest="range",
@@ -77,9 +73,7 @@ def run(args):
         switch_anno, switch_chrom, switch_start, switch_end
     )
 
-    switch_seqs = [
-        genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int
-    ]
+    switch_seqs = [genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int]
     stot = "".join(switch_seqs)
 
     jd = dict()
@@ -89,16 +83,8 @@ def run(args):
             [
                 [
                     jaccard_distance(
-                        stot[
-                            max(binsize * k - n, 0) : min(
-                                binsize * (k + 1) + n, len(stot)
-                            )
-                        ],
-                        stot[
-                            max(binsize * j - n, 0) : min(
-                                binsize * (j + 1) + n, len(stot)
-                            )
-                        ],
+                        stot[max(binsize * k - n, 0) : min(binsize * (k + 1) + n, len(stot))],
+                        stot[max(binsize * j - n, 0) : min(binsize * (j + 1) + n, len(stot))],
                         n=n,
                     )
                     for j in range(len(stot) // binsize)
@@ -110,16 +96,8 @@ def run(args):
             [
                 [
                     jaccard_distance(
-                        stot[
-                            max(binsize * k - n, 0) : min(
-                                binsize * (k + 1) + n, len(stot)
-                            )
-                        ],
-                        stot[
-                            max(binsize * j - n, 0) : min(
-                                binsize * (j + 1) + n, len(stot)
-                            )
-                        ],
+                        stot[max(binsize * k - n, 0) : min(binsize * (k + 1) + n, len(stot))],
+                        stot[max(binsize * j - n, 0) : min(binsize * (j + 1) + n, len(stot))],
                         n=n,
                         rc=True,
                     )
@@ -160,14 +138,10 @@ def run(args):
             il = np.tril_indices(len(stot) // binsize)
             jj[il] = jd["fw_{0}".format(n)][il]
             jj[iu] = jd["rv_{0}".format(n)][iu]
-            ax.imshow(
-                jj, cmap=plt.cm.Reds, origin="lower", interpolation="none"
-            )
+            ax.imshow(jj, cmap=plt.cm.Reds, origin="lower", interpolation="none")
             ax.set_xlim([len(stot) // binsize, 0])
             ax.set_ylim([len(stot) // binsize, 0])
-            ax.plot(
-                [0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5
-            )
+            ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)
             ax.set_yticks(np.array(major_ticks) // binsize)
             ax.set_xticks(np.array(major_ticks) // binsize)
             ax.set_yticks(np.array(minor_ticks) // binsize, minor=True)

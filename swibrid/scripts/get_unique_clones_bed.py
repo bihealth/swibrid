@@ -4,9 +4,7 @@
 def setup_argparse(parser):
 
     parser.add_argument("-b", "--bed", dest="bed", help="""input bed file""")
-    parser.add_argument(
-        "-c", "--clustering", dest="clustering", help="""clustering results"""
-    )
+    parser.add_argument("-c", "--clustering", dest="clustering", help="""clustering results""")
     parser.add_argument(
         "--cut",
         dest="cut",
@@ -21,15 +19,13 @@ def run(args):
     import sys
     from logzero import logger
     import pandas as pd
-    from .utils import get_eff_nclust
 
     logger.info("reading clustering from " + args.clustering)
     clustering = pd.read_csv(args.clustering, header=0)
     clustering = clustering[~clustering["cluster"].isna()]
-    n_eff = get_eff_nclust(clustering["cluster"], cut=args.cut)
-    clones = (
-        clustering["cluster"].dropna().astype(int).value_counts().index[:n_eff]
-    )
+    clusters = clustering["filtered_cluster"]
+    clones = clusters[clusters >= 0]
+
     reads = (
         clustering[clustering["cluster"].astype(int).isin(clones)]
         .groupby("cluster")

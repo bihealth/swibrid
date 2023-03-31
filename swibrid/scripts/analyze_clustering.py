@@ -28,11 +28,6 @@ def setup_argparse(parser):
         help="""file with clustering stats""",
     )
     parser.add_argument(
-        "--mutations",
-        dest="mutations",
-        help="""file with mutation info (from find_mutations.py)""",
-    )
-    parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
@@ -43,14 +38,12 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
+    parser.add_argument("--inserts", dest="inserts", help="""results.tsv file with inserts""")
     parser.add_argument(
-        "--inserts", dest="inserts", help="""results.tsv file with inserts"""
-    )
-    parser.add_argument(
-        "--adjust_size", 
+        "--adjust_size",
         dest="adjust_size",
         action="store_true",
-        help="""calculate cluster size adjusted for fragment length and QC content"""
+        help="""calculate cluster size adjusted for fragment length and QC content""",
     )
 
 
@@ -74,7 +67,7 @@ def run(args):
         interval_length,
         merge_intervals,
         intersect_intervals,
-        ncodes
+        ncodes,
     )
 
     (
@@ -99,9 +92,7 @@ def run(args):
     )
 
     avg_isotype = (
-        clustering.groupby("cluster")["isotype"]
-        .agg(lambda x: pd.Series.mode(x)[0])
-        .loc[clusters]
+        clustering.groupby("cluster")["isotype"].agg(lambda x: pd.Series.mode(x)[0]).loc[clusters]
     )
 
     logger.info("loading gaps from " + args.gaps)
@@ -112,40 +103,27 @@ def run(args):
 
     logger.info("getting cluster consensus sequences")
 
-    nogap = mm.dot(msa!=0)
-    means = dict((n,mm.dot(msa == c)) for n,c in ncodes.items())
+    nogap = mm.dot(msa != 0)
+    means = dict((n, mm.dot(msa == c)) for n, c in ncodes.items())
 
     cluster_seq = []
     cluster_length = []
     cluster_GC = []
     for n, clust in enumerate(clusters):
-        pos = np.where(nogap[n].todense().A1 > .5)[0]
-        cons = np.vstack([means[c][n,pos].todense() for c in 'acgtACGT']).argmax(0).A1
-        seq = ''.join('acgtACGT'[c] for c in cons)
+        pos = np.where(nogap[n].todense().A1 > 0.5)[0]
+        cons = np.vstack([means[c][n, pos].todense() for c in "acgtACGT"]).argmax(0).A1
+        seq = "".join("acgtACGT"[c] for c in cons)
         cluster_seq.append(seq)
         cluster_length.append(len(seq))
-        cluster_GC.append((seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq))
+        cluster_GC.append(
+            (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
+        )
 
     logger.info("removing gaps > {0} from MSA".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
     logger.info("averaging cleaned MSA")
     avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
     break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
-
-    if args.mutations is not None:
-        logger.info("adding mutations from {0}".format(args.mutations))
-        mutations = pd.read_csv(args.mutations, sep="\t", header=0)
-        mut = construct_mut_matrix(mutations, msa.shape[0], msa.shape[1])
-        logger.info("averaging mutations")
-        avg_mut = mm.dot(mut > 0)
-        mut_positions = (avg_mut > 0).sum(1).A1
-        tmp = avg_mut.copy()
-        tmp.data[(tmp.data <= 0.05) | (tmp.data >= 0.95)] = 0
-        tmp.eliminate_zeros()
-        mut_spread = np.sum(tmp > 0, 1).A1 / mut_positions
-
-    else:
-        mut_spread = np.zeros(len(clusters))
 
     try:
         inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
@@ -205,10 +183,7 @@ def run(args):
             insert_coords = x[["insert_left", "insert_right"]].drop_duplicates()
             insert_union = interval_length(
                 merge_intervals(
-                    [
-                        ("", y["insert_left"], y["insert_right"])
-                        for _, y in insert_coords.iterrows()
-                    ]
+                    [("", y["insert_left"], y["insert_right"]) for _, y in insert_coords.iterrows()]
                 )
             )
             insert_intersection = interval_length(
@@ -222,9 +197,7 @@ def run(args):
             )
             insert_overlap = insert_intersection / insert_union
 
-            insert_pos = x[
-                ["insert_pos_left", "insert_pos_right"]
-            ].drop_duplicates()
+            insert_pos = x[["insert_pos_left", "insert_pos_right"]].drop_duplicates()
             pos_union = (
                 interval_length(
                     merge_intervals(
@@ -273,24 +246,19 @@ def run(args):
             columns=["chrom", "insert_pos_left", "insert_pos_right", "."],
             index=inserts.index,
         ).drop(["chrom", "."], axis=1)
-        (
-            insert_pos["insert_pos_left"],
-            insert_pos["insert_pos_right"],
-        ) = insert_pos.min(axis=1) - 1, insert_pos.max(axis=1)
+        (insert_pos["insert_pos_left"], insert_pos["insert_pos_right"],) = insert_pos.min(
+            axis=1
+        ) - 1, insert_pos.max(axis=1)
 
         inserts = pd.concat([inserts, insert_coords, insert_pos], axis=1)
         inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
 
         tmp = pd.concat([clustering, inserts], axis=1)
         insert_frequency = (
-            tmp.groupby("cluster")["insert"]
-            .agg(lambda x: np.mean(~pd.isnull(x)))
-            .loc[clusters]
+            tmp.groupby("cluster")["insert"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
         )
         if tmp.dropna().shape[0] > 0:
-            insert_stats = (
-                tmp.dropna().groupby("cluster").apply(aggregate_inserts)
-            )
+            insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
 
     df = pd.DataFrame(
         {
@@ -300,7 +268,6 @@ def run(args):
             "length": cluster_length,
             "GC": cluster_GC,
             "break_spread": break_spread,
-            "mut_spread": mut_spread,
             "insert_frequency": insert_frequency,
         },
         index=clusters,
@@ -314,29 +281,23 @@ def run(args):
     if args.adjust_size:
         logger.info("calculating adjusted cluster size")
         from sklearn import linear_model
-        stats = pd.read_csv(
-            args.clustering_stats, header=0, index_col=0
-        ).squeeze()
-        neff = stats["eff_nclusters"].astype(int)
-        clones = (
-            clustering["cluster"]
-            .dropna()
-            .astype(int)
-            .value_counts()
-            .index[:neff]
-        )
 
-        X = df.loc[clones][['length','GC']].values
-        y = df.loc[clones]['size'].values
+        stats = pd.read_csv(args.clustering_stats, header=0, index_col=0).squeeze()
+        neff = stats["eff_nclusters"].astype(int)
+        clusters = clustering["filtered_cluster"].dropna()
+        clones = clusters[clusters >= 0].astype(int)
+
+        X = df.loc[clones][["length", "GC"]].values
+        y = df.loc[clones]["size"].values
         lr = linear_model.LinearRegression()
         lr.fit(X, np.log(y))
 
-        tmp = y / np.exp(np.dot(X,lr.coef_))
-        df.loc[clones,'adj_size'] = y.sum() * tmp / tmp.sum()
-    
+        tmp = y / np.exp(np.dot(X, lr.coef_))
+        df.loc[clones, "adj_size"] = y.sum() * tmp / tmp.sum()
+
     else:
 
-        df['adj_size'] = df['size']
+        df["adj_size"] = df["size"]
 
     logger.info("saving results to " + args.output)
     df.to_csv(args.output)

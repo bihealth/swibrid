@@ -3,9 +3,7 @@
 
 def setup_argparse(parser):
     """setup argparser subparser"""
-    parser.add_argument(
-        "-i", "--input", dest="input", default="input", help="""input fastq"""
-    )
+    parser.add_argument("-i", "--input", dest="input", default="input", help="""input fastq""")
     parser.add_argument(
         "-o",
         "--output",
@@ -14,9 +12,7 @@ def setup_argparse(parser):
         help="""output fasta (.gz)""",
     )
     parser.add_argument("--info", dest="info", help="""read info""")
-    parser.add_argument(
-        "--nmax", dest="nmax", type=int, help="""use only nmax reads"""
-    )
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
     parser.add_argument("--stats", dest="stats", help="""output stats""")
     parser.add_argument(
         "--min-length",
@@ -70,18 +66,13 @@ def filter_reads(reads, info, args, stats):
                 )
 
             if args.only_complete and not (
-                any("rv" in p for p in primers)
-                and any("fw" in p for p in primers)
+                any("rv" in p for p in primers) and any("fw" in p for p in primers)
             ):
                 stats["incomplete"] += 1
                 keep = False
 
             internal = info.loc[rec.id, "internal"]
-            if (
-                not args.keep_internal
-                and not pd.isna(internal)
-                and "primer" in internal
-            ):
+            if not args.keep_internal and not pd.isna(internal) and "primer" in internal:
                 stats["internal"] += 1
                 keep = False
 
@@ -108,9 +99,7 @@ def run(args):
             args,
             stats,
         ),
-        gzip.open(args.output, "wt")
-        if args.output.endswith(".gz")
-        else args.output,
+        gzip.open(args.output, "wt") if args.output.endswith(".gz") else args.output,
         "fasta",
     )
 

@@ -2,17 +2,13 @@
 
 
 def setup_argparse(parser):
-    parser.add_argument(
-        "--samples", dest="samples", help="""comma-separated list of samples"""
-    )
+    parser.add_argument("--samples", dest="samples", help="""comma-separated list of samples""")
     parser.add_argument(
         "--sample_stats",
         dest="sample_stats",
         help="""output file with sample_stats""",
     )
-    parser.add_argument(
-        "--inserts", dest="inserts", help="""output file with inserts"""
-    )
+    parser.add_argument("--inserts", dest="inserts", help="""output file with inserts""")
     parser.add_argument(
         "--cluster_stats",
         dest="cluster_stats",
@@ -35,9 +31,7 @@ def run(args):
     dfs = dict(
         (
             sample,
-            pd.read_csv(
-                "stats/" + sample + "_summary.csv", header=None, index_col=0
-            )
+            pd.read_csv("stats/" + sample + "_summary.csv", header=None, index_col=0)
             .squeeze()
             .dropna(),
         )
@@ -68,9 +62,7 @@ def run(args):
         for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
             name = rf.split("/")[-1].split("_analysis.csv")[0]
             try:
-                tmp = pd.read_csv(rf, header=0, index_col=0).sort_values(
-                    "size", ascending=False
-                )
+                tmp = pd.read_csv(rf, header=0, index_col=0).sort_values("size", ascending=False)
                 tmp.to_excel(writer, sheet_name=name, index=True)
                 logger.info("adding clustering stats for {0}".format(name))
             except pd.errors.EmptyDataError:

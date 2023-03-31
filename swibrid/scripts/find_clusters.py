@@ -9,6 +9,13 @@ def setup_argparse(parser):
         help="""output of construct_linkage.py""",
     )
     parser.add_argument(
+        "-f",
+        "--fix_cutoff",
+        dest="cutoff",
+        type=float,
+        help="""use fixed cutoff instead of data-derived""",
+    )
+    parser.add_argument(
         "-c",
         dest="cmin",
         default=0.001,
@@ -35,23 +42,18 @@ def setup_argparse(parser):
         dest="input",
         help="""read info (output of construct_msa.py)""",
     )
+    parser.add_argument("-o", "--output", dest="output", help="""output file with clustering""")
     parser.add_argument(
-        "-o", "--output", dest="output", help="""output file with clustering"""
+        "--scanning",
+        dest="scanning",
+        help="""file with scanning data""",
     )
+    parser.add_argument("-s", "--stats", dest="stats", help="""file with statistics""")
     parser.add_argument(
-        "-e",
-        "--extrapolation",
-        dest="extrapolation",
-        help="""file with extrapolation data""",
-    )
-    parser.add_argument(
-        "-s", "--stats", dest="stats", help="""file with statistics"""
-    )
-    parser.add_argument(
-        "--extrapolation-method",
-        dest="extrapolation_method",
+        "--fit-method",
+        dest="fit_method",
         default="distance",
-        help="""extrapolation method: "fit" or "distance" [distance]""",
+        help="""cutoff determination method: "trend" or "distance" [distance]""",
     )
 
 
@@ -66,10 +68,11 @@ def fit_cutoff(cc, nn, method="fit"):
     cmax = np.max(cc)
     nmin = np.min(nn)
     nmax = np.max(nn)
-    if method == "fit":
+    if method == "trend":
         from .utils import res2
 
-        p0 = [nmax, 0, nmin, np.log(nmax / nmin) / (cmax - cmin)]
+        # p0 = [nmax, 0, nmin, np.log(nmax / nmin) / (cmax - cmin)]
+        p0 = [0.75 * (nmax - nmin), 10, 0.25 * (nmax - nmin), 200]
         opt2 = scipy.optimize.least_squares(
             res2,
             1.0e-8 + np.array(p0),
@@ -99,30 +102,47 @@ def run(args):
     import numpy as np
     import pandas as pd
     import scipy.sparse
+    import scipy.stats
     import scipy.cluster.hierarchy
     import scipy.optimize
     from logzero import logger
-    from .utils import get_eff_nclust
+    from .utils import filter_clustering
 
     cutoffs = np.linspace(args.cmin, args.cmax, args.nc)
+    if args.cutoff is not None:
+        cutoffs = np.sort(np.unique(np.concatenate([cutoffs, [args.cutoff]])))
+    ncutoffs = len(cutoffs)
+
     logger.info("loading linkage from {0}".format(args.linkage))
     Z = np.load(args.linkage)["Z"]
 
-    logger.info("testing {0} cutoffs on linkage".format(args.nc))
+    logger.info("scanning {0} cutoffs on linkage".format(ncutoffs))
     cc = scipy.cluster.hierarchy.cut_tree(Z, height=cutoffs)
     nclust = np.max(cc, 0) + 1
+    entropy = np.array(
+        [scipy.stats.entropy(np.bincount(cc[:, i])) / np.log(nclust[i]) for i in range(ncutoffs)]
+    )
 
-    if args.extrapolation:
-        logger.info(
-            "saving extrapolation data to {0}".format(args.extrapolation)
-        )
-        pd.Series(nclust, index=cutoffs).to_csv(
-            args.extrapolation, header=False, index=True
+    if args.scanning:
+        logger.info("saving scanning data to {0}".format(args.scanning))
+        pd.DataFrame({"nclusters": nclust, "entropy": entropy}, index=cutoffs).to_csv(
+            args.scanning, header=True, index=True
         )
 
-    logger.info("finding optimal cutoff")
-    res, c_opt = fit_cutoff(cutoffs, nclust, method=args.extrapolation_method)
+    if args.cutoff is None:
+
+        logger.info("finding optimal cutoff")
+        res, c_opt = fit_cutoff(cutoffs, nclust, method=args.fit_method)
+
+    else:
+
+        logger.info("fixing cutoff at {0}".format(args.cutoff))
+        res, c_opt = [], args.cutoff
+
     clustering = cc[:, cutoffs == c_opt].flatten()
+
+    logger.info("filtering clusters")
+    filtered_clustering = filter_clustering(Z, clustering)
 
     if args.stats:
         logger.info("saving stats to {0}".format(args.stats))
@@ -131,7 +151,7 @@ def run(args):
             + [
                 c_opt,
                 len(np.unique(clustering)),
-                get_eff_nclust(clustering),
+                sum(np.unique(filtered_clustering) >= 0),
                 np.sum(np.bincount(clustering) > 1),
                 np.mean(np.bincount(clustering)[np.unique(clustering)] == 1),
             ],
@@ -151,12 +171,14 @@ def run(args):
         df = pd.read_csv(args.input, header=0, index_col=0)
         if len(clustering) == df.shape[0]:
             df["cluster"] = clustering
+            df["filtered_cluster"] = filtered_clustering
         else:
-            df["cluster"] = np.concatenate(
-                [clustering, [np.nan] * (df.shape[0] - len(clustering))]
+            df["cluster"] = np.concatenate([clustering, [np.nan] * (df.shape[0] - len(clustering))])
+            df["filtered_cluster"] = np.concatenate(
+                [filtered_clustering, [np.nan] * (df.shape[0] - len(filtered_clustering))]
             )
     else:
-        df = pd.DataFrame(dict(cluster=clustering))
+        df = pd.DataFrame(dict(cluster=clustering, filtered_cluster=filtered_clustering))
 
     if args.output:
         logger.info("saving read info to {0}".format(args.output))

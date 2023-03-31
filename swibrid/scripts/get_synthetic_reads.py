@@ -4,9 +4,7 @@
 def setup_argparse(parser):
 
     parser.add_argument("-b", "--bed", dest="bed", help="""input bed file""")
-    parser.add_argument(
-        "-r", "--reference", dest="reference", help="""reference sequence"""
-    )
+    parser.add_argument("-r", "--reference", dest="reference", help="""reference sequence""")
     parser.add_argument(
         "-n",
         "--n",
@@ -14,12 +12,8 @@ def setup_argparse(parser):
         type=int,
         help="""use n random entries of input bed file""",
     )
-    parser.add_argument(
-        "-p", "--par", dest="par", help="""file with LAST parameters"""
-    )
-    parser.add_argument(
-        "-o", "--out", dest="out", help="""output fasta / fastq file"""
-    )
+    parser.add_argument("-p", "--par", dest="par", help="""file with LAST parameters""")
+    parser.add_argument("-o", "--out", dest="out", help="""output fasta / fastq file""")
     parser.add_argument(
         "-k",
         "--k",
@@ -28,9 +22,7 @@ def setup_argparse(parser):
         default=1,
         help="""number of mutated copies per sequence [1]""",
     )
-    parser.add_argument(
-        "-i", "--info", dest="info", help="""output info file"""
-    )
+    parser.add_argument("-i", "--info", dest="info", help="""output info file""")
     parser.add_argument(
         "--no-mutations",
         dest="no_mutations",
@@ -91,10 +83,7 @@ def mutate_seq(seq, pars):
         seq3 = (
             seq2[: j[0]]
             + rand_string(s[0])
-            + "".join(
-                seq2[j[i] : j[i + 1]] + rand_string(s[i + 1])
-                for i in range(len(j) - 1)
-            )
+            + "".join(seq2[j[i] : j[i + 1]] + rand_string(s[i + 1]) for i in range(len(j) - 1))
             + seq2[j[-1] :]
         )
     else:
@@ -166,9 +155,7 @@ def run(args):
         pars = None
 
     logger.info("reading bed file from " + args.bed)
-    bed = pd.read_csv(args.bed, sep="\t", header=None, index_col=None).sample(
-        n=args.n
-    )
+    bed = pd.read_csv(args.bed, sep="\t", header=None, index_col=None).sample(n=args.n)
     logger.info("loading reference from " + args.reference)
     reference = pysam.FastaFile(args.reference)
 
@@ -197,9 +184,7 @@ def run(args):
             reference.fetch(chrom, start + bstart, start + bstart + bsize)
             for bsize, bstart in zip(blocksizes, blockstarts)
         )
-        rec = SeqRecord.SeqRecord(
-            seq=Seq.Seq(seq), id=name, name=name, description=name
-        )
+        rec = SeqRecord.SeqRecord(seq=Seq.Seq(seq), id=name, name=name, description=name)
 
         if args.poisson_n:
             ncopies = np.random.poisson(args.k)
@@ -216,9 +201,7 @@ def run(args):
             info[read.id] = {
                 "length": len(read),
                 "barcodes": "BC01@1-30:+",
-                "primers": "primer_fw@0-50:+;primer_rv@{0}-{1}:+".format(
-                    len(read) - 50, len(read)
-                ),
+                "primers": "primer_fw@0-50:+;primer_rv@{0}-{1}:+".format(len(read) - 50, len(read)),
                 "internal": "",
             }
 

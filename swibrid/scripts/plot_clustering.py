@@ -9,9 +9,7 @@ def setup_argparse(parser):
         help="""file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
     )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
-    parser.add_argument(
-        "--sample", dest="sample", help="""sample name (for figure title)"""
-    )
+    parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
     parser.add_argument("--info", dest="info", help="""file with read info""")
     parser.add_argument(
         "--coords",
@@ -28,9 +26,7 @@ def setup_argparse(parser):
         dest="clustering_stats",
         help="""file contains clustering stats""",
     )
-    parser.add_argument(
-        "--linkage", dest="linkage", help="""file contains linkage"""
-    )
+    parser.add_argument("--linkage", dest="linkage", help="""file contains linkage""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -51,7 +47,7 @@ def setup_argparse(parser):
         "--color_by",
         dest="color_by",
         default="isotype",
-        help="""color reads by isotype, cluster, sample or by other columns present in the "info" file [isotype]""",
+        help="""color reads by isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
     )
     parser.add_argument(
         "--show_inserts",
@@ -85,24 +81,29 @@ def setup_argparse(parser):
         "--linkage_border",
         dest="linkage_border",
         type=float,
-        default=.1,
+        default=0.1,
         help="""fraction of figure used for dendrogram [.1]""",
     )
     parser.add_argument(
         "--cutoff_color",
         dest="cutoff_color",
-        default='r',
-        help="""color of dendrogram cutoff line [r]"""
+        default="r",
+        help="""color of dendrogram cutoff line [r]""",
     )
     parser.add_argument(
-        "--mutations",
-        dest="mutations",
-        help="""file with mutation info (from find_mutations.py)""",
+        "--variants_table",
+        dest="variants_table",
+        help="""file with variant table (from find_variants.py)""",
     )
     parser.add_argument(
-        "--genotypes",
-        dest="genotypes",
-        help="""file with genotype clustering (from cluster_genotypes.py)""",
+        "--variants_matrix",
+        dest="variants_matrix",
+        help="""file with variant matrix (from find_variants.py)""",
+    )
+    parser.add_argument(
+        "--haplotypes",
+        dest="haplotypes",
+        help="""file with haplotype clustering (from find_variants.py)""",
     )
     parser.add_argument(
         "--dpi",
@@ -121,7 +122,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--plot_circles",
         dest="plot_circles",
-        help="""plot another graph displaying circular packing of clusters"""
+        help="""plot another graph displaying circular packing of clusters""",
     )
     parser.add_argument(
         "--cmax",
@@ -131,54 +132,15 @@ def setup_argparse(parser):
     )
 
 
-def fit_cutoff(cc, nn, method="fit"):
-
-    import scipy
-    import pandas as pd
-    import numpy as np
-    from .utils import res2
-
-    cc = np.asarray(cc)
-    nn = np.asarray(nn)
-    cmin = np.min(cc)
-    cmax = np.max(cc)
-    nmin = np.min(nn)
-    nmax = np.max(nn)
-    if method == "fit":
-        p0 = [nmax, 0, nmin, np.log(nmax / nmin) / (cmax - cmin)]
-        opt2 = scipy.optimize.least_squares(
-            res2,
-            1.0e-8 + np.array(p0),
-            args=(cc, nn),
-            method="dogbox",
-            bounds=(0, np.inf),
-        )
-        if opt2.x[1] > opt2.x[3]:
-            res = [opt2.x[2], opt2.x[3], opt2.x[0], opt2.x[1]]
-        else:
-            res = list(opt2.x)
-        diff = pd.Series(np.abs(nn - res[0]), index=cc)
-        cutoff = diff.sort_values().index[0]
-        return res, cutoff
-    elif method == "distance":
-        # diff=pd.Series(np.abs((cmax-cmin)*(np.log(nmax)-np.log(nn))-
-        #                      (cmin-cc)*(np.log(nmin)-np.log(nmax)))/
-        #               np.sqrt((cmax-cmin)**2+(np.log(nmax)-np.log(nmin))**2),index=cc)
-        diff = pd.Series(
-            np.abs((cmax - cmin) * (nmax - nn) - (cmin - cc) * (nmin - nmax))
-            / np.sqrt((cmax - cmin) ** 2 + (nmax - nmin) ** 2),
-            index=cc,
-        )
-        cutoff = diff.sort_values().index[-1]
-        return [], cutoff
-
-
 def rand_cmap(
     nlabels,
     type="bright",
-    first_color_black=True,
+    first_color_black=False,
     last_color_black=False,
-    verbose=True,
+    verbose=False,
+    bad="white",
+    under="black",
+    over="black",
     seed=0,
 ):
     """
@@ -211,9 +173,7 @@ def rand_cmap(
         # Convert HSV list to RGB
         randRGBcolors = []
         for HSVcolor in randHSVcolors:
-            randRGBcolors.append(
-                colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2])
-            )
+            randRGBcolors.append(colorsys.hsv_to_rgb(HSVcolor[0], HSVcolor[1], HSVcolor[2]))
 
         if first_color_black:
             randRGBcolors[0] = [0, 0, 0]
@@ -244,9 +204,7 @@ def rand_cmap(
         print('Please choose "bright" or "soft" for type')
         return
 
-    random_colormap = LinearSegmentedColormap.from_list(
-        "new_map", randRGBcolors, N=nlabels
-    )
+    random_colormap = LinearSegmentedColormap.from_list("new_map", randRGBcolors, N=nlabels)
 
     if verbose:
         from matplotlib import colors, colorbar
@@ -267,6 +225,10 @@ def rand_cmap(
             format="%1i",
             orientation="horizontal",
         )
+
+    random_colormap.set_bad(bad)
+    random_colormap.set_under(under)
+    random_colormap.set_over(over)
 
     return random_colormap
 
@@ -295,8 +257,6 @@ def run(args):
         shift_coord,
         decode_insert,
         merge_intervals,
-        get_eff_nclust,
-        construct_mut_matrix,
     )
 
     matplotlib.rcParams.update({"font.size": 8})
@@ -337,27 +297,29 @@ def run(args):
     logger.info("loading clustering from {0}".format(args.clustering_results))
     clustering = pd.read_csv(args.clustering_results, index_col=0, header=0)
     if clustering.shape[0] != nreads:
-        logger.warn(
-            "# of reads in clustering different from # of reads in msa!"
-        )
+        logger.warn("# of reads in clustering different from # of reads in msa!")
         exit(1)
     reads = clustering["cluster"].dropna().index
     clustering = clustering.loc[reads]
     nreads = len(reads)
     if len(reads) < msa.shape[0]:
-        logger.info(
-            "restricting msa to {0} reads in clustering\n".format(nreads)
-        )
+        logger.info("restricting msa to {0} reads in clustering\n".format(nreads))
         msa = msa[:nreads]
 
     if args.info:
         logger.info("reading read info from {0}".format(args.info))
         read_info = pd.read_csv(args.info, header=0, index_col=0)
 
-    if args.mutations:
-        logger.info("adding mutations from {0}".format(args.mutations))
-        mutations = pd.read_csv(args.mutations, sep="\t", header=0)
-        mut = construct_mut_matrix(mutations, msa.shape[0], msa.shape[1])
+    if args.variants_table:
+        logger.info("reading variant table from {0}".format(args.variants_table))
+        variants = pd.read_csv(args.variants_table, sep="\t", header=0)
+    if args.variants_matrix:
+        logger.info("reading variant matrix from {0}".format(args.variants_matrix))
+        vmat = scipy.sparse.load_npz(args.variants_matrix)
+
+    if args.haplotypes:
+        logger.info("reading haplotypes from {0}".format(args.haplotypes))
+        haplotypes = pd.read_csv(args.haplotypes, index_col=0, header=0)
 
     logger.info("coloring msa by {0}".format(args.color_by))
     if args.color_by == "cluster":
@@ -379,9 +341,7 @@ def run(args):
     elif args.info and args.color_by in read_info.columns:
         info_col = read_info.loc[reads, args.color_by]
         if pd.api.types.is_numeric_dtype(read_info[args.color_by]):
-            values = (info_col - info_col.min()) / (
-                info_col.max() - info_col.min()
-            )
+            values = (info_col - info_col.min()) / (info_col.max() - info_col.min())
             cmap = plt.cm.cool
         else:
             if args.color_by in ["primers", "barcodes"]:
@@ -389,9 +349,7 @@ def run(args):
                     lambda x: "+".join(
                         set(
                             map(
-                                lambda y: re.sub(
-                                    "primer_", "", y.split("@")[0]
-                                ),
+                                lambda y: re.sub("primer_", "", y.split("@")[0]),
                                 x.split(";"),
                             )
                         )
@@ -401,48 +359,20 @@ def run(args):
             cmap = plt.cm.tab20
     elif args.color_by == "orientation":
         cmap = plt.cm.PiYG
-    elif (
-        args.color_by == "strand"
-        and args.info
-        and "primers" in read_info.columns
-    ):
+    elif args.color_by == "strand" and args.info and "primers" in read_info.columns:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
-    elif args.color_by == "genotype" and args.genotypes is not None:
-        genotypes = np.load(args.genotypes)
-        cov = (msa != 0).mean(0).A1
-        freq = (mut > 0).mean(0).A1 / cov
-        # covs = np.vstack(
-        #    [
-        #        (msa.tocsr()[genotypes == gt, :] != 0).mean(0).A1
-        #        for gt in np.unique(genotypes)
-        #    ]
-        # )
-        freqs = (
-            np.vstack(
-                [
-                    (mut.tocsr()[genotypes == gt, :] > 0).mean(0).A1
-                    for gt in np.unique(genotypes)
-                ]
-            )
-            / cov
-        )
-        # cv = freqs.std(0) / freqs.mean(0)
-        use = ~np.isnan(freq) & (freq > 0.05) & (freq < 0.8) & (cov > 0.5)
-        values = genotypes + 1
-        cmap = plt.cm.Set1
+    elif args.color_by == "haplotype" and args.haplotypes is not None:
+        values = haplotypes.loc[clustering['cluster'].astype(int).values,'haplotype'].values
+        cmap = plt.cm.coolwarm
     else:
         logger.warn("no info on {0}!".format(args.color_by))
         values = [0.3] * nreads
         cmap = plt.cm.Greys
 
     if args.clustering_stats is not None:
-        logger.info(
-            "reading clustering stats from {0}".format(args.clustering_stats)
-        )
-        clustering_stats = pd.read_csv(
-            args.clustering_stats, header=None, index_col=0
-        ).squeeze()
+        logger.info("reading clustering stats from {0}".format(args.clustering_stats))
+        clustering_stats = pd.read_csv(args.clustering_stats, header=None, index_col=0).squeeze()
         cutoff = clustering_stats["c_opt"]
     else:
         cutoff = None
@@ -461,11 +391,7 @@ def run(args):
     width = 1 - linkage_border - insert_border
 
     if args.linkage:
-        logger.info(
-            "reading linkage from {0} and creating dendrogram".format(
-                args.linkage
-            )
-        )
+        logger.info("reading linkage from {0} and creating dendrogram".format(args.linkage))
         Z = np.load(args.linkage)["Z"]
         ax = fig.add_axes([0.01, bottom, left - 0.02, height])
         lw = fig.bbox_inches.height * ax.get_position().height * 72 / nreads
@@ -488,9 +414,7 @@ def run(args):
             ax.spines["bottom"].set_visible(False)
             if args.cmax is None:
                 ax.set_xlim([Z[:, 2].max(), 0])
-                ax.set_xscale(
-                    "function", functions=(lambda x: x ** (1 / 2), lambda x: x**2)
-                )
+                ax.set_xscale("function", functions=(lambda x: x ** (1 / 2), lambda x: x**2))
             else:
                 ax.set_xlim([args.cmax, 0])
             ax.set_ylim(ax.get_ylim()[::-1])
@@ -502,14 +426,20 @@ def run(args):
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
+    if args.haplotypes: # and not args.color_by=='haplotype':
+        logger.info("adding haplotype information")
+        ax = fig.add_axes([left-.005, bottom, .01, height])
+        ht = haplotypes.loc[clustering['cluster'].astype(int).values,'haplotype'].values[order][:,np.newaxis]
+        ax.imshow(ht, aspect='auto', interpolation='none', cmap=plt.cm.coolwarm, vmin=0, vmax=1)
+        ax.set_axis_off()
+
+    logger.info("plotting MSA")
     ax = fig.add_axes([left, bottom, width, height])
 
     # plot the image in chunks
     nchunks = np.ceil(nreads / args.chunksize).astype(int)
     for n in range(nchunks):
-        order_chunk = order[
-            n * args.chunksize : min((n + 1) * args.chunksize, nreads)
-        ]
+        order_chunk = order[n * args.chunksize : min((n + 1) * args.chunksize, nreads)]
         extent = [
             0,
             Ltot,
@@ -529,7 +459,7 @@ def run(args):
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
             im[np.nonzero(msa_chunk)] = tmp[np.nonzero(msa_chunk)]
 
-        if args.mutations and mut.nnz > 0:
+        if args.variants_matrix and vmat.nnz > 0:
             ax.imshow(
                 im,
                 aspect="auto",
@@ -538,22 +468,16 @@ def run(args):
                 alpha=0.5,
                 extent=extent,
             )
-            x, y = mut[order_chunk].nonzero()
-            # colormap: A is red, C is green, G is blue and T is yellow
-            c = np.array(list("wbrgy"))[mut[order_chunk][(x, y)].A1.astype(int)]
-            if args.color_by == "genotype" and len(use) == mut.shape[1]:
-                show = np.isin(y, np.where(use)[0])
-                x = x[show]
-                y = y[show]
-                c = c[show]
+            x, y = vmat[order_chunk].nonzero()
+            use = np.isin(y, variants['rel_pos'])
             ax.scatter(
-                y,
-                nreads - (x + n * args.chunksize),
+                y[use],
+                nreads - (x[use] + n * args.chunksize),
                 marker=".",
                 lw=0,
-                s=lw,
+                s=.1,
                 zorder=2,
-                color=c,
+                color='k',
                 edgecolor=None,
             )
         else:
@@ -564,6 +488,14 @@ def run(args):
                 cmap=cmap,
                 extent=extent,
             )
+
+    if args.variants_table:
+        logger.info("adding variant positions")
+        for typ, c in zip(('n.d.', 'het0', 'het1', 'hom'),
+                           ('gray', 'b', 'r', 'k')):
+            take = variants['type'] == typ
+            ax.scatter(variants[take]['rel_pos'].values, nreads*np.ones(take.sum()),
+                       s=6, c=c, marker=7, lw=0, zorder=2, edgecolor=None, clip_on=False)
 
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
@@ -616,9 +548,7 @@ def run(args):
             logger.warn("need processed read coordinates to show inserts!")
             exit(1)
         read_inserts = {}
-        logger.info(
-            "reading processed read coordinates from {0}".format(args.coords)
-        )
+        logger.info("reading processed read coordinates from {0}".format(args.coords))
         for line in open(args.coords):
             ls = line.strip("\n").split("\t")
             read = ls[0]
@@ -648,7 +578,9 @@ def run(args):
         unique_inserts = merge_intervals(inserts)
         ninserts_unique = len(unique_inserts)
         nclusts = len(np.unique(clustering["cluster"].astype(int)))
-        nclusts_eff = get_eff_nclust(clustering["cluster"].astype(int))
+        nclusts_eff = len(
+            np.unique(clustering["filtered_cluster"][clustering["filtered_cluster"] >= 0])
+        )
         stats = stat_string.format(
             args.sample, nreads, ninserts, ninserts_unique, nclusts, nclusts_eff
         )
@@ -670,9 +602,9 @@ def run(args):
                 insert_end = int(m.group("insert_end"))
                 switch_left = int(m.group("switch_left"))
                 switch_right = int(m.group("switch_right"))
-                if (
-                    switch_orientation == "+" and switch_right < switch_left
-                ) or (switch_orientation == "-" and switch_right > switch_left):
+                if (switch_orientation == "+" and switch_right < switch_left) or (
+                    switch_orientation == "-" and switch_right > switch_left
+                ):
                     switch_right, switch_left = switch_left, switch_right
                 insert = (insert_chrom, insert_start, insert_end)
                 ax.plot(
@@ -696,17 +628,13 @@ def run(args):
                     if interval_length(intersect_intervals([insert], [ins])) > 0
                 ][0]
                 if uinsert in insert_pos:
-                    arrows.append(
-                        [(-dx, p + 0.5), (-3 * dx, insert_pos[uinsert])]
-                    )
+                    arrows.append([(-dx, p + 0.5), (-3 * dx, insert_pos[uinsert])])
                     continue
                 n -= dn
                 arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
                 insert_pos[uinsert] = n + 0.5
                 insert_anno = set()
-                for rec in intersect_intervals(
-                    [uinsert], annotation[uinsert[0]], loj=True
-                ):
+                for rec in intersect_intervals([uinsert], annotation[uinsert[0]], loj=True):
                     insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
                 if len(insert_anno) == 0 or insert_anno == set("."):
                     insert_anno = "{0}:{1}-{2}".format(*uinsert)
@@ -725,13 +653,13 @@ def run(args):
                     va="center",
                 )
 
-        ax.add_collection(
-            LineCollection(arrows, linewidths=0.25, colors="k", clip_on=False)
-        )
+        ax.add_collection(LineCollection(arrows, linewidths=0.25, colors="k", clip_on=False))
     else:
         stat_string = "{0}: {1} reads " "({2} clusters; {3} eff. clusters)\n"
         nclusts = len(np.unique(clustering["cluster"].astype(int)))
-        nclusts_eff = get_eff_nclust(clustering["cluster"].astype(int))
+        nclusts_eff = len(
+            np.unique(clustering["filtered_cluster"][clustering["filtered_cluster"] >= 0])
+        )
         stats = stat_string.format(args.sample, nreads, nclusts, nclusts_eff)
 
         fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
@@ -742,19 +670,21 @@ def run(args):
 
     if args.plot_circles is not None:
 
-        if not args.color_by == 'cluster':
+        if not args.color_by == "cluster":
             logger.error("can't create bubble chart when not coloring by cluster!")
         logger.info("creating bubble chart")
 
         if nclust < 500:
             import circlify
+
             circles = circlify.circlify(
-                clustering["cluster"].value_counts().tolist(), 
-                show_enclosure=False, 
-                target_enclosure=circlify.Circle(x=0, y=0, r=1)
+                clustering["cluster"].value_counts().tolist(),
+                show_enclosure=False,
+                target_enclosure=circlify.Circle(x=0, y=0, r=1),
             )
         else:
             import packcircles
+
             circles = packcircles.pack(np.sqrt(clustering["cluster"].value_counts())[::-1].tolist())
 
         figsize = (args.fig_height + 0.5, args.fig_height + 0.5)
@@ -762,16 +692,25 @@ def run(args):
         fig.clf()
 
         ax = fig.add_axes([bottom, bottom, width, width])
-        ax.axis('off')
+        ax.axis("off")
 
-        lim=0
+        lim = 0
         for n, (x, y, r) in enumerate(circles):
-            ax.add_patch(plt.Circle((x, y), r, facecolor=cmap(nclust - n - 1), edgecolor='k', linewidth=.25, clip_on=False))
+            ax.add_patch(
+                plt.Circle(
+                    (x, y),
+                    r,
+                    facecolor=cmap(nclust - n - 1),
+                    edgecolor="k",
+                    linewidth=0.25,
+                    clip_on=False,
+                )
+            )
             m = max(abs(x) + r, abs(y) + r)
             if m > lim:
                 lim = m
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
-            
+
         logger.info("saving bubble chart to " + args.plot_circles)
         fig.savefig(args.plot_circles, dpi=args.dpi)

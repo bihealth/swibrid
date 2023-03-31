@@ -1,5 +1,5 @@
 ENV: "swibrid"
-SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10 --use-conda --conda-prefix ${HOME}/miniconda/envs"
+SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10"
 STUDY: "test_study"
 INPUT: ""
 SAMPLE_SHEET: ""
@@ -10,13 +10,13 @@ GENOME: 'hg19'
 REFERENCE: 'index/hg19.fa'
 SWITCH: 'chr14:106050000-106337000:-'
 ANNOTATION: 'index/gencode.v19.annotation.exon.gene_shortedV2.bed'
-SWITCH_ANNOTATION: 'hg19_switch_regions.bed'
+SWITCH_ANNOTATION: 'index/hg19_switch_regions.bed'
 LASTINDEX: 'index/hg19db'
 TELO_REPEAT: 'index/telomerSequence.fasta'
-EFF_CLUSTER_CUTOFF: .95
-NMAX: 200000
-N_NEIGHBORS: 500
-GBBS_BIN: '$HOME/gbbs/bazel-bin'
+NMAX: 50000
 MAX_GAP: 75
 BINSIZE: 50
 BLACKLIST_REGIONS: 'index/hg19_blacklist_regions.bed'
+CLUSTERING_METRIC: 'cosine'
+CLUSTERING_METHOD: 'average'
+CLUSTERING_CUTOFF: 0.01

@@ -3,9 +3,7 @@
 
 def setup_argparse(parser):
 
-    parser.add_argument(
-        "-g", "--genome", dest="genome", help="""genome fasta file"""
-    )
+    parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -25,9 +23,7 @@ def setup_argparse(parser):
         default=100,
         help="""binsize [100]""",
     )
-    parser.add_argument(
-        "-o", "--output", dest="output", help="""output file (npz)"""
-    )
+    parser.add_argument("-o", "--output", dest="output", help="""output file (npz)""")
     parser.add_argument(
         "--motifs",
         dest="motifs",
@@ -62,9 +58,7 @@ def run(args):
         switch_anno, switch_chrom, switch_start, switch_end
     )
 
-    switch_seqs = [
-        genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int
-    ]
+    switch_seqs = [genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int]
     stot = "".join(switch_seqs)
 
     binsize = args.binsize
@@ -73,12 +67,7 @@ def run(args):
     motif_counts["G_C"] = (
         np.array(
             [
-                sum(
-                    1
-                    for _ in re.finditer(
-                        "G|C", stot[k * binsize : (k + 1) * binsize]
-                    )
-                )
+                sum(1 for _ in re.finditer("G|C", stot[k * binsize : (k + 1) * binsize]))
                 for k in range(len(stot) // binsize)
             ]
         )
@@ -87,12 +76,7 @@ def run(args):
     motif_counts["A_T"] = (
         np.array(
             [
-                sum(
-                    1
-                    for _ in re.finditer(
-                        "A|T", stot[k * binsize : (k + 1) * binsize]
-                    )
-                )
+                sum(1 for _ in re.finditer("A|T", stot[k * binsize : (k + 1) * binsize]))
                 for k in range(len(stot) // binsize)
             ]
         )
@@ -101,12 +85,7 @@ def run(args):
     for motif in args.motifs.split(","):
         motif_counts[motif] = np.array(
             [
-                sum(
-                    1
-                    for _ in re.finditer(
-                        motif, stot[k * binsize : (k + 1) * binsize]
-                    )
-                )
+                sum(1 for _ in re.finditer(motif, stot[k * binsize : (k + 1) * binsize]))
                 for k in range(len(stot) // binsize)
             ]
         ) / (binsize / len(motif))
@@ -133,9 +112,7 @@ def run(args):
         minor_ticks = np.array(minor_ticks)
         major_ticks = np.array(np.unique(major_ticks))
 
-        fig, axs = plt.subplots(
-            len(motif_counts), 1, figsize=(4, 2 * len(motif_counts))
-        )
+        fig, axs = plt.subplots(len(motif_counts), 1, figsize=(4, 2 * len(motif_counts)))
         fig.subplots_adjust(top=0.97, bottom=0.05)
 
         for k, motif in enumerate(motif_counts.keys()):

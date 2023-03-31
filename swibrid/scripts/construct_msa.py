@@ -29,9 +29,7 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
-    parser.add_argument(
-        "--nmax", dest="nmax", type=int, help="""use only nmax reads"""
-    )
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
     parser.add_argument(
         "--use_orientation",
         dest="use_orientation",
@@ -71,9 +69,7 @@ def run(args):
         switch_anno, switch_chrom, switch_start, switch_end
     )
 
-    logger.info(
-        "reading processed read coordinates from {0}".format(args.coords)
-    )
+    logger.info("reading processed read coordinates from {0}".format(args.coords))
 
     read_mappings = {}
     read_isotypes = {}
@@ -124,9 +120,7 @@ def run(args):
     read_orientation = pd.Series(read_orientation)[reads]
     read_inserts = pd.Series(read_inserts)[reads]
 
-    logger.info(
-        "reading processed read sequences from {0}".format(args.sequences)
-    )
+    logger.info("reading processed read sequences from {0}".format(args.sequences))
     i, j, x = [], [], []
     for rec in SeqIO.parse(
         gzip.open("{0}".format(args.sequences), "rt")
@@ -146,11 +140,7 @@ def run(args):
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
         elif min(ne, Ltot) >= max(ns, 0):
-            logger.warn(
-                "coordinates {0}:{1}-{2} partially outside range".format(
-                    chrom, start, end
-                )
-            )
+            logger.warn("coordinates {0}:{1}-{2} partially outside range".format(chrom, start, end))
             ne = min(ne, Ltot)
             ns = max(ns, 0)
             if np.isfinite(shift_coord(start, cov_int)) or ne > Ltot:
@@ -162,11 +152,7 @@ def run(args):
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
         else:
-            logger.warn(
-                "coordinates {0}:{1}-{2} outside range".format(
-                    chrom, start, end
-                )
-            )
+            logger.warn("coordinates {0}:{1}-{2} outside range".format(chrom, start, end))
             continue
         n = read_isotypes.index.get_loc(read)
         # find all the non-gap positions in this part of the read sequence
@@ -178,9 +164,7 @@ def run(args):
     if np.unique(np.vstack([i, j]), axis=1).shape[1] < len(i):
         raise Exception("indices appear multiple times!\n")
 
-    msa = scipy.sparse.csr_matrix(
-        (x, (i, j)), shape=(nreads, Ltot), dtype=np.int8
-    )
+    msa = scipy.sparse.csr_matrix((x, (i, j)), shape=(nreads, Ltot), dtype=np.int8)
 
     use = msa.sum(1).A1 > 0
     logger.info("removing {0} reads without coverage".format((~use).sum()))

@@ -19,9 +19,7 @@ def run(args):
     from .utils import get_gap_positions
 
     if not os.path.isfile(args.msa):
-        logger.warn(
-            "no msa at {0}; run construct_msa.py first!".format(args.msa)
-        )
+        logger.warn("no msa at {0}; run construct_msa.py first!".format(args.msa))
         sys.exit(1)
 
     logger.info("loading msa from {0}".format(args.msa))

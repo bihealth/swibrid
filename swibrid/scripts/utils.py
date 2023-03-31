@@ -134,9 +134,7 @@ def p_adjust_bh(p):
     by_orig = by_descend.argsort()
     steps = float(len(p[ok])) / np.arange(len(p[ok]), 0, -1)
     q = np.zeros_like(p)
-    q[ok] = np.minimum(1, np.minimum.accumulate(steps * p[ok][by_descend]))[
-        by_orig
-    ]
+    q[ok] = np.minimum(1, np.minimum.accumulate(steps * p[ok][by_descend]))[by_orig]
     q[~ok] = np.nan
     return q
 
@@ -291,11 +289,38 @@ def shift_coord(coord, cov_int, ignore=False):
     return coord - shift
 
 
-def get_eff_nclust(clustering, cut=0.95, min_size=1):
-    p = np.bincount(clustering) / len(clustering)
-    step = min_size / len(clustering)
-    p[::-1].sort()
-    return np.sum((np.cumsum(p) < cut) & (p >= step)) + 1
+def get_leader_height(Z, C):
+    import scipy.cluster.hierarchy
+    import pandas as pd
+
+    L, M = scipy.cluster.hierarchy.leaders(Z, C.astype(np.int32))
+    h = pd.concat(
+        [
+            pd.Series(Z[:, 2], index=Z[:, 0].astype(int)),
+            pd.Series(Z[:, 2], index=Z[:, 1].astype(int)),
+        ],
+        axis=0,
+    )
+    return pd.Series(h.loc[L].values, index=M)
+
+
+def filter_clustering(Z, C, p=0.95, min_size=0):
+    clusts, cinv, csize = np.unique(C, return_inverse=True, return_counts=True)
+    heights = get_leader_height(Z, C)
+    o = np.lexsort([heights.max() - heights.loc[clusts].values, csize])[::-1]
+    o_rev = np.zeros_like(o)
+    o_rev[o] = np.arange(len(o))
+    remove = ((csize < min_size) | (np.cumsum(csize[o])[o_rev] >= p * len(C)))[cinv]
+    C_filtered = np.copy(C)
+    C_filtered[remove] = -1
+    return C_filtered
+
+
+# def get_eff_nclust(clustering, cut=0.95, min_size=1):
+#    p = np.bincount(clustering) / len(clustering)
+#    step = min_size / len(clustering)
+#    p[::-1].sort()
+#    return np.sum((np.cumsum(p) < cut) & (p >= step)) + 1
 
 
 def f2(p, x):
@@ -307,15 +332,13 @@ def res2(p, x, y):
 
 
 def get_gap_positions(msa):
-    cps = np.array(np.diff((~(msa != 0).todense()).astype(np.int8), axis=1))
-    read_idx_cps, pos_idx_cps = np.where(cps != 0)
-    internal_gaps = (np.diff(read_idx_cps) == 0) & (
-        cps[(read_idx_cps, pos_idx_cps)][:-1] == 1
-    )
-    gap_sizes = np.diff(pos_idx_cps)[internal_gaps]
-    read_idx = read_idx_cps[:-1][internal_gaps]
-    pos_left = pos_idx_cps[:-1][internal_gaps] + 1
-    pos_right = pos_idx_cps[1:][internal_gaps] + 1
+
+    ii, jj = msa.nonzero()
+    cps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
+    pos_left = jj[cps] + 1
+    pos_right = pos_left + np.diff(jj)[cps] - 1
+    read_idx = ii[cps]
+    gap_sizes = pos_right - pos_left
 
     return read_idx, pos_left, pos_right, gap_sizes
 
@@ -363,24 +386,38 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
 
     if return_sparse:
-        msa_cleaned = scipy.sparse.csr_matrix((np.sign(msa.data), (msa.row, msa.col)), 
-                                          shape=msa.shape, dtype=np.int8)
+        msa_cleaned = scipy.sparse.csr_matrix(
+            (np.sign(msa.data), (msa.row, msa.col)), shape=msa.shape, dtype=np.int8
+        ).tolil()
         vals_replace = np.repeat(
-            np.max(np.array([msa_cleaned[(read_idx, pos_left - 1)].A1,
-                             msa_cleaned[(read_idx, pos_right)].A1]),
-                   0,)[remove],
-            gaps_to_remove)   
+            np.max(
+                np.array(
+                    [
+                        msa_cleaned[(read_idx, pos_left - 1)].todense().A1,
+                        msa_cleaned[(read_idx, pos_right)].todense().A1,
+                    ]
+                ),
+                0,
+            )[remove],
+            gaps_to_remove,
+        )
+        msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
+        return msa_cleaned.tocsr()
     else:
         msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
         msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
         vals_replace = np.repeat(
-            np.max(np.array([msa_cleaned[(read_idx, pos_left - 1)],
-                             msa_cleaned[(read_idx, pos_right)]]),
-                   0,)[remove],
-            gaps_to_remove)
+            np.max(
+                np.array(
+                    [msa_cleaned[(read_idx, pos_left - 1)], msa_cleaned[(read_idx, pos_right)]]
+                ),
+                0,
+            )[remove],
+            gaps_to_remove,
+        )
 
-    msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
-    return msa_cleaned
+        msa_cleaned[(read_idx_to_remove, pos_idx_to_remove)] = vals_replace
+        return msa_cleaned
 
 
 def parse_range(numString: str):
@@ -397,9 +434,7 @@ def parse_range(numString: str):
         else:
             raise IndexError("too many values in range!")
 
-    return sorted(
-        set(itertools.chain(*map(expand_range, numString.split(","))))
-    )
+    return sorted(set(itertools.chain(*map(expand_range, numString.split(",")))))
 
 
 def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
@@ -426,15 +461,27 @@ def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
         j = np.concatenate(j)
         d = np.concatenate(d)
 
-        mut = scipy.sparse.csc_matrix(
-            (d, (i, j)), shape=(nreads, npos), dtype=np.int8
-        )
+        mut = scipy.sparse.csc_matrix((d, (i, j)), shape=(nreads, npos), dtype=np.int8)
     else:
-        mut = scipy.sparse.csc_matrix(
-            ([], ([], [])), shape=(nreads, npos), dtype=np.int8
-        )
+        mut = scipy.sparse.csc_matrix(([], ([], [])), shape=(nreads, npos), dtype=np.int8)
 
     return mut
+
+
+def nmf_consistency(U_max, U_all):
+
+    from sklearn.metrics.cluster import contingency_matrix
+
+    gmax = np.argmax(U_max, axis=1)
+    c = []
+    for u in U_all:
+        g = np.argmax(u, axis=1)
+        mm = np.argmax(contingency_matrix(gmax, g), axis=1)
+        try:
+            c.append(mm[g])
+        except:
+            pass
+    return np.mean(np.array(c), 0)
 
 
 def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
@@ -443,9 +490,7 @@ def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
     for rec in anno_recs:
         start = shift_coord(int(rec[3][1]), cov_int) - eff_start
         end = shift_coord(int(rec[3][2]), cov_int) - eff_start
-        switch_iis.append(
-            [rec[3][3].upper()] * (end // binsize - start // binsize)
-        )
+        switch_iis.append([rec[3][3].upper()] * (end // binsize - start // binsize))
     return np.concatenate(switch_iis)
 
 
@@ -462,13 +507,13 @@ def calculate_gini(x, w=None):
         # Force float dtype to avoid overflows
         cumw = np.cumsum(sorted_w, dtype=float)
         cumxw = np.cumsum(sorted_x * sorted_w, dtype=float)
-        return (np.sum(cumxw[1:] * cumw[:-1] - cumxw[:-1] * cumw[1:]) / 
-                (cumxw[-1] * cumw[-1]))
+        return np.sum(cumxw[1:] * cumw[:-1] - cumxw[:-1] * cumw[1:]) / (cumxw[-1] * cumw[-1])
     else:
         sorted_x = np.sort(x)
         n = len(x)
         cumx = np.cumsum(sorted_x, dtype=float)
         return (n + 1 - 2 * np.sum(cumx) / cumx[-1]) / n
+
 
 def weighted_avg_and_std(values, weights):
     """
@@ -479,6 +524,5 @@ def weighted_avg_and_std(values, weights):
     """
     average = np.average(values, weights=weights)
     # Fast and numerically precise:
-    variance = np.average((values-average)**2, weights=weights)
+    variance = np.average((values - average) ** 2, weights=weights)
     return (average, np.sqrt(variance))
-

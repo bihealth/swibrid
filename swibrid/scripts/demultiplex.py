@@ -2,12 +2,8 @@
 
 
 def setup_argparse(parser):
-    parser.add_argument(
-        "-i", "--input", dest="input", help="""input fastq(.gz)"""
-    )
-    parser.add_argument(
-        "-b", "--blast", dest="blast", help="""BLAST output file (or stdin)"""
-    )
+    parser.add_argument("-i", "--input", dest="input", help="""input fastq(.gz)""")
+    parser.add_argument("-b", "--blast", dest="blast", help="""BLAST output file (or stdin)""")
     parser.add_argument(
         "-c",
         "--cutoff",
@@ -32,15 +28,9 @@ def setup_argparse(parser):
         type=float,
         help="""min # of reads required to create separate file [1000]""",
     )
-    parser.add_argument(
-        "-o", "--outdir", dest="outdir", help="""output directory"""
-    )
-    parser.add_argument(
-        "-f", "--figure", dest="figure", help="""summary figure"""
-    )
-    parser.add_argument(
-        "-r", "--report", dest="report", help="""summary report"""
-    )
+    parser.add_argument("-o", "--outdir", dest="outdir", help="""output directory""")
+    parser.add_argument("-f", "--figure", dest="figure", help="""summary figure""")
+    parser.add_argument("-r", "--report", dest="report", help="""summary report""")
     parser.add_argument(
         "-s",
         "--sample-sheet",
@@ -67,9 +57,7 @@ def setup_argparse(parser):
         default=200,
         help="""maximum distance between internal primer matches to split read""",
     )
-    parser.add_argument(
-        "--nmax", dest="nmax", type=int, help="""maximum number of reads"""
-    )
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""maximum number of reads""")
 
 
 def run(args):
@@ -87,9 +75,7 @@ def run(args):
 
     if args.sample_sheet is not None:
         logger.info("reading sample sheet from " + args.sample_sheet)
-        sample_sheet = pd.read_csv(
-            args.sample_sheet, sep="\t", index_col=0, header=None
-        ).squeeze()
+        sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
         whitelist = sample_sheet.index
 
     if args.blast is not None:
@@ -157,10 +143,7 @@ def run(args):
 
     if args.outdir is not None:
 
-        logger.info(
-            "using these barcode combinations for demultiplexing: "
-            + ", ".join(combs)
-        )
+        logger.info("using these barcode combinations for demultiplexing: " + ", ".join(combs))
 
         outf = {}
         for comb in combs:
@@ -170,13 +153,9 @@ def run(args):
                     "wt",
                 )
             else:
-                outf[comb] = gzip.open(
-                    os.path.join(args.outdir, comb + ".fastq.gz"), "wt"
-                )
+                outf[comb] = gzip.open(os.path.join(args.outdir, comb + ".fastq.gz"), "wt")
 
-        outf["undetermined"] = gzip.open(
-            os.path.join(args.outdir, "undetermined.fastq.gz"), "wt"
-        )
+        outf["undetermined"] = gzip.open(os.path.join(args.outdir, "undetermined.fastq.gz"), "wt")
 
         read_info = defaultdict(dict)
 
@@ -239,27 +218,18 @@ def run(args):
                 primers = [
                     rh
                     for rh in read_hits
-                    if "primer" in rh[0]
-                    and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
+                    if "primer" in rh[0] and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
                 ]
                 internal = [
-                    rh
-                    for rh in read_hits
-                    if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
                 ]
                 if args.collapse:
                     comb = "+".join(set(bc[0] for bc in barcodes))
                 else:
                     comb = "+".join(bc[0] for bc in barcodes)
-                barcodes = ";".join(
-                    "{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes
-                )
-                primers = ";".join(
-                    "{0}@{1}-{2}:{3}".format(*pr) for pr in primers
-                )
-                internal = ";".join(
-                    "{0}@{1}-{2}:{3}".format(*h) for h in internal
-                )
+                barcodes = ";".join("{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes)
+                primers = ";".join("{0}@{1}-{2}:{3}".format(*pr) for pr in primers)
+                internal = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in internal)
                 if comb in combs:
                     comb = comb
                 else:
@@ -289,10 +259,7 @@ def run(args):
                         si = min(i for i, t in enumerate(is_bc) if t)
                     else:
                         # otherwise split in the largest gap
-                        gaps = [
-                            rhs[i][1] - rhs[i - 1][2]
-                            for i in range(1, len(rhs))
-                        ]
+                        gaps = [rhs[i][1] - rhs[i - 1][2] for i in range(1, len(rhs))]
                         si = np.argmax(gaps)
                     p = (rhs[si + 1][1] + rhs[si][2]) // 2
                     if p > sp[-1]:
@@ -310,58 +277,39 @@ def run(args):
                         for lb, st, en, o in read_hits
                         if not lb.startswith("primer")
                         and (st >= sp[k] and en <= sp[k + 1])
-                        and (
-                            st <= sp[k] + args.dist
-                            or en >= sp[k + 1] - args.dist
-                        )
+                        and (st <= sp[k] + args.dist or en >= sp[k + 1] - args.dist)
                     ]
                     primers = [
                         (lb, st - sp[k], en - sp[k], o)
                         for lb, st, en, o in read_hits
                         if lb.startswith("primer")
                         and (st >= sp[k] and en <= sp[k + 1])
-                        and (
-                            st <= sp[k] + args.dist
-                            or en >= sp[k + 1] - args.dist
-                        )
+                        and (st <= sp[k] + args.dist or en >= sp[k + 1] - args.dist)
                     ]
                     internal = [
                         (lb, st - sp[k], en - sp[k], o)
                         for lb, st, en, o in read_hits
                         if (st >= sp[k] and en <= sp[k + 1])
-                        and (
-                            st > sp[k] + args.dist
-                            and en < sp[k + 1] - args.dist
-                        )
+                        and (st > sp[k] + args.dist and en < sp[k + 1] - args.dist)
                     ]
                     if args.collapse:
                         comb = "+".join(set(bc[0] for bc in barcodes))
                     else:
                         comb = "+".join(bc[0] for bc in barcodes)
-                    barcodes = ";".join(
-                        "{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes
-                    )
-                    primers = ";".join(
-                        "{0}@{1}-{2}:{3}".format(*pr) for pr in primers
-                    )
-                    internal = ";".join(
-                        "{0}@{1}-{2}:{3}".format(*h) for h in internal
-                    )
+                    barcodes = ";".join("{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes)
+                    primers = ";".join("{0}@{1}-{2}:{3}".format(*pr) for pr in primers)
+                    internal = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in internal)
                     if comb in combs:
                         comb = comb
                     else:
                         comb = "undetermined"
                     SeqIO.write(rsub, outf[comb], "fastq")
                     read_info[comb][rsub.id] = dict(
-                        map(
-                            lambda x: x.split("="), rsub.description.split()[2:]
-                        )
+                        map(lambda x: x.split("="), rsub.description.split()[2:])
                     )
                     read_info[comb][rsub.id].update(
                         dict(
-                            meanQ=np.mean(
-                                rsub.letter_annotations["phred_quality"]
-                            ),
+                            meanQ=np.mean(rsub.letter_annotations["phred_quality"]),
                             length=len(rsub),
                             barcodes=barcodes,
                             primers=primers,
@@ -371,32 +319,25 @@ def run(args):
 
         logger.info("{0} reads split ... collecting info".format(nsplit))
         for comb in read_info.keys():
-            read_info[comb] = pd.DataFrame.from_dict(
-                read_info[comb], orient="index"
-            )
+            read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
             if "start_time" in read_info[comb].columns:
-                read_info[comb]["start_time"] = pd.to_datetime(
-                    read_info[comb]["start_time"]
-                ).apply(lambda x: time.mktime(x.timetuple()))
+                read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
+                    lambda x: time.mktime(x.timetuple())
+                )
                 read_info[comb]["start_time"] = (
-                    read_info[comb]["start_time"]
-                    - read_info[comb]["start_time"].min()
+                    read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
                 )
 
             if args.sample_sheet is not None and comb in sample_sheet.index:
-                read_info[comb].to_csv(
-                    os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
-                )
+                read_info[comb].to_csv(os.path.join(args.outdir, sample_sheet[comb] + "_info.csv"))
             else:
-                read_info[comb].to_csv(
-                    os.path.join(args.outdir, comb + "_info.csv")
-                )
+                read_info[comb].to_csv(os.path.join(args.outdir, comb + "_info.csv"))
 
         logger.info("done")
 
-    nreads = pd.Series(
-        dict((k, v.shape[0]) for k, v in read_info.items())
-    ).sort_values(ascending=False)
+    nreads = pd.Series(dict((k, v.shape[0]) for k, v in read_info.items())).sort_values(
+        ascending=False
+    )
     if args.report is not None:
         nreads.to_csv(args.report)
 
@@ -439,11 +380,8 @@ def run(args):
         ax = fig.add_axes([0.13, 0.1, 0.35, 0.4])
         for comb in nreads.index:
             bc_pos = [
-                np.mean(list(map(int, re.split("[-:]", p.split("@")[1])[:2])))
-                / r["length"]
-                for _, r in read_info[comb][["length", "barcodes"]]
-                .dropna()
-                .iterrows()
+                np.mean(list(map(int, re.split("[-:]", p.split("@")[1])[:2]))) / r["length"]
+                for _, r in read_info[comb][["length", "barcodes"]].dropna().iterrows()
                 if len(r["barcodes"]) > 0
                 for p in r["barcodes"].split(";")
                 if comb in p

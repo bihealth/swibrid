@@ -130,8 +130,8 @@ def parse_maf(maf_input, min_gap=50):
     from logzero import logger
     from Bio import AlignIO
 
-    logger.info("parsing MAF file " + maf_input)
-    read_matches = defaultdict(list)
+    read_matches = []
+    read_id = ''
     for ref, read_part in AlignIO.parse(maf_input, "maf", seq_count=2):
         read_start = read_part.annotations["start"]
         ref_start = ref.annotations["start"]
@@ -200,9 +200,15 @@ def parse_maf(maf_input, min_gap=50):
 
         chunks.append(chnk)
 
-        read_matches[read_part.id] += chunks
+        if read_part.id != read_id:
+            if len(read_matches) > 0:
+                yield read_id, read_matches
+            read_id = read_part.id
+            read_matches = []
 
-    return read_matches
+        read_matches += chunks
+
+    yield read_id, read_matches
 
 
 def run(args):
@@ -236,8 +242,6 @@ def run(args):
     else:
         blacklist_regions = []
 
-    read_matches = parse_maf(args.last)
-
     (
         switch_chrom,
         switch_start,
@@ -245,8 +249,6 @@ def run(args):
         switch_orientation,
     ) = parse_switch_coords(args.switch_coords)
     switch_anno = read_switch_anno(args.switch_annotation)
-
-    logger.info("filtering reads")
 
     stats = {
         "nreads": 0,
@@ -259,10 +261,12 @@ def run(args):
         "small_gap": 0,
     }
 
-    outf = open(args.outfile, "w")
-    sequences = []
+    logger.info("processing reads from MAF file " + args.last)
 
-    for read, matches in read_matches.items():
+    outf = open(args.outfile, "w")
+    seq_out = gzip.open(args.sequences, "wt") if args.sequences.endswith(".gz") else open(args.sequences, "w")
+
+    for read, matches in parse_maf(args.last):
 
         use = True
         stats["nreads"] += 1
@@ -367,9 +371,6 @@ def run(args):
         if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
             stats["orientation_mismatch"] += 1
             use = False
-
-        if orientations["1"] > 0 and orientations["-1"] > 0 and use:
-            stats["inversions"] += 1
 
         # sort switch matches by their order along the read
         switch_matches = sorted(switch_matches, key=operator.itemgetter(0))
@@ -517,10 +518,12 @@ def run(args):
             stats["low_cov"] += 1
             use = False
 
-        # check that switch matches are in consistent order along the read and the genome
-        read_order = np.argsort([sm[0] for sm in switch_matches])
-        genomic_order = np.argsort([sm[3] for sm in switch_matches])
-        if not ((read_order == genomic_order).all() or (read_order == genomic_order[::-1]).all()):
+        # check that switch matches are in consistent order along the read and the genome (but ignore inverted segments)
+        read_order = np.argsort([sm[0] for sm in switch_matches if sm[5] == main_orientation])
+        genomic_order = np.argsort([sm[3] for sm in switch_matches if sm[5] == main_orientation])
+        if main_orientation == -1:
+            genomic_order = genomic_order[::-1]
+        if not (read_order == genomic_order).all():
             stats["switch_order"] += 1
             use = False
 
@@ -529,6 +532,9 @@ def run(args):
 
         if not use:
             continue
+
+        if orientations["1"] > 0 and orientations["-1"] > 0:
+            stats["inversions"] += 1
 
         # isotype
         last_map = read_mappings[-1] if switch_orientation == "+" else read_mappings[0]
@@ -606,6 +612,7 @@ def run(args):
                             + aligned_seq
                             + seq[k][(ref_end - rm[1]) :]
                         )
+            sequences = []
             for k, rm in enumerate(read_mappings):
                 sequences.append(
                     SeqRecord.SeqRecord(
@@ -613,17 +620,13 @@ def run(args):
                         id="{0}@{1}:{2}-{3}:{4}".format(read, *rm),
                     )
                 )
+            SeqIO.write(sequences, seq_out, "fasta")
 
     outf.close()
+    seq_out.close()
 
-    if args.sequences is not None:
-        SeqIO.write(
-            sequences,
-            gzip.open(args.sequences, "wt")
-            if args.sequences.endswith(".gz")
-            else open(args.sequences, "w"),
-            "fasta",
-        )
-
+    logger.info('done. saving stats to ' + args.stats)
     if args.stats:
         pd.Series(stats).to_csv(args.stats)
+
+        

@@ -2,6 +2,28 @@ import numpy as np
 from logzero import logger
 
 ncodes = dict(zip(list("ACGTacgt"), [1, 2, 3, 4, -1, -2, -3, -4]))
+IUPAC = {
+    'A': 'A',
+    'C': 'C',
+    'G': 'G',
+    'T': 'T',
+    'R': '[AG]',
+    'K': '[GT]',
+    'S': '[GC]',
+    'Y': '[CT]',
+    'M': '[AC]',
+    'W': '[AT]',
+    'B': '[CGT]',
+    'H': '[ACT]',
+    'D': '[AGT]',
+    'V': '[ACG]',
+    'N': '[ACGT]'
+    }
+
+RC = {'A': 'T', 
+      'C': 'G',
+      'G': 'C',
+      'T': 'A'}
 
 
 def parse_switch_coords(switch_coords):

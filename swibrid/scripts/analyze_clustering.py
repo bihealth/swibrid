@@ -53,6 +53,7 @@ def run(args):
     import scipy.sparse
     import scipy.cluster.hierarchy
     import pandas as pd
+    import re
 
     from logzero import logger
 
@@ -119,7 +120,7 @@ def run(args):
             (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
         )
 
-    logger.info("removing gaps > {0} from MSA".format(args.max_gap))
+    logger.info("removing gaps < {0} from MSA".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
     logger.info("averaging cleaned MSA")
     avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
@@ -148,7 +149,7 @@ def run(args):
 
         def get_insert_isotype(x):
             left_isotype = ",".join(
-                rec[3][3]
+                re.sub('[0-9][A-Za-z]$','',rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -162,7 +163,7 @@ def run(args):
                 )
             )
             right_isotype = ",".join(
-                rec[3][3]
+                re.sub('[0-9][A-Za-z]$','',rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -175,7 +176,7 @@ def run(args):
                     loj=True,
                 )
             )
-            return left_isotype + "_" + right_isotype
+            return right_isotype + "_" + left_isotype
 
         def aggregate_inserts(x):
             import functools

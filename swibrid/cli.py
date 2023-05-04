@@ -15,7 +15,6 @@ from .scripts import (
     process_last_output,
     construct_msa,
     get_gaps,
-    construct_graph,
     construct_linkage,
     find_clusters,
     plot_clustering,
@@ -108,8 +107,7 @@ def main(argv=None):
     swibrid create_bed             create bed files and summary tables for insert-containing reads
     swibrid construct_msa          construct a (pseudo) MSA
     swibrid get_gaps               find gaps in MSA
-    swibrid construct_graph        construct a read graph
-    swibrid construct_linkage      construct hierarchical clustering on graph
+    swibrid construct_linkage      construct hierarchical clustering linkage
     swibrid find_clusters          get read clustering from linkage
     swibrid find_variants          variant calling
     swibrid plot_clustering        plot the read clustering
@@ -194,9 +192,6 @@ def main(argv=None):
         subparsers.add_parser("construct_msa", help="step: construct (pseudo) MSA")
     )
     get_gaps.setup_argparse(subparsers.add_parser("get_gaps", help="step: find gaps in MSA"))
-    construct_graph.setup_argparse(
-        subparsers.add_parser("construct_graph", help="step: construct read graph")
-    )
     construct_linkage.setup_argparse(
         subparsers.add_parser("construct_linkage", help="step: construct linkage")
     )
@@ -247,7 +242,6 @@ def main(argv=None):
         "create_bed": create_bed.run,
         "construct_msa": construct_msa.run,
         "get_gaps": get_gaps.run,
-        "construct_graph": construct_graph.run,
         "construct_linkage": construct_linkage.run,
         "find_clusters": find_clusters.run,
         "find_variants": find_variants.run,

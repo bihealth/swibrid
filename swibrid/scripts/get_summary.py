@@ -299,10 +299,19 @@ def run(args):
 
         ref = variants["ref"].apply(lambda x: ncodes[x] - 1)
         alt = variants["alt"].apply(lambda x: ncodes[x] - 1)
-        padj = variants["padj_clust"]
+        germline = (variants['type'] != 'n.d.') | ~variants['anno'].isnull()
+        somatic = ~germline
 
-        mm = (
-            pd.crosstab(ref, alt)
+        mm_G = (
+            pd.crosstab(ref[germline], alt[germline])
+            .reindex(index=range(4), columns=range(4))
+            .fillna(0)
+            .astype(int)
+            .values
+        )
+
+        mm_S = (
+            pd.crosstab(ref[somatic], alt[somatic])
             .reindex(index=range(4), columns=range(4))
             .fillna(0)
             .astype(int)
@@ -312,16 +321,27 @@ def run(args):
         var_stats = pd.Series(
             {
                 "num_variants": len(ref),
-                "fraction_cluster_specific_variants": np.mean(padj < 0.05),
-                "fraction_transitions": mm[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / len(ref),
-                "fraction_C>A": mm[(1, 2), (0, 3)].sum() / len(ref),
-                "fraction_C>G": mm[(1, 2), (2, 1)].sum() / len(ref),
-                "fraction_C>T": mm[(1, 2), (3, 0)].sum() / len(ref),
-                "fraction_T>A": mm[(3, 0), (0, 3)].sum() / len(ref),
-                "fraction_T>C": mm[(3, 0), (1, 2)].sum() / len(ref),
-                "fraction_T>G": mm[(3, 0), (2, 1)].sum() / len(ref),
+                "fraction_somatic_variants": np.mean(~germline),
+                "fraction_germline_transitions": mm_G[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / sum(germline),
+                "fraction_germline_C>A": mm_G[(1, 2), (0, 3)].sum() / sum(germline),
+                "fraction_germline_C>G": mm_G[(1, 2), (2, 1)].sum() / sum(germline),
+                "fraction_germline_C>T": mm_G[(1, 2), (3, 0)].sum() / sum(germline),
+                "fraction_germline_T>A": mm_G[(3, 0), (0, 3)].sum() / sum(germline),
+                "fraction_germline_T>C": mm_G[(3, 0), (1, 2)].sum() / sum(germline),
+                "fraction_germline_T>G": mm_G[(3, 0), (2, 1)].sum() / sum(germline),
+                "fraction_somatic_transitions": mm_S[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / sum(somatic),
+                "fraction_somatic_C>A": mm_S[(1, 2), (0, 3)].sum() / sum(somatic),
+                "fraction_somatic_C>G": mm_S[(1, 2), (2, 1)].sum() / sum(somatic),
+                "fraction_somatic_C>T": mm_S[(1, 2), (3, 0)].sum() / sum(somatic),
+                "fraction_somatic_T>A": mm_S[(3, 0), (0, 3)].sum() / sum(somatic),
+                "fraction_somatic_T>C": mm_S[(3, 0), (1, 2)].sum() / sum(somatic),
+                "fraction_somatic_T>G": mm_S[(3, 0), (2, 1)].sum() / sum(somatic),
             }
         )
+
+        for mot in set(','.join(variants["motif"].dropna()).split(',')):
+            var_stats['num_variants_germline_' + mot] = (variants['motif'].str.contains(mot) & germline).sum()
+            var_stats['num_variants_somatic_' + mot] = (variants['motif'].str.contains(mot) & somatic).sum()
 
         stats = pd.concat([stats, var_stats], axis=0)
 

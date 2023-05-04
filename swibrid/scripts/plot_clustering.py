@@ -22,6 +22,12 @@ def setup_argparse(parser):
         help="""file contains clustering results for extrapolated cutoff""",
     )
     parser.add_argument(
+        "--cutoff",
+        dest="cutoff",
+        type=float,
+        help="""use fixed cutoff instead of data-derived""",
+    )
+    parser.add_argument(
         "--clustering_stats",
         dest="clustering_stats",
         help="""file contains clustering stats""",
@@ -337,7 +343,7 @@ def run(args):
         values = crank[clustering["cluster"].astype(int)].values % nclust
     elif args.color_by == "isotype":
         cmap = plt.cm.tab20
-        values = clustering["isotype"].astype("category").cat.codes % 20
+        values = clustering["isotype"].astype("category").cat.codes.values % 20
     elif args.info and args.color_by in read_info.columns:
         info_col = read_info.loc[reads, args.color_by]
         if pd.api.types.is_numeric_dtype(read_info[args.color_by]):
@@ -370,7 +376,10 @@ def run(args):
         values = [0.3] * nreads
         cmap = plt.cm.Greys
 
-    if args.clustering_stats is not None:
+    if args.cutoff is not None:
+        logger.info("setting clustering cutoff at {0:.2f}".format(args.cutoff))
+        cutoff = args.cutoff
+    elif args.clustering_stats is not None:
         logger.info("reading clustering stats from {0}".format(args.clustering_stats))
         clustering_stats = pd.read_csv(args.clustering_stats, header=None, index_col=0).squeeze()
         cutoff = clustering_stats["c_opt"]
@@ -455,6 +464,7 @@ def run(args):
             i, j = np.nonzero(msa_chunk)
             im[(i[pos], j[pos])] = 0.8
             im[(i[neg], j[neg])] = 0.1
+            values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
             im[np.nonzero(msa_chunk)] = tmp[np.nonzero(msa_chunk)]
@@ -467,6 +477,8 @@ def run(args):
                 cmap=cmap,
                 alpha=0.5,
                 extent=extent,
+                vmin=0,
+                vmax=values.max(),
             )
             x, y = vmat[order_chunk].nonzero()
             use = np.isin(y, variants['rel_pos'])
@@ -487,6 +499,8 @@ def run(args):
                 interpolation="none",
                 cmap=cmap,
                 extent=extent,
+                vmin=0,
+                vmax=values.max(),
             )
 
     if args.variants_table:

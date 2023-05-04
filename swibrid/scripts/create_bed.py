@@ -7,7 +7,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--processed_reads",
         dest="processed_reads",
-        help="""output of process_maf.py""",
+        help="""output of process_last_output""",
     )
     parser.add_argument(
         "--bed",

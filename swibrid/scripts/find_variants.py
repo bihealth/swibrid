@@ -47,13 +47,6 @@ def setup_argparse(parser):
         help="""minimum read coverage at potentially variable positions [50]""",
     )
     parser.add_argument(
-        "--min_cluster_cov",
-        dest="min_cluster_cov",
-        default=10,
-        type=int,
-        help="""minimum read coverage at potentially variable positions per cluster [10]""",
-    )
-    parser.add_argument(
         "--gap_window_size",
         dest="gap_window_size",
         default=10,
@@ -67,17 +60,45 @@ def setup_argparse(parser):
         type=float,
         help="""max. local gap frequency in window [.7]""",
     )
+    parser.add_argument(
+        "--min_cluster_cov",
+        dest="min_cluster_cov",
+        default=10,
+        type=int,
+        help="""minimum read coverage at potentially variable positions per cluster [10]""",
+    )
+    parser.add_argument(
+        "--min_freq",
+        dest="min_freq",
+        default=.4,
+        type=float,
+        help="""minimum allele frequency at potentially variable positions (in total or per cluster) [.4]""",
+    )
     parser.add_argument("-o", "--out", dest="out", help="""output file (text)""")
     parser.add_argument("-m", "--mat", dest="mat", help="""output file (matrix)""")
+    parser.add_argument(
+        "--variant_annotation",
+        dest="variant_annotation",
+        default="",
+        help="""variant annotation file (vcf.gz; e.g., from 1000Genomes project)"""
+    )
     parser.add_argument(
         "--haplotypes",
         dest="haplotypes",
         help="""cluster haplotypes""",
     )
+    parser.add_argument(
+        "--motifs",
+        dest="motifs",
+        default="Cg,wrCy,Tw",
+        help="""comma-separated list of sequence motifs to look up at variant positions [Cg,wrCy,Tw]"""
+    )
+
 
 
 def run(args):
 
+    import os
     import numpy as np
     import pandas as pd
     import scipy.cluster.hierarchy
@@ -210,17 +231,19 @@ def run(args):
     # - less than min_cov non-gaps
     # - fewer variants than expected
     # - high strand bias
-    # - no cluster with at least min_cluster_cov reads and allele frequency > .5
+    # - no cluster with at least min_cluster_cov reads and allele frequency > args.min_freq
     logger.info("filtering variants")
     low_cov = nr < args.min_cov
     few_var = pp_adj > args.fdr
     stranded = np.abs(strand_bias - 0.5) > 0.25
     if D.nnz > 0:
         dnz = D.nonzero()
-        no_clust_data = (A[dnz] > 0.5 * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1
+        no_clust_data = (A[dnz] > args.min_freq * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1
         no_clust = ~(scipy.sparse.csr_matrix((no_clust_data, dnz), shape=D.shape).sum(0) > 0).A1
     else:
         no_clust = np.ones_like(padj).astype(bool)
+    freq = mat.sum(0).A1 / (msa != 0).sum(0).A1
+    no_clust = no_clust & (freq <= args.min_freq) 
     padj[low_cov | few_var | stranded | no_clust] = 1
     SNP_pos = np.where(padj < args.fdr)[0]
     logger.info("{0} variants kept".format(len(SNP_pos)))
@@ -243,11 +266,28 @@ def run(args):
     pclust_adj = p_adjust_bh(pclust)
 
     # test distribution of inversions across clusters
-    inversions = (msa < 0).sum(1).A1 > 0
-    cdist = np.bincount(clustering["cluster"])
-    cdist_inv = np.bincount(clustering["cluster"][inversions], minlength=len(cdist))
-    cdist_ref = cdist * cdist_inv.sum() / cdist.sum()
-    pinv = scipy.stats.chisquare(cdist_inv, cdist_ref)[1]
+    # inversions = (msa < 0).sum(1).A1 > 0
+    # cdist = np.bincount(clustering["cluster"])
+    # cdist_inv = np.bincount(clustering["cluster"][inversions], minlength=len(cdist))
+    # cdist_ref = cdist * cdist_inv.sum() / cdist.sum()
+    # pinv = scipy.stats.chisquare(cdist_inv, cdist_ref)[1]
+
+    anno = [""] * len(SNP_pos)
+    if args.variant_annotation and os.path.isfile(args.variant_annotation):
+
+        logger.info("annotating variants with " + args.variant_annotation)
+        
+        var_anno = pd.read_csv(args.variant_annotation, sep='\t', comment='#', header=None,
+                               index_col = 1, 
+                               names=['CHROM', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'])
+
+        
+        for n, pos in enumerate(SNP_pos):
+            real_pos = cov_map[pos] + 1
+            if (real_pos in var_anno.index and 
+                var_anno.loc[real_pos, 'REF'] == "ACGT"[ref[pos] - 1] and 
+                var_anno.loc[real_pos, 'ALT'] == "ACGT"[alt[pos] - 1]):
+                anno[n] = var_anno.loc[real_pos, 'ID']
 
     mtype = np.array(["n.d."] * len(SNP_pos))
 
@@ -300,19 +340,45 @@ def run(args):
             args.haplotypes
         )
 
+    if args.motifs is not None:
+        
+        logger.info("checking motifs")
+
+        import re
+        from collections import defaultdict
+        from .utils import IUPAC, RC
+
+        motif_anno = defaultdict(set)
+
+        for mot in args.motifs.split(','):
+            
+            rx = r''.join(IUPAC[m.upper()] for m in mot)
+            i = re.search(r'[A-Z]', mot).start() 
+            for p in SNP_pos:
+                seq = ref_seq[(p - i):(p - i + len(mot))]
+                seq_rc = ''.join(RC[s] for s in ref_seq[(p - len(mot) + i + 1):(p + i + 1)][::-1])
+                if re.match(rx, seq) or re.match(rx, seq_rc):
+                    motif_anno[p].add(mot)
+                    
+        motif_anno = np.array([','.join(motif_anno[p]) for p in SNP_pos])
+
+    else:
+
+        motif_anno = np.array([''] * len(SNP_pos))
+            
     logger.info("saving variant table to {0}".format(args.out))
     with open(args.out, "w") as outf:
         outf.write(
-            "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tpval_clust\tpadj_clust\tstrand_bias\ttype\n"
+            "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tpval_clust\tpadj_clust\tstrand_bias\ttype\tanno\tmotif\n"
         )
         lines = []
-        line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9:.3g}\t{10:.3g}\t{11:.3g}\t{12}\n"
+        line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9:.3g}\t{10:.3g}\t{11:.3g}\t{12}\t{13}\t{14}\n"
         for n, pos in enumerate(SNP_pos):
             ref = ref_seq[pos]
-            real_pos = cov_map[pos]
+            real_pos = cov_map[pos] + 1
             region = []
             for _, _, _, hit in intersect_intervals(
-                [("chr14", real_pos, real_pos + 1)], switch_anno, loj=True
+                [("chr14", real_pos - 1, real_pos)], switch_anno, loj=True
             ):
                 region.append(hit[3])
             region = ",".join(region)
@@ -330,6 +396,8 @@ def run(args):
                 pclust_adj[n],
                 strand_bias[pos],
                 mtype[n],
+                anno[n],
+                motif_anno[n]
             ]
             lines.append(line.format(*vals))
         outf.writelines(lines)

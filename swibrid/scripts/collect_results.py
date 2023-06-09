@@ -43,28 +43,30 @@ def run(args):
     logger.info("saving sample stats to " + args.sample_stats)
     df.T.to_csv(args.sample_stats)
 
-    wb = Workbook()
-    with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
-        writer.book = wb
-        for rf in glob.glob(os.path.join("inserts", "*_inserts.tsv")):
-            name = rf.split("/")[-1].split("_inserts.tsv")[0]
-            try:
-                tmp = pd.read_csv(rf, sep="\t", header=0)
-                tmp.to_excel(writer, sheet_name=name, index=False)
-                logger.info("adding inserts for {0}".format(name))
-            except pd.errors.EmptyDataError:
-                logger.warn("no inserts for {0}".format(name))
-                pass
+    if args.inserts is not None:
+        wb = Workbook()
+        with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
+            writer.book = wb
+            for rf in glob.glob(os.path.join("inserts", "*_inserts.tsv")):
+                name = rf.split("/")[-1].split("_inserts.tsv")[0]
+                try:
+                    tmp = pd.read_csv(rf, sep="\t", header=0)
+                    tmp.to_excel(writer, sheet_name=name, index=False)
+                    logger.info("adding inserts for {0}".format(name))
+                except pd.errors.EmptyDataError:
+                    logger.warn("no inserts for {0}".format(name))
+                    pass
 
-    wb = Workbook()
-    with pd.ExcelWriter(args.cluster_stats, engine="openpyxl") as writer:
-        writer.book = wb
-        for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
-            name = rf.split("/")[-1].split("_analysis.csv")[0]
-            try:
-                tmp = pd.read_csv(rf, header=0, index_col=0).sort_values("size", ascending=False)
-                tmp.to_excel(writer, sheet_name=name, index=True)
-                logger.info("adding clustering stats for {0}".format(name))
-            except pd.errors.EmptyDataError:
-                logger.warn("no clustering stats for {0}".format(name))
-                pass
+    if args.cluster_stats is not None:
+        wb = Workbook()
+        with pd.ExcelWriter(args.cluster_stats, engine="openpyxl") as writer:
+            writer.book = wb
+            for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
+                name = rf.split("/")[-1].split("_analysis.csv")[0]
+                try:
+                    tmp = pd.read_csv(rf, header=0, index_col=0).sort_values("size", ascending=False)
+                    tmp.to_excel(writer, sheet_name=name, index=True)
+                    logger.info("adding clustering stats for {0}".format(name))
+                except pd.errors.EmptyDataError:
+                    logger.warn("no clustering stats for {0}".format(name))
+                    pass

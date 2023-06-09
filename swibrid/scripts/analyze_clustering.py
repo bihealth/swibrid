@@ -92,6 +92,9 @@ def run(args):
         shape=(len(clusters), len(cinv)),
     )
 
+    avg_coverage = clustering.groupby("cluster")["coverage"].mean()
+    avg_outside_range = clustering.groupby("cluster")["outside_range"].mean()
+
     avg_isotype = (
         clustering.groupby("cluster")["isotype"].agg(lambda x: pd.Series.mode(x)[0]).loc[clusters]
     )
@@ -265,6 +268,8 @@ def run(args):
         {
             "size": csize,
             "isotype": avg_isotype,
+            "coverage": avg_coverage,
+            "outside_range": avg_outside_range,
             "sequence": cluster_seq,
             "length": cluster_length,
             "GC": cluster_GC,

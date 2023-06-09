@@ -34,9 +34,9 @@ def setup_argparse(parser):
         help="""reference sequence (switch chromosome)""",
     )
     parser.add_argument(
-        "--last",
-        dest="last",
-        help="""LAST parameters to estimate mutation probability""",
+        "--pars",
+        dest="pars",
+        help="""alignment parameters to estimate mutation probability""",
     )
     parser.add_argument("--fdr", dest="fdr", default=0.05, help="""FDR for variant calling""")
     parser.add_argument(
@@ -111,7 +111,6 @@ def run(args):
         read_switch_anno,
         get_switch_coverage,
         intersect_intervals,
-        parse_LAST_pars,
         p_adjust_bh,
         vrange,
         nmf_consistency,
@@ -148,9 +147,9 @@ def run(args):
         logger.info("restricting msa to {0} reads in clustering".format(nreads))
         msa = msa[:nreads]
 
-    # get LAST pars
-    logger.info("reading LAST pars from {0}".format(args.last))
-    pars = parse_LAST_pars(args.last)
+    # get alignment pars
+    logger.info("reading alignment pars from {0}".format(args.pars))
+    pars = np.load(args.pars)
     m0 = pars["p_c"] / pars["p_c"].sum(1)[:, np.newaxis]
 
     logger.info("looking for variants")
@@ -177,7 +176,9 @@ def run(args):
     all_diff.data[gap_freq >= args.max_local_gap_freq] = False
     all_diff.eliminate_zeros()
 
-    # get distribution of nucleotides at each position
+    logger.info("{0} positions ignored due to high gap frequency".format(sum(gap_freq >= args.max_local_gap_freq)))
+
+
     nuc_dist = np.vstack([np.sum(np.abs(msa) == k, 0).A1 for k in range(1, 5)]).T
     # number of non-gaps at each position
     nr = nuc_dist.sum(1)
@@ -204,6 +205,7 @@ def run(args):
     npos = all_diff[clustering["orientation"].values == "+", :].sum(0).A1
     nneg = all_diff[clustering["orientation"].values == "-", :].sum(0).A1
     strand_bias = npos / (npos + nneg)
+    pstrand = scipy.stats.chisquare(np.array([npos,nneg]),axis=0)[1]
 
     logger.info("aggregating counts over clusters")
     i, j = all_diff.multiply(np.abs(msa) == alt).nonzero()
@@ -235,7 +237,7 @@ def run(args):
     logger.info("filtering variants")
     low_cov = nr < args.min_cov
     few_var = pp_adj > args.fdr
-    stranded = np.abs(strand_bias - 0.5) > 0.25
+    stranded = pstrand < .05 # np.abs(strand_bias - 0.5) > 0.25
     if D.nnz > 0:
         dnz = D.nonzero()
         no_clust_data = (A[dnz] > args.min_freq * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1
@@ -246,6 +248,10 @@ def run(args):
     no_clust = no_clust & (freq <= args.min_freq) 
     padj[low_cov | few_var | stranded | no_clust] = 1
     SNP_pos = np.where(padj < args.fdr)[0]
+    logger.info("{0} variants removed due to low coverage".format(sum(low_cov)))
+    logger.info("{0} variants removed due to low # of events".format(sum(few_var)))
+    logger.info("{0} variants removed due to strand bias".format(sum(stranded)))
+    logger.info("{0} variants removed due to low allele frequency".format(sum(no_clust)))
     logger.info("{0} variants kept".format(len(SNP_pos)))
 
     logger.info("testing distribution across clusters")
@@ -369,7 +375,7 @@ def run(args):
     logger.info("saving variant table to {0}".format(args.out))
     with open(args.out, "w") as outf:
         outf.write(
-            "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tpval_clust\tpadj_clust\tstrand_bias\ttype\tanno\tmotif\n"
+            "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tpval_clust\tpadj_clust\tpval_strand\ttype\tanno\tmotif\n"
         )
         lines = []
         line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9:.3g}\t{10:.3g}\t{11:.3g}\t{12}\t{13}\t{14}\n"
@@ -394,7 +400,7 @@ def run(args):
                 padj[pos],
                 pclust[n],
                 pclust_adj[n],
-                strand_bias[pos],
+                pstrand[pos],
                 mtype[n],
                 anno[n],
                 motif_anno[n]

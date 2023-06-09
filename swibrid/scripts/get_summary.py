@@ -10,7 +10,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--process",
         dest="process",
-        help="""stats file from process_last_output.py""",
+        help="""stats file from process_alignments.py""",
     )
     parser.add_argument("--info", dest="info", help="""read info""")
     parser.add_argument("--gaps", dest="gaps", help="""gap distribution""")
@@ -161,6 +161,9 @@ def run(args):
     stats["std_cluster_size"] = clustering_analysis.loc[clones, "size"].std()
     stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
     stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
+
+    stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
+    stats["mean_cluster_outside_range"] = clustering_analysis.loc[clones, "outside_range"].mean()
 
     stats["cluster_gini"] = calculate_gini(
         clustering["cluster"][clustering["cluster"].isin(clones)],

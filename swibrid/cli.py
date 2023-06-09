@@ -12,7 +12,7 @@ from ruamel.yaml import YAML
 from .scripts import (
     demultiplex,
     filter_reads,
-    process_last_output,
+    process_alignments,
     construct_msa,
     get_gaps,
     construct_linkage,
@@ -25,6 +25,7 @@ from .scripts import (
     get_switch_motifs,
     create_bed,
     get_synthetic_reads,
+    get_alignment_pars,
     get_unique_clones_bed,
     analyze_clustering,
     collect_results,
@@ -103,7 +104,8 @@ def main(argv=None):
 
     swibrid demultiplex            demultiplex minION run
     swibrid filter_reads           filter reads
-    swibrid process_last_output    process output of LAST
+    swibrid process_alignments     process alignment output
+    swibrid get_alignment_pars     get alignment parameters (mismatch + gap rates) from align output
     swibrid create_bed             create bed files and summary tables for insert-containing reads
     swibrid construct_msa          construct a (pseudo) MSA
     swibrid get_gaps               find gaps in MSA
@@ -115,10 +117,10 @@ def main(argv=None):
     swibrid get_gap_stats          get breakpoint histogram stats
     swibrid get_switch_homology    get switch sequence homology
     swibrid get_switch_motifs      get switch sequence motifs
-    swibrid analyze_clustering     analyze clustering results at different cutoffs
-    swibrid collect results        collect results
+    swibrid analyze_clustering     analyze clustering results
+    swibrid collect results        collect results for multiple samples
 
-    subcommands to create synthetic reads for testing or benchmarking:
+    additional subcommands to create synthetic reads for testing or benchmarking:
 
     swibrid get_unique_clones_bed  get bed file with unique clones
     swibrid get_synthetic_reads    create synthetic reads from bed file
@@ -184,8 +186,11 @@ def main(argv=None):
 
     demultiplex.setup_argparse(subparsers.add_parser("demultiplex", help="demultiplex minION run"))
     filter_reads.setup_argparse(subparsers.add_parser("filter_reads", help="filter reads"))
-    process_last_output.setup_argparse(
-        subparsers.add_parser("process_last_output", help=argparse.SUPPRESS)
+    process_alignments.setup_argparse(
+        subparsers.add_parser("process_alignments", help=argparse.SUPPRESS)
+    )
+    get_alignment_pars.setup_argparse(
+        subparsers.add_parser("get_alignment_pars", help=argparse.SUPPRESS)
     )
     create_bed.setup_argparse(subparsers.add_parser("create_bed", help="step: create bed file"))
     construct_msa.setup_argparse(
@@ -238,7 +243,8 @@ def main(argv=None):
         "setup": run_setup,
         "demultiplex": demultiplex.run,
         "filter_reads": filter_reads.run,
-        "process_last_output": process_last_output.run,
+        "process_alignments": process_alignments.run,
+        "get_alignment_pars": get_alignment_pars.run,
         "create_bed": create_bed.run,
         "construct_msa": construct_msa.run,
         "get_gaps": get_gaps.run,

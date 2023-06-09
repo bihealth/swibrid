@@ -1,11 +1,11 @@
-"""process LAST output"""
+"""process alignments"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
-        "--last",
-        dest="last",
-        help="""MAF file with aligned reads (LAST output)""",
+        "--alignments",
+        dest="alignments",
+        help="""MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)"""
     )
     parser.add_argument(
         "--telo",
@@ -123,87 +123,181 @@ def setup_argparse(parser):
     )
 
 
-def parse_maf(maf_input, min_gap=50):
+def parse_sam(sam_input, min_gap=75):
 
     from collections import defaultdict
     import re
     from logzero import logger
+    import pysam
+    import re
+
+    read_matches = []
+    read_id = ''
+
+    for rec in pysam.Samfile(sam_input):
+
+        if rec.is_unmapped or rec.seq is None or rec.is_secondary or rec.seq is None:
+            continue
+
+        clip_start = rec.cigartuples[0][1] if rec.cigartuples[0][0] == 5 else 0
+        clip_end = rec.cigartuples[-1][1] if rec.cigartuples[-1][0] == 5 else 0
+        aligned_seq = ''
+        p = 0
+        l = 0
+        read_start_chunk = clip_start
+        chunks = []
+        for op, n in rec.cigartuples:
+
+            if op in [0, 7, 8]: # alignment match
+                aligned_seq+=str(rec.seq[p:p+n])
+                p += n
+                l += n
+
+            elif op == 1: # insertion 
+
+                if n > min_gap: # split insertions of more than min_gap nucleotides
+                    chnk = (
+                        read_start_chunk,
+                        clip_start + l - read_start_chunk,
+                        len(rec.seq) + clip_start + clip_end,
+                        rec.reference_name,
+                        rec.reference_start,
+                        rec.reference_length,
+                        -1 if rec.is_reverse else 1, 
+                        str(aligned_seq),
+                    )
+                    chunks.append(chnk)
+                    aligned_seq = ''
+                    read_start_chunk = clip_start + l + n
+                    
+                p += n
+                l += n
+
+            elif op == 2: # deletion
+                aligned_seq+='-'*n
+
+            elif op == 4: # soft clip
+                if p == 0: # add to clip_start if at beginning
+                    read_start_chunk += n
+                    clip_start += n
+                p += n
+
+            elif op != 5:
+                raise ValueError('CIGAR op {0} not implemented'.format(op))
+
+        chnk = (
+            read_start_chunk,
+            clip_start + l - read_start_chunk,
+            len(rec.seq) + clip_start + clip_end,
+            rec.reference_name,
+            rec.reference_start,
+            rec.reference_length,
+            -1 if rec.is_reverse else 1, 
+            str(aligned_seq),
+        )
+        chunks.append(chnk)
+
+        if rec.query_name != read_id:
+            if len(read_matches) > 0:
+                yield read_id, read_matches
+            read_id = rec.query_name
+            read_matches = []
+
+        read_matches += chunks
+
+    yield read_id, read_matches
+
+
+def parse_maf(alignments, min_gap=75):
+
+    from collections import defaultdict
+    import re
+    from logzero import logger
+    import pysam
     from Bio import AlignIO
 
     read_matches = []
     read_id = ''
-    for ref, read_part in AlignIO.parse(maf_input, "maf", seq_count=2):
-        read_start = read_part.annotations["start"]
-        ref_start = ref.annotations["start"]
+
+    for ref, read in AlignIO.parse(alignments, "maf", seq_count=2):
+
+        read_name = read.id
+        read_start = read.annotations['start']
+        read_len = read.annotations['srcSize']
+        read_seq = str(read.seq)
+        ref_name = ref.id
+        ref_start = ref.annotations['start']
+        ref_len = ref.annotations['size']
+        ref_seq = str(ref.seq)
+        orientation = read.annotations["strand"]
+
         pos = 0
         num_ref_gaps = 0
         num_read_gaps = 0
         chunks = []
         # find ref gaps of at least min_gap
-        for m in re.finditer(r"\-{{{0},}}".format(min_gap), str(ref.seq)):
+        for m in re.finditer(r"\-{{{0},}}".format(min_gap), ref_seq):
 
-            new_ref_gaps = ref.seq[pos : m.start()].count("-")
-            ref_start = ref.annotations["start"] + pos - num_ref_gaps
-            ref_end = ref.annotations["start"] + m.start() - num_ref_gaps - new_ref_gaps
+            new_ref_gaps = ref_seq[pos : m.start()].count("-")
+            ref_start_chunk = ref_start + pos - num_ref_gaps
+            ref_end_chunk = ref_start + m.start() - num_ref_gaps - new_ref_gaps
 
-            new_read_gaps = read_part.seq[pos : m.start()].count("-")
-            read_start = read_part.annotations["start"] + pos - num_read_gaps
-            read_end = read_part.annotations["start"] + m.start() - num_read_gaps - new_read_gaps
+            new_read_gaps = read_seq[pos : m.start()].count("-")
+            read_start_chunk = read_start + pos - num_read_gaps
+            read_end_chunk = read_start + m.start() - num_read_gaps - new_read_gaps
 
             # get sequence of read at non-gap positions in ref
-            ref_seq = ref.seq[pos : m.start()]
-            aligned_seq = "".join(
-                x for k, x in enumerate(read_part.seq[pos : m.start()]) if ref_seq[k] != "-"
+            ref_seq_chunk = ref_seq[pos : m.start()]
+            aligned_seq_chunk = "".join(
+                x for k, x in enumerate(read_seq[pos : m.start()]) if ref_seq_chunk[k] != "-"
             )
 
             chnk = (
-                read_start,
-                read_end - read_start,
-                read_part.annotations["srcSize"],
-                ref.id,
-                ref_start,
-                ref_end - ref_start,
-                ref.annotations["size"],
-                read_part.annotations["strand"],
-                str(aligned_seq),
+                read_start_chunk,
+                read_end_chunk - read_start_chunk,
+                read_len,
+                ref_name,
+                ref_start_chunk,
+                ref_end_chunk - ref_start_chunk,
+                orientation,
+                str(aligned_seq_chunk),
             )
-
+            
             chunks.append(chnk)
 
             num_read_gaps += new_read_gaps
             num_ref_gaps += m.end() - m.start() + new_ref_gaps
             pos = m.end()
 
-        new_ref_gaps = ref.seq[pos:].count("-")
-        ref_start = ref.annotations["start"] + pos - num_ref_gaps
-        ref_end = ref.annotations["start"] + len(ref) - num_ref_gaps - new_ref_gaps
+        new_ref_gaps = ref_seq[pos:].count("-")
+        ref_start_chunk = ref_start + pos - num_ref_gaps
+        ref_end_chunk = ref_start + len(ref_seq) - num_ref_gaps - new_ref_gaps
 
-        new_read_gaps = read_part.seq[pos:].count("-")
-        read_start = read_part.annotations["start"] + pos - num_read_gaps
-        read_end = read_part.annotations["start"] + len(ref) - num_read_gaps - new_read_gaps
+        new_read_gaps = read_seq[pos:].count("-")
+        read_start_chunk = read_start + pos - num_read_gaps
+        read_end_chunk = read_start + len(ref_seq) - num_read_gaps - new_read_gaps
 
         # get sequence of read at non-gap positions in ref
-        ref_seq = ref.seq[pos:]
-        aligned_seq = "".join(x for k, x in enumerate(read_part.seq[pos:]) if ref_seq[k] != "-")
+        ref_seq_chunk = ref_seq[pos:]
+        aligned_seq_chunk = "".join(x for k, x in enumerate(read_seq[pos:]) if ref_seq_chunk[k] != "-")
 
         chnk = (
-            read_start,
-            read_end - read_start,
-            read_part.annotations["srcSize"],
-            ref.id,
-            ref_start,
-            ref_end - ref_start,
-            ref.annotations["size"],
-            read_part.annotations["strand"],
-            str(aligned_seq),
+            read_start_chunk,
+            read_end_chunk - read_start_chunk,
+            read_len,
+            ref_name,
+            ref_start_chunk,
+            ref_end_chunk - ref_start_chunk,
+            orientation,
+            str(aligned_seq_chunk)
         )
 
         chunks.append(chnk)
 
-        if read_part.id != read_id:
+        if read_name != read_id:
             if len(read_matches) > 0:
                 yield read_id, read_matches
-            read_id = read_part.id
+            read_id = read_name
             read_matches = []
 
         read_matches += chunks
@@ -213,6 +307,7 @@ def parse_maf(maf_input, min_gap=50):
 
 def run(args):
 
+    import os
     import operator
     import numpy as np
     import pandas as pd
@@ -231,7 +326,7 @@ def run(args):
     if args.telo:
         telo = pd.read_csv(args.telo, index_col=0, sep="\t")
 
-    if args.blacklist_regions is not None:
+    if args.blacklist_regions is not None and os.path.isfile(args.blacklist_regions):
         blacklist_regions = sorted(
             [
                 (line.split()[0],) + tuple(map(int, line.split()[1:3]))
@@ -254,19 +349,24 @@ def run(args):
         "nreads": 0,
         "no_switch": 0,
         "length_mismatch": 0,
-        "orientation_mismatch": 0,
+        "overlap_mismatch": 0,
         "inversions": 0,
         "low_cov": 0,
         "switch_order": 0,
         "small_gap": 0,
     }
 
-    logger.info("processing reads from MAF file " + args.last)
+    if args.alignments.endswith('.maf'):
+        logger.info("processing reads from MAF file " + args.alignments)
+        alignments = parse_maf(args.alignments)
+    else:
+        logger.info("processing reads from SAM file " + args.alignments)
+        alignments = parse_sam(args.alignments)
 
     outf = open(args.outfile, "w")
     seq_out = gzip.open(args.sequences, "wt") if args.sequences.endswith(".gz") else open(args.sequences, "w")
 
-    for read, matches in parse_maf(args.last):
+    for read, matches in alignments:
 
         use = True
         stats["nreads"] += 1
@@ -278,18 +378,16 @@ def run(args):
         # get total read coverage
 
         # get positions of matches to switch region and to elsewhere ("inserts")
-        for match in matches:
-            (
+        for (
                 read_start,
                 read_len,
                 tot_read_len,
                 ref_chrom,
                 ref_start,
                 ref_len,
-                tot_ref_len,
                 orientation,
                 aligned_seq,
-            ) = match
+            ) in matches:
             if orientation == -1:
                 read_start = tot_read_len - read_start - read_len
             read_end = read_start + read_len
@@ -369,7 +467,7 @@ def run(args):
         )
 
         if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
-            stats["orientation_mismatch"] += 1
+            stats["overlap_mismatch"] += 1
             use = False
 
         # sort switch matches by their order along the read

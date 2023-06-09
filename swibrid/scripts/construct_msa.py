@@ -5,12 +5,12 @@ def setup_argparse(parser):
     parser.add_argument(
         "--coords",
         dest="coords",
-        help="""process_last_output.py coordinate output""",
+        help="""process_alignments.py coordinate output""",
     )
     parser.add_argument(
         "--sequences",
         dest="sequences",
-        help="""process_last_output.py sequence output""",
+        help="""process_alignments.py sequence output""",
     )
     parser.add_argument(
         "--msa",
@@ -47,6 +47,7 @@ def run(args):
     from Bio import SeqIO
     import scipy.sparse
     from logzero import logger
+    from collections import defaultdict
     import gzip
     from .utils import (
         parse_switch_coords,
@@ -121,6 +122,9 @@ def run(args):
     read_inserts = pd.Series(read_inserts)[reads]
 
     logger.info("reading processed read sequences from {0}".format(args.sequences))
+    nt_ignored = defaultdict(int)
+    nt_assigned = defaultdict(int)
+
     i, j, x = [], [], []
     for rec in SeqIO.parse(
         gzip.open("{0}".format(args.sequences), "rt")
@@ -139,6 +143,7 @@ def run(args):
             seq = str(rec.seq).upper()
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
+            nt_assigned[read] += len(seq)
         elif min(ne, Ltot) >= max(ns, 0):
             logger.warn("coordinates {0}:{1}-{2} partially outside range".format(chrom, start, end))
             ne = min(ne, Ltot)
@@ -151,8 +156,11 @@ def run(args):
                 seq = str(rec.seq[: (ne - ns)]).upper()
             if args.use_orientation and orientation == "-":
                 seq = seq.lower()
+            nt_assigned[read] += len(seq)
+            nt_ignored[read] += len(rec.seq) - len(seq)
         else:
             logger.warn("coordinates {0}:{1}-{2} outside range".format(chrom, start, end))
+            nt_ignored[read] += len(rec.seq)
             continue
         n = read_isotypes.index.get_loc(read)
         # find all the non-gap positions in this part of the read sequence
@@ -174,10 +182,13 @@ def run(args):
     scipy.sparse.save_npz(args.msa, msa)
 
     logger.info("saving info to {0}".format(args.out))
+    nt_assigned = pd.Series(nt_assigned)
+    nt_ignored = pd.Series(nt_ignored)
+    outside_range = (nt_ignored / (nt_assigned + nt_ignored)).fillna(0)
     read_info = pd.concat(
-        [read_isotypes, read_orientation, read_coverage],
+        [read_isotypes, read_orientation, read_coverage, outside_range],
         axis=1,
-        keys=["isotype", "orientation", "coverage"],
+        keys=["isotype", "orientation", "coverage", "outside_range"],
     )
     read_info["insert"] = read_inserts.apply(
         lambda x: ",".join(

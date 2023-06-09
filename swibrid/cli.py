@@ -56,6 +56,10 @@ def run_pipeline(args, snake_options):
         sfile=snakefile, cfile=args.config, snakemake_options=config["SNAKEOPTS"]
     )
     s_command += " " + " ".join(snake_options)
+
+    if args.slurm and args.sge:
+        logger.error("cannot submit to slurm and SGE at the same time!")
+
     if args.slurm:
         s_command = """#!/bin/bash\n""" + s_command + " --profile=cubi-dev\n"
         logger.info("run script content:\n" + s_command)
@@ -64,6 +68,13 @@ def run_pipeline(args, snake_options):
         command = "sbatch -t 168:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
             queue=args.queue
         )
+    elif args.sge:
+        drmaa_string = """" --mem={resources.mem_mb} --time={resources.time} -n {threads}"""""
+        s_command = """#!/bin/bash\n""" + s_command + " --drmaa=" + drmaa_string
+        logger.info("run script content:\n" + s_command)
+        run_script = Path("run_pipeline.sh")
+        run_script.write_text(s_command)
+        command = "qsub -t 168:00:00 --mem=4G -n 1 run_pipeline.sh"
     else:
         command = s_command
     # run
@@ -81,12 +92,12 @@ def run_setup(args):
 
     if not os.path.isfile("pipeline.snake") or args.overwrite:
         logger.info("copying pipeline.snake")
-        os.system("cp -i {0} .".format(snakefile))
+        os.system("cp {0} .".format(snakefile))
     else:
         logger.warn("refusing to overwrite pipeline.snake")
     if not os.path.isfile("config.yaml") or args.overwrite:
         logger.info("copying config.yaml")
-        os.system("cp -i {0} .".format(configfile))
+        os.system("cp {0} .".format(configfile))
     else:
         logger.warn("refusing to overwrite config.yaml")
 
@@ -173,6 +184,12 @@ def main(argv=None):
         dest="slurm",
         action="store_true",
         help="submit to slurm",
+    )
+    pipeline_parser.add_argument(
+        "--sge",
+        dest="sge",
+        action="store_true",
+        help="submit to SGE",
     )
     pipeline_parser.add_argument(
         "--queue",

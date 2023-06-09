@@ -45,7 +45,7 @@ def run(args):
 
     if args.inserts is not None:
         wb = Workbook()
-        with pd.ExcelWriter(args.inserts, engine="openpyxl", if_sheet_exists="overlay") as writer:
+        with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
             writer.workbook = wb
             for rf in glob.glob(os.path.join("inserts", "*_inserts.tsv")):
                 name = rf.split("/")[-1].split("_inserts.tsv")[0]
@@ -59,7 +59,7 @@ def run(args):
 
     if args.cluster_stats is not None:
         wb = Workbook()
-        with pd.ExcelWriter(args.cluster_stats, engine="openpyxl", if_sheet_exists="overlay") as writer:
+        with pd.ExcelWriter(args.cluster_stats, engine="openpyxl") as writer:
             writer.workbook = wb
             for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
                 name = rf.split("/")[-1].split("_analysis.csv")[0]

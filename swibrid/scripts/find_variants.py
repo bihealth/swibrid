@@ -286,7 +286,8 @@ def run(args):
         var_anno = pd.read_csv(args.variant_annotation, sep='\t', comment='#', header=None,
                                index_col = 1, 
                                names=['CHROM', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'])
-
+        # keep only PASS variants and remove polyclonal variants
+        var_anno = var_anno[(var_anno['FILTER'] == 'PASS') & (var_anno['REF'].str.len() == 1) & (var_anno['ALT'].str.len() == 1)]
         
         for n, pos in enumerate(SNP_pos):
             real_pos = cov_map[pos] + 1

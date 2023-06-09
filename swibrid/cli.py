@@ -69,12 +69,12 @@ def run_pipeline(args, snake_options):
             queue=args.queue
         )
     elif args.sge:
-        drmaa_string = """" --mem={resources.mem_mb} --time={resources.time} -n {threads}"""""
-        s_command = """#!/bin/bash\n""" + s_command + " --drmaa=" + drmaa_string
+        drmaa_string = "\" --mem={resources.mem_mb} --time={resources.time} -n {threads}\""
+        s_command = """#!/bin/bash\n""" + s_command + " --drmaa=" + drmaa_string + "\n"
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "qsub -cwd -V -pe smp 1 -l h_vmem=4G,h_rt=168:00:00 -j y run_pipeline.sh"
+        command = "qsub -cwd -V -pe smp 1 -l h_vmem=4G,h_rt=168:00:00 -j y -o swibrid.log run_pipeline.sh"
     else:
         command = s_command
     # run

@@ -74,7 +74,7 @@ def run_pipeline(args, snake_options):
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "qsub -t 168:00:00 --mem=4G -n 1 run_pipeline.sh"
+        command = "qsub -cwd -V -pe smp 1 -l h_vmem=4G,h_rt=168:00:00 -j y run_pipeline.sh"
     else:
         command = s_command
     # run

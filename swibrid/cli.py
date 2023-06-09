@@ -148,6 +148,8 @@ def main(argv=None):
         "-f",
         "--overwrite",
         dest="overwrite",
+        action="store_true",
+        default=False,
         help="""overwrite files if present [no]""",
     )
 

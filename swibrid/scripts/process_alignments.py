@@ -129,18 +129,19 @@ def parse_sam(sam_input, min_gap=75):
     import re
     from logzero import logger
     import pysam
-    import re
+    import sys
 
     read_matches = []
     read_id = ''
 
     for rec in pysam.Samfile(sam_input):
 
-        if rec.is_unmapped or rec.seq is None or rec.is_secondary or rec.seq is None:
+        if rec.is_unmapped or rec.seq is None or rec.is_secondary:
             continue
 
         clip_start = rec.cigartuples[0][1] if rec.cigartuples[0][0] == 5 else 0
         clip_end = rec.cigartuples[-1][1] if rec.cigartuples[-1][0] == 5 else 0
+        read_len = len(rec.seq) + clip_start + clip_end
         aligned_seq = ''
         p = 0
         l = 0
@@ -159,7 +160,7 @@ def parse_sam(sam_input, min_gap=75):
                     chnk = (
                         read_start_chunk,
                         clip_start + l - read_start_chunk,
-                        len(rec.seq) + clip_start + clip_end,
+                        read_len,
                         rec.reference_name,
                         rec.reference_start,
                         rec.reference_length,
@@ -188,7 +189,7 @@ def parse_sam(sam_input, min_gap=75):
         chnk = (
             read_start_chunk,
             clip_start + l - read_start_chunk,
-            len(rec.seq) + clip_start + clip_end,
+            read_len,
             rec.reference_name,
             rec.reference_start,
             rec.reference_length,

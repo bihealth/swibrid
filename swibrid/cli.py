@@ -65,7 +65,7 @@ def run_pipeline(args, snake_options):
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "sbatch -t 168:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
+        command = "sbatch -t 48:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
             queue=args.queue
         )
     elif args.sge:
@@ -74,7 +74,7 @@ def run_pipeline(args, snake_options):
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "qsub -cwd -V -pe smp 8 -l h_vmem=4G,h_rt=168:00:00, -j y -o swibrid.log run_pipeline.sh"
+        command = "qsub -cwd -V -pe smp 8 -l h_vmem=64G,h_rt=48:00:00, -j y -o swibrid.log run_pipeline.sh"
     else:
         command = s_command
     # run

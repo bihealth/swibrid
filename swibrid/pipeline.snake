@@ -81,9 +81,9 @@ rule align_last:
   shell:
     r"""
     mkdir -p align
-    last-train -P4 {params.index} {input} > {wildcards.sample}.par 
+    last-train -P4 {params.index} {input} > align/{wildcards.sample}.par 
     lastal -P4 -p align/{wildcards.sample}.par {params.index} {input} | last-split -m1e-6 | grep -v "^p" > {output.maf}
-    swibrid get_alignment_pars  -i {wildcards.sample}.par -o {output.par}
+    swibrid get_alignment_pars  -i align/{wildcards.sample}.par -o {output.par}
     """
 
 
@@ -96,7 +96,7 @@ rule align_minimap:
   params:
     index=config['MINIMAP_INDEX'],
     reference=config['REFERENCE']
-  threads: 1
+  threads: 4
   resources:
     mem_mb=32000,
     time='08:00:00'
@@ -105,7 +105,7 @@ rule align_minimap:
   shell:
     r"""
     mkdir -p align
-    minimap2 -a -x map-ont {params.index} {input} > {output.sam}
+    minimap2 -a -x map-ont -t {threads} {params.index} {input} > {output.sam}
     swibrid get_alignment_pars -i {output.sam} -o {output.par} -r {params.reference}
     """
 

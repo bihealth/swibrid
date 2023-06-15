@@ -15,6 +15,7 @@ def run(args):
     import pysam
     from Bio import AlignIO
     from logzero import logger
+    from .utils import RC
 
     stats = defaultdict(int)
     ins_sizes = []
@@ -47,7 +48,7 @@ def run(args):
 
         for rec in pysam.Samfile(args.inf):
 
-            if rec.is_unmapped or rec.seq is None or rec.is_secondary or rec.seq is None:
+            if rec.is_unmapped or rec.seq is None or rec.is_secondary:
                 continue
 
             pairs = rec.get_aligned_pairs()
@@ -89,7 +90,10 @@ def run(args):
                     ref_nuc = genome.fetch(rec.reference_name, ref_pos, ref_pos + 1).upper()
                     read_nuc = str(rec.seq[read_pos]).upper()
 
-                    stats[(read_nuc, ref_nuc)] += 1
+                    if rec.is_reverse:
+                        stats[(RC[read_nuc], RC[ref_nuc])] += 1
+                    else:
+                        stats[(read_nuc, ref_nuc)] += 1
 
     elif args.inf.endswith('.maf'):
 

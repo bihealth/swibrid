@@ -26,6 +26,7 @@ rule demux:
     time='08:00:00'
   conda:
     config['ENV']
+  log: "logs/all/demux.log"  
   shell:
     r"""
     mkdir -p demux
@@ -57,6 +58,7 @@ rule filter:
     time='04:00:00'
   conda:
     config['ENV']
+  log: "logs/filter/{sample}.log"
   shell:
     r"""
     mkdir -p filter
@@ -64,7 +66,7 @@ rule filter:
     """
 
 
-rule align_last:
+rule last:
   input:
     'filter/{sample}.fasta'
   output:
@@ -78,6 +80,7 @@ rule align_last:
     time='08:00:00'
   conda:
     config['ENV']
+  log: "logs/align/{sample}.log"
   shell:
     r"""
     mkdir -p align
@@ -87,7 +90,7 @@ rule align_last:
     """
 
 
-rule align_minimap:
+rule minimap:
   input:
     'filter/{sample}.fasta'
   output:
@@ -102,10 +105,11 @@ rule align_minimap:
     time='08:00:00'
   conda:
     config['ENV']
+  log: "logs/align/{sample}.log"
   shell:
     r"""
     mkdir -p align
-    minimap2 -a -x map-ont -t {threads} {params.index} {input} > {output.sam}
+    minimap2 -a -x map-ont -t {threads} --secondary=no --sam-hit-only {params.index} {input} > {output.sam}
     swibrid get_alignment_pars -i {output.sam} -o {output.par} -r {params.reference}
     """
 
@@ -123,6 +127,7 @@ rule telo:
     time='04:00:00'
   conda:
     config['ENV']
+  log: "logs/telo/{sample}.log"
   shell:
     r"""
     mkdir -p telo
@@ -150,6 +155,7 @@ rule process:
     time='04:00:00'
   conda:
     config['ENV']
+  log: "logs/process/{sample}.log"
   shell:
     r"""
     mkdir -p process
@@ -174,6 +180,7 @@ rule inserts:
     time='01:00:00'
   conda:
     config['ENV']
+  log: "logs/inserts/{sample}.log"
   shell:
     r"""
     mkdir -p inserts
@@ -205,6 +212,7 @@ rule msa:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/msa/{sample}.log"
   shell:
     r"""
     mkdir -p msa
@@ -225,6 +233,7 @@ rule gaps:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/gaps/{sample}.log"
   shell:
     r"""
     mkdir -p gaps
@@ -250,6 +259,7 @@ rule linkage:
     partition=get_partition,
   conda:
     config['ENV']
+  log: "logs/linkage/{sample}.log"
   shell:
     r"""
     mkdir -p linkage
@@ -274,6 +284,7 @@ rule cluster:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/cluster/{sample}.log"
   shell:
     r"""
     mkdir -p cluster
@@ -302,6 +313,7 @@ rule variants:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/variants/{sample}.log"
   shell:
     r"""
     mkdir -p variants
@@ -324,6 +336,7 @@ rule homology:
     partition='short'
   conda:
     config['ENV']
+  log: "logs/all/homology.log"
   shell:
     r"""
     mkdir -p gaps
@@ -346,6 +359,7 @@ rule motifs:
     partition='short'
   conda:
     config['ENV']
+  log: "logs/all/motifs.log"
   shell:
     r"""
     mkdir -p gaps
@@ -373,6 +387,7 @@ rule analyze_clustering:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/cluster/{sample}_analysis.log"
   shell:
     r"""
     swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --clustering_stats {input.stats} --adjust_size
@@ -402,6 +417,7 @@ rule gap_stats:
     time='4:00:00',
   conda:
     config['ENV']
+  log: "logs/gaps/{sample}_stats.log"
   shell:
     r"""
     mkdir -p gaps
@@ -434,6 +450,7 @@ rule plot_clustering:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/plots/{sample}.log"
   shell:
     r"""
     mkdir -p plots
@@ -468,6 +485,7 @@ rule summary:
     partition=get_partition
   conda:
     config['ENV']
+  log: "logs/summary/{sample}.log"
   shell:
     r"""
     mkdir -p plots stats
@@ -492,6 +510,7 @@ rule collect:
     time='04:00:00'
   conda:
     config['ENV']
+  log: "logs/all/collect.log"
   shell:
     r"""
     mkdir -p collect

@@ -323,7 +323,10 @@ def get_leader_height(Z, C):
         ],
         axis=0,
     )
-    return pd.Series(h.loc[L].values, index=M)
+    if np.isin(L, h.index).all():
+        return pd.Series(h.loc[L].values, index=M)
+    else:
+        return pd.Series([h.max()], index=M)
 
 
 def filter_clustering(Z, C, p=0.95, min_size=0):
@@ -336,13 +339,6 @@ def filter_clustering(Z, C, p=0.95, min_size=0):
     C_filtered = np.copy(C)
     C_filtered[remove] = -1
     return C_filtered
-
-
-# def get_eff_nclust(clustering, cut=0.95, min_size=1):
-#    p = np.bincount(clustering) / len(clustering)
-#    step = min_size / len(clustering)
-#    p[::-1].sort()
-#    return np.sum((np.cumsum(p) < cut) & (p >= step)) + 1
 
 
 def f2(p, x):

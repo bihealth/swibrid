@@ -23,11 +23,6 @@ def setup_argparse(parser):
         help="""find_clusters.py output file""",
     )
     parser.add_argument(
-        "--clustering_stats",
-        dest="clustering_stats",
-        help="""file with clustering stats""",
-    )
-    parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
@@ -284,12 +279,10 @@ def run(args):
     for isotype in np.unique(switch_iis):
         df["length_" + isotype] = avg_msa[:, switch_iis == isotype].sum(1)
 
-    if args.adjust_size:
+    if args.adjust_size and (clustering['filtered_cluster'] > 0).sum():
         logger.info("calculating adjusted cluster size")
         from sklearn import linear_model
 
-        stats = pd.read_csv(args.clustering_stats, header=0, index_col=0).squeeze()
-        neff = stats["eff_nclusters"].astype(int)
         clusters = clustering["filtered_cluster"].dropna()
         clones = clusters[clusters >= 0].astype(int)
 

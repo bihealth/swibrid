@@ -333,7 +333,7 @@ def run(args):
         nclust = len(csize)
         crank = pd.Series(range(nclust), csize.index)
         cmap = rand_cmap(
-            nclust,
+            max(2, nclust),
             type="bright",
             first_color_black=False,
             last_color_black=False,
@@ -478,7 +478,7 @@ def run(args):
                 alpha=0.5,
                 extent=extent,
                 vmin=0,
-                vmax=values.max(),
+                vmax=max(1, values.max()),
             )
             x, y = vmat[order_chunk].nonzero()
             use = np.isin(y, variants['rel_pos'])
@@ -500,7 +500,7 @@ def run(args):
                 cmap=cmap,
                 extent=extent,
                 vmin=0,
-                vmax=values.max(),
+                vmax=max(1, values.max()),
             )
 
     if args.variants_table:

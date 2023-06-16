@@ -369,7 +369,6 @@ rule analyze_clustering:
     msa='msa/{sample}_msa.npz',
     gaps='gaps/{sample}_gaps.npz',
     clustering='cluster/{sample}_clustering.csv',
-    stats='cluster/{sample}_stats.csv',
     inserts='inserts/{sample}_inserts.tsv',
   output:
     'cluster/{sample}_analysis.csv'
@@ -387,7 +386,7 @@ rule analyze_clustering:
   log: "logs/cluster/{sample}_analysis.log"
   shell:
     r"""
-    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --clustering_stats {input.stats} --adjust_size 2> {log}
+    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --adjust_size 2> {log}
     """
 
 

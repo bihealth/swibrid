@@ -151,46 +151,49 @@ def run(args):
 
     stats["nclusters_used"] = len(clones)
     stats["clustered"] = sum(~clustering["cluster"].isna())
-    stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
-        clustering_analysis.loc[clones, "length"], w
-    )
-    stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std(
-        clustering_analysis.loc[clones, "GC"], w
-    )
-    stats["mean_cluster_size"] = clustering_analysis.loc[clones, "size"].mean()
-    stats["std_cluster_size"] = clustering_analysis.loc[clones, "size"].std()
-    stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
-    stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
 
-    stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
-    stats["mean_cluster_outside_range"] = clustering_analysis.loc[clones, "outside_range"].mean()
+    if len(clones) > 0:
 
-    stats["cluster_gini"] = calculate_gini(
-        clustering["cluster"][clustering["cluster"].isin(clones)],
-    )
-    stats["cluster_entropy"] = scipy.stats.entropy(
-        clustering_analysis.loc[clones, "size"]
-    ) / np.log(len(clones))
-    stats["cluster_inverse_simpson"] = (
-        1.0
-        / (
-            (
-                clustering_analysis.loc[clones, "size"]
-                / clustering_analysis.loc[clones, "size"].sum()
-            )
-            ** 2
-        ).sum()
-    )
+        stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
+            clustering_analysis.loc[clones, "length"], w
+        )
+        stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std(
+            clustering_analysis.loc[clones, "GC"], w
+        )
+        stats["mean_cluster_size"] = clustering_analysis.loc[clones, "size"].mean()
+        stats["std_cluster_size"] = clustering_analysis.loc[clones, "size"].std()
+        stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
+        stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
 
-    stats["PCR_length_bias"] = scipy.stats.linregress(
-        clustering_analysis.loc[clones, "length"],
-        np.log(clustering_analysis.loc[clones, "size"]),
-    )[0]
+        stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
+        stats["mean_cluster_outside_range"] = clustering_analysis.loc[clones, "outside_range"].mean()
 
-    stats["PCR_GC_bias"] = scipy.stats.linregress(
-        clustering_analysis.loc[clones, "GC"],
-        np.log(clustering_analysis.loc[clones, "size"]),
-    )[0]
+        stats["cluster_gini"] = calculate_gini(
+            clustering["cluster"][clustering["cluster"].isin(clones)],
+        )
+        stats["cluster_entropy"] = scipy.stats.entropy(
+            clustering_analysis.loc[clones, "size"]
+        ) / np.log(len(clones))
+        stats["cluster_inverse_simpson"] = (
+            1.0
+            / (
+                (
+                    clustering_analysis.loc[clones, "size"]
+                    / clustering_analysis.loc[clones, "size"].sum()
+                )
+                ** 2
+            ).sum()
+        )
+
+        stats["PCR_length_bias"] = scipy.stats.linregress(
+            clustering_analysis.loc[clones, "length"],
+            np.log(clustering_analysis.loc[clones, "size"]),
+        )[0]
+
+        stats["PCR_GC_bias"] = scipy.stats.linregress(
+            clustering_analysis.loc[clones, "GC"],
+            np.log(clustering_analysis.loc[clones, "size"]),
+        )[0]
 
     logger.info("reading read info")
     read_info = pd.read_csv(args.info, header=0, index_col=0)

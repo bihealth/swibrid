@@ -7,7 +7,7 @@ SAMPLES: ["sample1","sample2"]
 MINLENGTH: 500
 BARCODES_PRIMERS: 'index/barcodes_primers.fa'
 GENOME: 'hs1'
-REFERENCE: 'hs1.fa'
+REFERENCE: 'index/hs1.fa'
 SWITCH: 'chr14:99840000-100138000:-'
 ANNOTATION: 'index/chm13.draft_v2.0.gene_annotation.exon_shorted.bed'
 SWITCH_ANNOTATION: 'index/hs1_switch_regions.bed'

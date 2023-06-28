@@ -110,7 +110,9 @@ def setup_argparse(parser):
         dest="haplotypes",
         help="""file with haplotype clustering (from find_variants.py)""",
     )
-    parser.add_argument("--realignments", dest="realignments", help="""file with breakpoint realignments""")
+    parser.add_argument(
+        "--realignments", dest="realignments", help="""file with breakpoint realignments"""
+    )
     parser.add_argument(
         "--dpi",
         dest="dpi",
@@ -689,30 +691,37 @@ def run(args):
         fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
 
     if args.realignments is not None and os.path.isfile(args.realignments):
-
         logger.info("adding breakpoint realignment results")
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
-        realignments = realignments[realignments['type'] == 'switch']
-        realignments['cluster'] = clustering.loc[realignments.index, 'cluster']
+        realignments = realignments[realignments["type"] == "switch"]
+        realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
 
-        pleft = realignments['pos_left'].apply(lambda x: shift_coord(int(x.split(':')[1]), cov_int) - eff_start).values
-        pright = realignments['pos_right'].apply(lambda x: shift_coord(int(x.split(':')[1]), cov_int) - eff_start).values
-        nh = realignments['n_homology'].values
-        nu = realignments['n_untemplated'].values
+        pleft = (
+            realignments["pos_left"]
+            .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+            .values
+        )
+        pright = (
+            realignments["pos_right"]
+            .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+            .values
+        )
+        nh = realignments["n_homology"].values
+        nu = realignments["n_untemplated"].values
 
         pos = clustering.iloc[order].index.get_indexer(realignments.index)
 
         ax.scatter(
             np.maximum(pleft, pright),
-            nreads - pos, 
-            s=.1*(1+nu),
+            nreads - pos,
+            s=0.1 * (1 + nu),
             c=nh,
             lw=0,
             zorder=2,
             edgecolor=None,
             clip_on=False,
-            vmin=0, 
+            vmin=0,
             vmax=10,
             cmap=plt.cm.winter,
         )

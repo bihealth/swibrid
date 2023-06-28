@@ -190,7 +190,7 @@ def parse_sam(sam_input, min_gap=75):
                 else:
                     clip_end += n
                 al_pos += n
-        
+
             elif op != 5:
                 raise ValueError("CIGAR op {0} not implemented".format(op))
 
@@ -212,8 +212,10 @@ def parse_sam(sam_input, min_gap=75):
             read_id = rec.query_name
             read_matches = []
 
-        assert sum(c[5] for c in chunks) == rec.reference_length, 'ref lengths dont match!'
-        assert sum(c[1] for c in chunks) + clip_start + clip_end + insertions == read_len, 'read lengths dont match!'
+        assert sum(c[5] for c in chunks) == rec.reference_length, "ref lengths dont match!"
+        assert (
+            sum(c[1] for c in chunks) + clip_start + clip_end + insertions == read_len
+        ), "read lengths dont match!"
 
         read_matches += chunks
 
@@ -313,7 +315,6 @@ def parse_maf(alignments, min_gap=75):
 
 
 def combine_alignments(al1, al2, pad):
-
     s1 = ""
     s0 = ""
     s2 = ""
@@ -352,9 +353,9 @@ def combine_alignments(al1, al2, pad):
             raise Exception("stop")
         if len(s1A[:i].replace("-", "")) != len(s2A[:j].replace("-", "")):
             raise Exception("stop")
-        if (
-            len(s1A[:i].replace("-", "")) == pad or len(s1A[i:].replace("-", "")) == pad
-        ) and not (s1A[i] == "-" or s2A[j] == "-"):
+        if (len(s1A[:i].replace("-", "")) == pad or len(s1A[i:].replace("-", "")) == pad) and not (
+            s1A[i] == "-" or s2A[j] == "-"
+        ):
             s1 += "/"
             s0 += "/"
             s2 += "/"
@@ -372,7 +373,7 @@ def realign_breakpoints(matches, genome, read_seq, pad=20):
         return "".join(RC[s] for s in seq[::-1])
 
     aligner = Align.PairwiseAligner()
-    aligner.mode = 'global'
+    aligner.mode = "global"
     aligner.match_score = 2
     aligner.mismatch_score = -4
     aligner.open_gap_score = -4
@@ -407,8 +408,8 @@ def realign_breakpoints(matches, genome, read_seq, pad=20):
                 matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
             ).upper()
 
-        #al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
-        #al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
+        # al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
+        # al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
 
         al1 = aligner.align(rseq, gseq1)
         al2 = aligner.align(rseq, gseq2)
@@ -462,7 +463,6 @@ def run(args):
     import operator
     import numpy as np
     import pandas as pd
-    from collections import defaultdict
     from Bio import SeqIO, Seq, SeqRecord
     import gzip
     from logzero import logger
@@ -551,8 +551,9 @@ def run(args):
             orientation,
             aligned_seq,
         ) in matches:
-
-            assert read_len > 0 and ref_len > 0 and tot_read_len > 0, 'negative lengths in parsed alignments!'
+            assert (
+                read_len > 0 and ref_len > 0 and tot_read_len > 0
+            ), "negative lengths in parsed alignments!"
 
             if orientation == -1:
                 read_start = tot_read_len - read_start - read_len
@@ -754,15 +755,15 @@ def run(args):
             use = False
 
         # check that there are no small gaps < args.min_gap
-        #switch_maps = defaultdict(list)
-        #for rec in intersect_intervals(read_mappings, switch_anno, loj=False):
+        # switch_maps = defaultdict(list)
+        # for rec in intersect_intervals(read_mappings, switch_anno, loj=False):
         #    if rec[3][3].startswith("S"):
         #        switch_maps[rec[3][3]].append((rec[1], rec[2]))
 
-        #gaps = [
+        # gaps = [
         #    val[i][1] - val[i - 1][0] for val in switch_maps.values() for i in range(1, len(val))
-        #]
-        #if len(gaps) > 0 and min(gaps) < args.min_gap:
+        # ]
+        # if len(gaps) > 0 and min(gaps) < args.min_gap:
         #    stats["small_gap"] += 1
         #    use = False
 
@@ -881,7 +882,11 @@ def run(args):
         if args.realign_breakpoints is not None:
             processed_matches = sorted(
                 [sm[:6] + ("switch",) for sm in switch_matches]
-                + [(f[7], f[8], f[0], f[1], f[2], f[9], "insert") for f in filtered_inserts if f[0] != 'telomer'],
+                + [
+                    (f[7], f[8], f[0], f[1], f[2], f[9], "insert")
+                    for f in filtered_inserts
+                    if f[0] != "telomer"
+                ],
                 key=operator.itemgetter(0),
             )
             realignments[read] = realign_breakpoints(

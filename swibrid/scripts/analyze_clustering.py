@@ -33,7 +33,9 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument("--inserts", dest="inserts", help="""results.tsv file with inserts""")
-    parser.add_argument("--realignments", dest="realignments", help="""file with breakpoint realignments""")
+    parser.add_argument(
+        "--realignments", dest="realignments", help="""file with breakpoint realignments"""
+    )
     parser.add_argument(
         "--adjust_size",
         dest="adjust_size",
@@ -261,14 +263,17 @@ def run(args):
             insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
 
     if args.realignments is not None and os.path.isfile(args.realignments):
-
         logger.info("reading breakpoint realignments from " + args.realignments)
 
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
-        realignments['cluster'] = clustering.loc[realignments.index, 'cluster']
-        realignment_stats = realignments.groupby(['type','cluster']).agg({'n_homology': 'mean', 'n_untemplated': 'mean'}).unstack(level=0)
-        realignment_stats.columns = ['_'.join(c) for c in realignment_stats.columns.tolist()]
+        realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
+        realignment_stats = (
+            realignments.groupby(["type", "cluster"])
+            .agg({"n_homology": "mean", "n_untemplated": "mean"})
+            .unstack(level=0)
+        )
+        realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
 
     df = pd.DataFrame(
         {

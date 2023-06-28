@@ -279,10 +279,21 @@ def run(args):
         axis=0,
     )
 
-    realignment_stats = clustering_analysis.loc[clones].groupby('isotype')[['n_untemplated_switch','n_homology_switch']].mean().unstack()
-    realignment_stats.index = ['_'.join(i) for i in realignment_stats.index.tolist()]
+    realignment_stats = (
+        clustering_analysis.loc[clones]
+        .groupby("isotype")[["n_untemplated_switch", "n_homology_switch"]]
+        .mean()
+        .unstack()
+    )
+    realignment_stats.index = ["_".join(i) for i in realignment_stats.index.tolist()]
 
-    realignment_stats = pd.concat([clustering_analysis.loc[clones][['n_untemplated_switch','n_homology_switch']].mean(), realignment_stats],axis=0)
+    realignment_stats = pd.concat(
+        [
+            clustering_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]].mean(),
+            realignment_stats,
+        ],
+        axis=0,
+    )
 
     stats = pd.concat(
         [
@@ -292,7 +303,7 @@ def run(args):
             pd.Series(cluster_stats),
             insert_stats,
             insert_isotype_count,
-            realignment_stats
+            realignment_stats,
         ],
         axis=0,
     )
@@ -334,12 +345,9 @@ def run(args):
             }
         )
 
-        if (~variants['motif'].isnull()).sum() > 0:
-
+        if (~variants["motif"].isnull()).sum() > 0:
             for mot in set(",".join(variants["motif"].dropna()).split(",")):
-                var_stats["num_variants_" + mot] = (
-                    variants["motif"].str.contains(mot) 
-                ).sum()
+                var_stats["num_variants_" + mot] = (variants["motif"].str.contains(mot)).sum()
 
         stats = pd.concat([stats, var_stats], axis=0)
 

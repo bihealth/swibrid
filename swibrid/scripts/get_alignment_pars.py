@@ -52,7 +52,9 @@ def run(args):
                 continue
 
             pairs = rec.get_aligned_pairs()
-            ref_seq = genome.fetch(rec.reference_name, rec.reference_start, rec.reference_end + 1).upper()
+            ref_seq = genome.fetch(
+                rec.reference_name, rec.reference_start, rec.reference_end + 1
+            ).upper()
 
             ref_gap_size = 0
             read_gap_size = 0
@@ -115,7 +117,7 @@ def run(args):
 
                     stats[(read_nuc.upper(), ref_nuc.upper())] += 1
 
-    stats = pd.Series(stats).unstack(level=1).values 
+    stats = pd.Series(stats).unstack(level=1).values
 
     # remove trailing gaps
     if read_gap_size > 0:

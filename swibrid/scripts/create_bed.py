@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with minION reads""")
     parser.add_argument(
         "--processed_reads",
@@ -43,7 +42,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import re
     import pandas as pd
     from collections import defaultdict
@@ -79,13 +77,11 @@ def run(args):
     bed = open(args.bed, "w")
     out_table = dict()
     for line in open(args.processed_reads):
-
         ls = line.strip("\n").split("\t")
         read = ls[0]
         isotype = ls[1]
         mappings = []
         inserts = []
-        read_orientation = ls[2]
         for ll in ls[4:]:
             if "insert" not in ll:
                 coords = decode_coords(ll)
@@ -114,7 +110,6 @@ def run(args):
         bed.write("\t".join(map(str, bed_entries)) + "\n")
 
         for insert in inserts:
-
             insert_chrom = insert.group("insert_chrom")
             insert_start = int(insert.group("insert_start"))
             insert_end = int(insert.group("insert_end"))

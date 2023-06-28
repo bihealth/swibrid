@@ -98,7 +98,6 @@ def fit_cutoff(cc, nn, method="fit"):
 
 
 def run(args):
-
     import numpy as np
     import pandas as pd
     import scipy.sparse
@@ -130,12 +129,10 @@ def run(args):
         )
 
     if args.cutoff is None:
-
         logger.info("finding optimal cutoff")
         res, c_opt = fit_cutoff(cutoffs, nclust, method=args.fit_method)
 
     else:
-
         logger.info("fixing cutoff at {0}".format(args.cutoff))
         res, c_opt = [], args.cutoff
 

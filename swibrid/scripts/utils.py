@@ -3,27 +3,24 @@ from logzero import logger
 
 ncodes = dict(zip(list("ACGTacgt"), [1, 2, 3, 4, -1, -2, -3, -4]))
 IUPAC = {
-    'A': 'A',
-    'C': 'C',
-    'G': 'G',
-    'T': 'T',
-    'R': '[AG]',
-    'K': '[GT]',
-    'S': '[GC]',
-    'Y': '[CT]',
-    'M': '[AC]',
-    'W': '[AT]',
-    'B': '[CGT]',
-    'H': '[ACT]',
-    'D': '[AGT]',
-    'V': '[ACG]',
-    'N': '[ACGT]'
-    }
+    "A": "A",
+    "C": "C",
+    "G": "G",
+    "T": "T",
+    "R": "[AG]",
+    "K": "[GT]",
+    "S": "[GC]",
+    "Y": "[CT]",
+    "M": "[AC]",
+    "W": "[AT]",
+    "B": "[CGT]",
+    "H": "[ACT]",
+    "D": "[AGT]",
+    "V": "[ACG]",
+    "N": "[ACGT]",
+}
 
-RC = {'A': 'T', 
-      'C': 'G',
-      'G': 'C',
-      'T': 'A'}
+RC = {"A": "T", "C": "G", "G": "C", "T": "A"}
 
 
 def parse_switch_coords(switch_coords):
@@ -41,7 +38,6 @@ def read_switch_anno(switch_annotation):
         chrom = ls[0]
         start = int(ls[1])
         end = int(ls[2])
-        name = ls[3]
         switch_anno.append((chrom, start, end) + tuple(ls[3:]))
     switch_anno = sorted(switch_anno, key=lambda x: (x[0], x[1]))
     return switch_anno
@@ -53,7 +49,6 @@ def get_switch_coverage(switch_anno, switch_chrom, switch_start, switch_end):
     for rec in intersect_intervals(
         [(switch_chrom, switch_start, switch_end)], switch_anno, loj=True
     ):
-
         anno_recs.append(rec)
         start = int(rec[3][1])
         end = int(rec[3][2])
@@ -67,7 +62,6 @@ def get_switch_coverage(switch_anno, switch_chrom, switch_start, switch_end):
 
 
 def merge_intervals(intervals):
-
     """interval merging function from here: http://codereview.stackexchange.com/questions/69242/merging-overlapping-intervals but extended to include chromosome as first entry of tuple"""
 
     sorted_by_lower_bound = sorted(intervals, key=lambda tup: (tup[0], tup[1]))
@@ -146,9 +140,9 @@ def interval_length(intervals):
 
 
 def p_adjust_bh(p):
-
     """Benjamini-Hochberg p-value correction for multiple hypothesis testing
-    (taken and modified for nan values from here: http://stackoverflow.com/questions/7450957/how-to-implement-rs-p-adjust-in-python)"""
+    (taken and modified for nan values from here: http://stackoverflow.com/questions/7450957/how-to-implement-rs-p-adjust-in-python)
+    """
 
     p = np.asfarray(p)
     ok = np.isfinite(p)
@@ -165,7 +159,6 @@ def parse_LAST_pars(pars):
     with open(pars) as inf:
         line = inf.readline()
         while line:
-
             if line.startswith("# mean delete size"):
                 mean_del_size = float(line.split(":")[1].strip())
                 line = inf.readline()
@@ -350,7 +343,6 @@ def res2(p, x, y):
 
 
 def get_gap_positions(msa):
-
     ii, jj = msa.nonzero()
     cps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
     pos_left = jj[cps] + 1
@@ -387,7 +379,6 @@ def vrange(starts, stops):
 
 
 def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
-
     import numpy as np
     import scipy.sparse
 
@@ -439,7 +430,6 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
 
 
 def parse_range(numString: str):
-
     import itertools
 
     def expand_range(s: str):
@@ -456,7 +446,6 @@ def parse_range(numString: str):
 
 
 def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
-
     import scipy.sparse
     import pandas as pd
 
@@ -487,7 +476,6 @@ def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
 
 
 def nmf_consistency(U_max, U_all):
-
     from sklearn.metrics.cluster import contingency_matrix
 
     gmax = np.argmax(U_max, axis=1)
@@ -503,7 +491,6 @@ def nmf_consistency(U_max, U_all):
 
 
 def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
-
     switch_iis = []
     for rec in anno_recs:
         start = shift_coord(int(rec[3][1]), cov_int) - eff_start

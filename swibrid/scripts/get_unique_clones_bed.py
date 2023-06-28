@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("-b", "--bed", dest="bed", help="""input bed file""")
     parser.add_argument("-c", "--clustering", dest="clustering", help="""clustering results""")
     parser.add_argument(
@@ -15,7 +14,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import sys
     from logzero import logger
     import pandas as pd

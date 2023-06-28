@@ -68,7 +68,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import os
     import sys
     import numpy as np
@@ -99,7 +98,6 @@ def run(args):
         msa_cleaned = msa_cleaned[:, used]
 
     if args.use_sparse:
-
         import sparsecluster
 
         logger.info(
@@ -132,7 +130,6 @@ def run(args):
             )
 
     else:
-
         import fastcluster
 
         logger.info(

@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument(
         "-g",
         "--gaps",
@@ -105,13 +104,11 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import numpy as np
     import pandas as pd
     import scipy.sparse
     import scipy.stats
     import pysam
-    import re
     from logzero import logger
     from .utils import (
         parse_switch_coords,
@@ -148,7 +145,6 @@ def run(args):
         stats = pd.read_csv(args.clustering_stats, header=0, index_col=0).squeeze()
         logger.info("reading clustering analysis from " + args.clustering_analysis)
         analysis = pd.read_csv(args.clustering_analysis, header=0, index_col=0)
-        neff = stats["eff_nclusters"].astype(int)
         if args.use_clones:
             if args.use_clones == "all":
                 clones = clustering["cluster"].astype(int).unique()
@@ -214,11 +210,11 @@ def run(args):
     stats["frac_within_break"] = bp_hist[within_event].sum() / nbreaks
 
     regions = np.unique(switch_iis)
-    if args.switch_coords.split(':')[-1] == '-':
+    if args.switch_coords.split(":")[-1] == "-":
         regions = regions[::-1]
     for i in range(len(regions)):
         r1 = regions[i]
-        for j in range(i+1):
+        for j in range(i + 1):
             r2 = regions[j]
             take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
                 switch_iis[xx] == r2
@@ -260,7 +256,6 @@ def run(args):
         stats["spread_" + sr] = np.sqrt(m2 - m**2)
 
     if args.motifs:
-
         motif_counts = np.load(args.motifs)
 
         for motif in motif_counts.files:
@@ -276,7 +271,6 @@ def run(args):
     pd.Series(stats).to_csv(args.out, header=False)
 
     if args.plot:
-
         logger.info("creating figure and saving to {0}\n".format(args.plot))
         from matplotlib import pyplot as plt
 
@@ -308,7 +302,7 @@ def run(args):
         ax.set_yticklabels(minor_labels, minor=True)
         ax.tick_params(which="minor", length=0)
         ax.grid(alpha=0.5, color="lightgrey", which="major")
-        ax.set_title('2D breakpoint histogram', size='medium')
+        ax.set_title("2D breakpoint histogram", size="medium")
 
         ax = fig.add_axes([0.12, 0.07, 0.83, 0.15])
         ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "k-", lw=0.5)
@@ -318,17 +312,16 @@ def run(args):
         ax.set_xticklabels([])
         ax.set_xticklabels(minor_labels, rotation=90, minor=True)
         ax.set_yticks([])
-        ax.set_ylabel('frequency')
+        ax.set_ylabel("frequency")
         ax.tick_params(which="minor", length=0)
         ax.grid(alpha=0.5, color="lightgrey", which="major")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.set_title('1D breakpoint histogram', size='medium')
+        ax.set_title("1D breakpoint histogram", size="medium")
 
         fig.savefig(args.plot)
 
     if args.reference and args.top_donor and args.top_receiver:
-
         genome = pysam.FastaFile(args.reference)
 
         switch_seqs = [genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int]

@@ -38,12 +38,10 @@ def setup_argparse(parser):
 
 
 def filter_reads(reads, info, args, stats):
-
     import pandas as pd
     import re
 
     for rec in reads:
-
         if args.nmax and stats["nreads"] > args.nmax:
             break
 
@@ -82,7 +80,6 @@ def filter_reads(reads, info, args, stats):
 
 
 def run(args):
-
     from Bio import SeqIO
     import gzip
     import pandas as pd

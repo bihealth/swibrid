@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
     parser.add_argument(
         "--switch_coords",
@@ -34,7 +33,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import pysam
     import numpy as np
     import re
@@ -94,7 +92,6 @@ def run(args):
         np.savez(args.output, **motif_counts)
 
     if args.figure:
-
         import matplotlib
 
         matplotlib.use("Agg")

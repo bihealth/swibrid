@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
     parser.add_argument(
         "--switch_coords",
@@ -49,7 +48,6 @@ def jaccard_distance(s1, s2, n=5, rc=False):
 
 
 def run(args):
-
     import pysam
     import numpy as np
     from .utils import (
@@ -111,7 +109,6 @@ def run(args):
         np.savez(args.output, **jd)
 
     if args.figure:
-
         import matplotlib
 
         matplotlib.use("Agg")

@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("-o", "--output", dest="output", help="""output""")
     parser.add_argument(
         "--msa",
@@ -34,6 +33,7 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument("--inserts", dest="inserts", help="""results.tsv file with inserts""")
+    parser.add_argument("--realignments", dest="realignments", help="""file with breakpoint realignments""")
     parser.add_argument(
         "--adjust_size",
         dest="adjust_size",
@@ -43,7 +43,7 @@ def setup_argparse(parser):
 
 
 def run(args):
-
+    import os
     import numpy as np
     import scipy.sparse
     import scipy.cluster.hierarchy
@@ -56,7 +56,6 @@ def run(args):
         parse_switch_coords,
         get_switch_coverage,
         read_switch_anno,
-        construct_mut_matrix,
         remove_gaps,
         get_switch_iis,
         decode_coords,
@@ -142,12 +141,11 @@ def run(args):
     insert_frequency = 0
 
     if inserts is not None:
-
         logger.info("checking inserts")
 
         def get_insert_isotype(x):
             left_isotype = ",".join(
-                re.sub('[0-9][A-Za-z]$','',rec[3][3])
+                re.sub("[0-9][A-Za-z]$", "", rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -161,7 +159,7 @@ def run(args):
                 )
             )
             right_isotype = ",".join(
-                re.sub('[0-9][A-Za-z]$','',rec[3][3])
+                re.sub("[0-9][A-Za-z]$", "", rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -245,7 +243,10 @@ def run(args):
             columns=["chrom", "insert_pos_left", "insert_pos_right", "."],
             index=inserts.index,
         ).drop(["chrom", "."], axis=1)
-        (insert_pos["insert_pos_left"], insert_pos["insert_pos_right"],) = insert_pos.min(
+        (
+            insert_pos["insert_pos_left"],
+            insert_pos["insert_pos_right"],
+        ) = insert_pos.min(
             axis=1
         ) - 1, insert_pos.max(axis=1)
 
@@ -258,6 +259,16 @@ def run(args):
         )
         if tmp.dropna().shape[0] > 0:
             insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
+
+    if args.realignments is not None and os.path.isfile(args.realignments):
+
+        logger.info("reading breakpoint realignments from " + args.realignments)
+
+        realignments = pd.read_csv(args.realignments, header=0, index_col=0)
+        realignments = realignments.loc[realignments.index.intersection(clustering.index)]
+        realignments['cluster'] = clustering.loc[realignments.index, 'cluster']
+        realignment_stats = realignments.groupby(['type','cluster']).agg({'n_homology': 'mean', 'n_untemplated': 'mean'}).unstack(level=0)
+        realignment_stats.columns = ['_'.join(c) for c in realignment_stats.columns.tolist()]
 
     df = pd.DataFrame(
         {
@@ -273,13 +284,13 @@ def run(args):
         },
         index=clusters,
     )
-    df = pd.concat([df, insert_stats], axis=1)
+    df = pd.concat([df, insert_stats, realignment_stats], axis=1)
 
     switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, 1)
     for isotype in np.unique(switch_iis):
         df["length_" + isotype] = avg_msa[:, switch_iis == isotype].sum(1)
 
-    if args.adjust_size and (clustering['filtered_cluster'] > 0).sum():
+    if args.adjust_size and (clustering["filtered_cluster"] > 0).sum():
         logger.info("calculating adjusted cluster size")
         from sklearn import linear_model
 
@@ -295,7 +306,6 @@ def run(args):
         df.loc[clones, "adj_size"] = y.sum() * tmp / tmp.sum()
 
     else:
-
         df["adj_size"] = df["size"]
 
     logger.info("saving results to " + args.output)

@@ -7,6 +7,7 @@ shell.prefix("set -e pipefail;")
 rule all:
   input:
      expand('plots/{sample}_reads.png',sample=config['SAMPLES']),
+     expand('plots/{sample}_realignments.png',sample=config['SAMPLES']),
      expand('plots/{sample}_gaps.png',sample=config['SAMPLES']),
      'collect/{0}_stats.csv'.format(config['STUDY'])
 
@@ -92,10 +93,8 @@ rule minimap:
     'filter/{sample}.fasta'
   output:
     sam='align/{sample}.sam',
-    par='align/{sample}_minimap_pars.npz'
   params:
     index=config['MINIMAP_INDEX'],
-    reference=config['REFERENCE']
   threads: 4
   resources:
     mem_mb=32000,
@@ -107,7 +106,27 @@ rule minimap:
     r"""
     mkdir -p align
     minimap2 -a -x map-ont -t {threads} --secondary=no --sam-hit-only {params.index} {input} > {output.sam} 2> {log}
-    swibrid get_alignment_pars -i {output.sam} -o {output.par} -r {params.reference} 2>> {log}
+    """
+
+
+rule minimap_pars:
+  input:
+    sam='align/{sample}.sam',
+  output:
+    par='align/{sample}_minimap_pars.npz'
+  params:
+    reference=config['REFERENCE']
+  threads: 1
+  resources:
+    mem_mb=32000,
+    time='08:00:00'
+  conda:
+    config['ENV']
+  log: "logs/minimap_pars/{sample}.log"
+  shell:
+    r"""
+    mkdir -p align
+    swibrid get_alignment_pars -i {input.sam} -o {output.par} -r {params.reference} 2> {log}
     """
 
 
@@ -137,15 +156,18 @@ rule process:
   input:
     alignments='align/{sample}.maf' if config['ALIGNER']=='LAST' else 'align/{sample}.sam',
     telo='telo/{sample}.out',
+    reads='filter/{sample}.fasta'
   output:
     out='process/{sample}.out',
     stats='process/{sample}.csv',
-    fasta='process/{sample}.fasta.gz'
+    fasta='process/{sample}.fasta.gz',
+    alignments='process/{sample}_breakpoint_alignments.csv'
   params:
     switch=config['SWITCH'],
     switch_anno=config['SWITCH_ANNOTATION'],
+    genome=config['REFERENCE'],
     min_cov=lambda wildcards: ".4" if 'plasmid' in wildcards.sample else ".9",
-    blacklist_regions=lambda x: "--blacklist_regions="+config['BLACKLIST_REGIONS'] if 'BLACKLIST_REGIONS' in config else ""
+    blacklist_regions="--blacklist_regions="+config['BLACKLIST_REGIONS'] if 'BLACKLIST_REGIONS' in config else ""
   threads: 1
   resources:
     mem_mb=16000,
@@ -156,7 +178,7 @@ rule process:
   shell:
     r"""
     mkdir -p process
-    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} {params.blacklist_regions} 2> {log}
+    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} {params.blacklist_regions} --realign_breakpoints {output.alignments} --raw_reads {input.reads} --genome {params.genome} 2> {log}
     """
 
 
@@ -302,7 +324,7 @@ rule variants:
     switch=config['SWITCH'],
     switch_annotation=config['SWITCH_ANNOTATION'],
     reference=config['REFERENCE'],
-    variant_annotation=config['VARIANT_ANNOTATION']
+    variant_annotation="--variant_annotation config['VARIANT_ANNOTATION']" if 'VARIANT_ANNOTATION' in config else ""
   threads: 1
   resources:
     mem_mb=increase_mem,
@@ -314,7 +336,7 @@ rule variants:
   shell:
     r"""
     mkdir -p variants
-    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht} --variant_annotation {params.variant_annotation} 2> {log}
+    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht} {params.variant_annotation} 2> {log}
     """
 
 
@@ -370,6 +392,7 @@ rule analyze_clustering:
     gaps='gaps/{sample}_gaps.npz',
     clustering='cluster/{sample}_clustering.csv',
     inserts='inserts/{sample}_inserts.tsv',
+    realignments='process/{sample}_breakpoint_alignments.csv'
   output:
     'cluster/{sample}_analysis.csv'
   params:
@@ -386,7 +409,7 @@ rule analyze_clustering:
   log: "logs/cluster/{sample}_analysis.log"
   shell:
     r"""
-    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --adjust_size 2> {log}
+    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --realignments {input.realignments} --adjust_size 2> {log}
     """
 
 
@@ -424,6 +447,7 @@ rule gap_stats:
 rule plot_clustering:
   input:
     process='process/{sample}.out',
+    realignments='process/{sample}_breakpoint_alignments.csv',
     info='info/{sample}_info.csv',
     clustering='cluster/{sample}_clustering.csv',
     linkage='linkage/{sample}_linkage.npz',
@@ -434,7 +458,8 @@ rule plot_clustering:
     variants_matrix='variants/{sample}_variants.npz',
     haplotypes='variants/{sample}_haplotypes.csv'
   output:
-    'plots/{sample}_reads.png'
+    reads='plots/{sample}_reads.png',
+    realignments='plots/{sample}_realignments.png'
   params:
     switch=config['SWITCH'],
     annotation=config['ANNOTATION'],
@@ -450,7 +475,8 @@ rule plot_clustering:
   shell:
     r"""
     mkdir -p plots
-    swibrid plot_clustering --msa {input.msa} --figure {output} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --coords {input.process} --show_inserts --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} 2> {log}
+    swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --coords {input.process} --show_inserts --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} 2> {log}
+    swibrid plot_clustering --msa {input.msa} --figure {output.realignments} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --coords {input.process} --show_inserts --clustering_stats {input.stats} --sample {wildcards.sample} --dpi 500 --realignments {input.realignments} 2> {log}
     """
 
 

@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("--sample", dest="sample", help="""sample""")
     parser.add_argument("--figure", dest="figure", help="""output figure""")
     parser.add_argument("--stats", dest="stats", help="""output stats""")
@@ -72,7 +71,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import os
     import re
     import numpy as np
@@ -128,7 +126,6 @@ def run(args):
     stats["cluster"] = pd.read_csv(args.cluster_stats, index_col=0, header=0).squeeze()
     stats = pd.concat(stats.values(), axis=0)
 
-    neff = stats["eff_nclusters"].astype(int)
     if args.use_clones:
         clones = list(map(int, args.use_clones.split(",")))
     else:
@@ -153,7 +150,6 @@ def run(args):
     stats["clustered"] = sum(~clustering["cluster"].isna())
 
     if len(clones) > 0:
-
         stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
             clustering_analysis.loc[clones, "length"], w
         )
@@ -165,8 +161,12 @@ def run(args):
         stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
         stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
 
-        stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
-        stats["mean_cluster_outside_range"] = clustering_analysis.loc[clones, "outside_range"].mean()
+        if "coverage" in clustering_analysis.columns:
+            stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
+        if "outside_range" in clustering_analysis.columns:
+            stats["mean_cluster_outside_range"] = clustering_analysis.loc[
+                clones, "outside_range"
+            ].mean()
 
         stats["cluster_gini"] = calculate_gini(
             clustering["cluster"][clustering["cluster"].isin(clones)],
@@ -279,6 +279,11 @@ def run(args):
         axis=0,
     )
 
+    realignment_stats = clustering_analysis.loc[clones].groupby('isotype')[['n_untemplated_switch','n_homology_switch']].mean().unstack()
+    realignment_stats.index = ['_'.join(i) for i in realignment_stats.index.tolist()]
+
+    realignment_stats = pd.concat([clustering_analysis.loc[clones][['n_untemplated_switch','n_homology_switch']].mean(), realignment_stats],axis=0)
+
     stats = pd.concat(
         [
             stats,
@@ -287,6 +292,7 @@ def run(args):
             pd.Series(cluster_stats),
             insert_stats,
             insert_isotype_count,
+            realignment_stats
         ],
         axis=0,
     )
@@ -299,25 +305,15 @@ def run(args):
         stats = pd.concat([stats, gap_stats], axis=0)
 
     if args.variants and os.path.isfile(args.variants):
-
         logger.info("loading variants from " + args.variants)
         variants = pd.read_csv(args.variants, sep="\t", header=0)
 
         ref = variants["ref"].apply(lambda x: ncodes[x] - 1)
         alt = variants["alt"].apply(lambda x: ncodes[x] - 1)
-        germline = (variants['type'] != 'n.d.') | ~variants['anno'].isnull()
-        somatic = ~germline
+        germline = (variants["type"] != "n.d.") | ~variants["anno"].isnull()
 
-        mm_G = (
-            pd.crosstab(ref[germline], alt[germline])
-            .reindex(index=range(4), columns=range(4))
-            .fillna(0)
-            .astype(int)
-            .values
-        )
-
-        mm_S = (
-            pd.crosstab(ref[somatic], alt[somatic])
+        mm = (
+            pd.crosstab(ref, alt)
             .reindex(index=range(4), columns=range(4))
             .fillna(0)
             .astype(int)
@@ -327,27 +323,23 @@ def run(args):
         var_stats = pd.Series(
             {
                 "num_variants": len(ref),
-                "fraction_somatic_variants": np.mean(~germline),
-                "fraction_germline_transitions": mm_G[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / sum(germline),
-                "fraction_germline_C>A": mm_G[(1, 2), (0, 3)].sum() / sum(germline),
-                "fraction_germline_C>G": mm_G[(1, 2), (2, 1)].sum() / sum(germline),
-                "fraction_germline_C>T": mm_G[(1, 2), (3, 0)].sum() / sum(germline),
-                "fraction_germline_T>A": mm_G[(3, 0), (0, 3)].sum() / sum(germline),
-                "fraction_germline_T>C": mm_G[(3, 0), (1, 2)].sum() / sum(germline),
-                "fraction_germline_T>G": mm_G[(3, 0), (2, 1)].sum() / sum(germline),
-                "fraction_somatic_transitions": mm_S[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / sum(somatic),
-                "fraction_somatic_C>A": mm_S[(1, 2), (0, 3)].sum() / sum(somatic),
-                "fraction_somatic_C>G": mm_S[(1, 2), (2, 1)].sum() / sum(somatic),
-                "fraction_somatic_C>T": mm_S[(1, 2), (3, 0)].sum() / sum(somatic),
-                "fraction_somatic_T>A": mm_S[(3, 0), (0, 3)].sum() / sum(somatic),
-                "fraction_somatic_T>C": mm_S[(3, 0), (1, 2)].sum() / sum(somatic),
-                "fraction_somatic_T>G": mm_S[(3, 0), (2, 1)].sum() / sum(somatic),
+                "fraction_germline_variants": np.mean(germline),
+                "fraction_transitions": mm[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / len(ref),
+                "fraction_C>A": mm[(1, 2), (0, 3)].sum() / len(ref),
+                "fraction_C>G": mm[(1, 2), (2, 1)].sum() / len(ref),
+                "fraction_C>T": mm[(1, 2), (3, 0)].sum() / len(ref),
+                "fraction_T>A": mm[(3, 0), (0, 3)].sum() / len(ref),
+                "fraction_T>C": mm[(3, 0), (1, 2)].sum() / len(ref),
+                "fraction_T>G": mm[(3, 0), (2, 1)].sum() / len(ref),
             }
         )
 
-        for mot in set(','.join(variants["motif"].dropna()).split(',')):
-            var_stats['num_variants_germline_' + mot] = (variants['motif'].str.contains(mot) & germline).sum()
-            var_stats['num_variants_somatic_' + mot] = (variants['motif'].str.contains(mot) & somatic).sum()
+        if (~variants['motif'].isnull()).sum() > 0:
+
+            for mot in set(",".join(variants["motif"].dropna()).split(",")):
+                var_stats["num_variants_" + mot] = (
+                    variants["motif"].str.contains(mot) 
+                ).sum()
 
         stats = pd.concat([stats, var_stats], axis=0)
 
@@ -356,7 +348,6 @@ def run(args):
         stats.to_csv(args.stats)
 
     if args.figure is not None:
-
         fig, axs = plt.subplots(4, 2, figsize=(6, 8))
         fig.subplots_adjust(hspace=0.5, wspace=0.4, bottom=0.1, top=0.95)
 
@@ -458,14 +449,14 @@ def run(args):
             bins=np.geomspace(1, stats["clustered"], 50),
             histtype="stepfilled",
             label="filtered",
-            alpha=.5,
+            alpha=0.5,
         )
         ax.hist(
             clustering_analysis["adj_size"].dropna(),
             bins=np.geomspace(1, stats["clustered"], 50),
             histtype="stepfilled",
             label="adjusted",
-            alpha=.5,
+            alpha=0.5,
         )
         ax.set_yscale("log")
         ax.set_xscale("log")

@@ -40,7 +40,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import numpy as np
     import re
     import pandas as pd
@@ -82,7 +81,6 @@ def run(args):
     nignored = 0
 
     for line in open(args.coords):
-
         ls = line.strip("\n").split("\t")
         read = ls[0]
         isotype = ls[1]

@@ -70,7 +70,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--min_freq",
         dest="min_freq",
-        default=.4,
+        default=0.4,
         type=float,
         help="""minimum allele frequency at potentially variable positions (in total or per cluster) [.4]""",
     )
@@ -80,7 +80,7 @@ def setup_argparse(parser):
         "--variant_annotation",
         dest="variant_annotation",
         default="",
-        help="""variant annotation file (vcf.gz; e.g., from 1000Genomes project)"""
+        help="""variant annotation file (vcf.gz; e.g., from 1000Genomes project)""",
     )
     parser.add_argument(
         "--haplotypes",
@@ -91,13 +91,11 @@ def setup_argparse(parser):
         "--motifs",
         dest="motifs",
         default="Cg,wrCy,Tw",
-        help="""comma-separated list of sequence motifs to look up at variant positions [Cg,wrCy,Tw]"""
+        help="""comma-separated list of sequence motifs to look up at variant positions [Cg,wrCy,Tw]""",
     )
 
 
-
 def run(args):
-
     import os
     import numpy as np
     import pandas as pd
@@ -176,8 +174,11 @@ def run(args):
     all_diff.data[gap_freq >= args.max_local_gap_freq] = False
     all_diff.eliminate_zeros()
 
-    logger.info("{0} positions ignored due to high gap frequency".format(sum(gap_freq >= args.max_local_gap_freq)))
-
+    logger.info(
+        "{0} positions ignored due to high gap frequency".format(
+            sum(gap_freq >= args.max_local_gap_freq)
+        )
+    )
 
     nuc_dist = np.vstack([np.sum(np.abs(msa) == k, 0).A1 for k in range(1, 5)]).T
     # number of non-gaps at each position
@@ -204,8 +205,7 @@ def run(args):
     # check strand bias
     npos = all_diff[clustering["orientation"].values == "+", :].sum(0).A1
     nneg = all_diff[clustering["orientation"].values == "-", :].sum(0).A1
-    strand_bias = npos / (npos + nneg)
-    pstrand = scipy.stats.chisquare(np.array([npos,nneg]),axis=0)[1]
+    pstrand = scipy.stats.chisquare(np.array([npos, nneg]), axis=0)[1]
 
     logger.info("aggregating counts over clusters")
     i, j = all_diff.multiply(np.abs(msa) == alt).nonzero()
@@ -237,7 +237,7 @@ def run(args):
     logger.info("filtering variants")
     low_cov = nr < args.min_cov
     few_var = pp_adj > args.fdr
-    stranded = pstrand < .05 # np.abs(strand_bias - 0.5) > 0.25
+    stranded = pstrand < 0.05
     if D.nnz > 0:
         dnz = D.nonzero()
         no_clust_data = (A[dnz] > args.min_freq * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1
@@ -245,7 +245,7 @@ def run(args):
     else:
         no_clust = np.ones_like(padj).astype(bool)
     freq = mat.sum(0).A1 / (msa != 0).sum(0).A1
-    no_clust = no_clust & (freq <= args.min_freq) 
+    no_clust = no_clust & (freq <= args.min_freq)
     padj[low_cov | few_var | stranded | no_clust] = 1
     SNP_pos = np.where(padj < args.fdr)[0]
     logger.info("{0} variants removed due to low coverage".format(sum(low_cov)))
@@ -280,30 +280,38 @@ def run(args):
 
     anno = [""] * len(SNP_pos)
     if args.variant_annotation and os.path.isfile(args.variant_annotation):
-
         logger.info("annotating variants with " + args.variant_annotation)
-        
-        var_anno = pd.read_csv(args.variant_annotation, sep='\t', comment='#', header=None,
-                               index_col = 1, 
-                               names=['CHROM', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'])
+
+        var_anno = pd.read_csv(
+            args.variant_annotation,
+            sep="\t",
+            comment="#",
+            header=None,
+            index_col=1,
+            names=["CHROM", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"],
+        )
         # keep only PASS variants and remove polyclonal variants
-        var_anno = var_anno[(var_anno['FILTER'] == 'PASS') & (var_anno['REF'].str.len() == 1) & (var_anno['ALT'].str.len() == 1)]
-        
+        var_anno = var_anno[
+            (var_anno["FILTER"] == "PASS")
+            & (var_anno["REF"].str.len() == 1)
+            & (var_anno["ALT"].str.len() == 1)
+        ]
+
         for n, pos in enumerate(SNP_pos):
             real_pos = cov_map[pos] + 1
-            if (real_pos in var_anno.index and 
-                var_anno.loc[real_pos, 'REF'] == "ACGT"[ref[pos] - 1] and 
-                var_anno.loc[real_pos, 'ALT'] == "ACGT"[alt[pos] - 1]):
-                anno[n] = var_anno.loc[real_pos, 'ID']
+            if (
+                real_pos in var_anno.index
+                and var_anno.loc[real_pos, "REF"] == "ACGT"[ref[pos] - 1]
+                and var_anno.loc[real_pos, "ALT"] == "ACGT"[alt[pos] - 1]
+            ):
+                anno[n] = var_anno.loc[real_pos, "ID"]
 
     mtype = np.array(["n.d."] * len(SNP_pos))
 
     if args.haplotypes is not None:
-
         use_clusts = np.isin(clusters, clones) & (csize >= args.min_cluster_cov)
 
         if use_clusts.sum() > 2 and len(SNP_pos) > 1:
-
             logger.info(
                 "clustering haplotypes for {0} clusters via wNMF using {1} SNPs".format(
                     sum(use_clusts), len(SNP_pos)
@@ -338,7 +346,6 @@ def run(args):
             mtype[(af0 > 0.6) & (af1 > 0.6)] = "hom"
 
         else:
-
             haplotypes = 0.5 * np.ones_like(clusters)
             consistency = np.zeros_like(clusters)
 
@@ -348,7 +355,6 @@ def run(args):
         )
 
     if args.motifs is not None:
-        
         logger.info("checking motifs")
 
         import re
@@ -357,22 +363,20 @@ def run(args):
 
         motif_anno = defaultdict(set)
 
-        for mot in args.motifs.split(','):
-            
-            rx = r''.join(IUPAC[m.upper()] for m in mot)
-            i = re.search(r'[A-Z]', mot).start() 
+        for mot in args.motifs.split(","):
+            rx = r"".join(IUPAC[m.upper()] for m in mot)
+            i = re.search(r"[A-Z]", mot).start()
             for p in SNP_pos:
-                seq = ref_seq[(p - i):(p - i + len(mot))]
-                seq_rc = ''.join(RC[s] for s in ref_seq[(p - len(mot) + i + 1):(p + i + 1)][::-1])
+                seq = ref_seq[(p - i) : (p - i + len(mot))]
+                seq_rc = "".join(RC[s] for s in ref_seq[(p - len(mot) + i + 1) : (p + i + 1)][::-1])
                 if re.match(rx, seq) or re.match(rx, seq_rc):
                     motif_anno[p].add(mot)
-                    
-        motif_anno = np.array([','.join(motif_anno[p]) for p in SNP_pos])
+
+        motif_anno = np.array([",".join(motif_anno[p]) for p in SNP_pos])
 
     else:
+        motif_anno = np.array([""] * len(SNP_pos))
 
-        motif_anno = np.array([''] * len(SNP_pos))
-            
     logger.info("saving variant table to {0}".format(args.out))
     with open(args.out, "w") as outf:
         outf.write(
@@ -404,7 +408,7 @@ def run(args):
                 pstrand[pos],
                 mtype[n],
                 anno[n],
-                motif_anno[n]
+                motif_anno[n],
             ]
             lines.append(line.format(*vals))
         outf.writelines(lines)

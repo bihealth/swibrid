@@ -69,8 +69,8 @@ def run_pipeline(args, snake_options):
             queue=args.queue
         )
     elif args.sge:
-        #drmaa_string = "\" --mem={resources.mem_mb} --time={resources.time} -n {threads}\""
-        s_command = """#!/bin/bash\n""" + s_command #+ " --drmaa=" + drmaa_string + "\n"
+        # drmaa_string = "\" --mem={resources.mem_mb} --time={resources.time} -n {threads}\""
+        s_command = """#!/bin/bash\n""" + s_command  # + " --drmaa=" + drmaa_string + "\n"
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)

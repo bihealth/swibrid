@@ -17,7 +17,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import os
     import pandas as pd
     import glob
@@ -64,7 +63,9 @@ def run(args):
             for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
                 name = rf.split("/")[-1].split("_analysis.csv")[0]
                 try:
-                    tmp = pd.read_csv(rf, header=0, index_col=0).sort_values("size", ascending=False)
+                    tmp = pd.read_csv(rf, header=0, index_col=0).sort_values(
+                        "size", ascending=False
+                    )
                     tmp.to_excel(writer, sheet_name=name, index=True)
                     logger.info("adding clustering stats for {0}".format(name))
                 except pd.errors.EmptyDataError:

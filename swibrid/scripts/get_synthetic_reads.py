@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument("-b", "--bed", dest="bed", help="""input bed file""")
     parser.add_argument("-r", "--reference", dest="reference", help="""reference sequence""")
     parser.add_argument(
@@ -52,7 +51,6 @@ def setup_argparse(parser):
 
 
 def mutate_seq(seq, pars):
-
     import numpy as np
 
     def rand_string(size):
@@ -107,7 +105,6 @@ def mutate_seq(seq, pars):
 
 
 def mutate_rec(rec, pars, add_id=None):
-
     import copy
     from Bio import SeqRecord, Seq
 
@@ -129,7 +126,6 @@ def mutate_rec(rec, pars, add_id=None):
 
 
 def run(args):
-
     import gzip
     import numpy as np
     import pandas as pd
@@ -176,7 +172,6 @@ def run(args):
         blocksizes,
         blockstarts,
     ) in bed.iterrows():
-
         blocksizes = list(map(int, blocksizes.strip(",").split(",")))
         blockstarts = list(map(int, blockstarts.strip(",").split(",")))
 

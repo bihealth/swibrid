@@ -5,7 +5,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--alignments",
         dest="alignments",
-        help="""MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)"""
+        help="""MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)""",
     )
     parser.add_argument(
         "--telo",
@@ -81,7 +81,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--min_gap",
         dest="min_gap",
-        default=-1,
+        default=75,
         type=float,
         help="""ignore reads containing small gaps [-1]""",
     )
@@ -121,79 +121,87 @@ def setup_argparse(parser):
         dest="blacklist_regions",
         help="""ignore inserts from blacklist regions defined in this bed file""",
     )
+    parser.add_argument(
+        "--realign_breakpoints",
+        dest="realign_breakpoints",
+        help="""re-align reads around breakpoints and save results to this file (requires --raw_reads and --genome)""",
+    )
+    parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with unaligned reads""")
+    parser.add_argument("--genome", dest="genome", help="""reference genome file""")
 
 
 def parse_sam(sam_input, min_gap=75):
-
-    from collections import defaultdict
-    import re
-    from logzero import logger
     import pysam
-    import sys
 
     read_matches = []
-    read_id = ''
+    read_id = ""
 
     for rec in pysam.Samfile(sam_input):
-
         if rec.is_unmapped or rec.seq is None or rec.is_secondary:
             continue
 
         clip_start = rec.cigartuples[0][1] if rec.cigartuples[0][0] == 5 else 0
         clip_end = rec.cigartuples[-1][1] if rec.cigartuples[-1][0] == 5 else 0
         read_len = len(rec.seq) + clip_start + clip_end
-        aligned_seq = ''
-        p = 0
-        l = 0
+        aligned_seq = ""
+        al_pos = 0
+        read_pos = 0
+        ref_pos = 0
         read_start_chunk = clip_start
+        ref_start_chunk = 0
+        insertions = 0
         chunks = []
         for op, n in rec.cigartuples:
+            if op in [0, 7, 8]:  # alignment match
+                aligned_seq += str(rec.seq[al_pos : al_pos + n])
+                al_pos += n
+                read_pos += n
+                ref_pos += n
 
-            if op in [0, 7, 8]: # alignment match
-                aligned_seq+=str(rec.seq[p:p+n])
-                p += n
-                l += n
-
-            elif op == 1: # insertion 
-
-                if n > min_gap: # split insertions of more than min_gap nucleotides
+            elif op == 1:  # insertion
+                if n > min_gap:  # split insertions of more than min_gap nucleotides
                     chnk = (
                         read_start_chunk,
-                        clip_start + l - read_start_chunk,
+                        clip_start + read_pos - read_start_chunk,
                         read_len,
                         rec.reference_name,
-                        rec.reference_start,
-                        rec.reference_length,
-                        -1 if rec.is_reverse else 1, 
+                        rec.reference_start + ref_start_chunk,
+                        ref_pos - ref_start_chunk,
+                        -1 if rec.is_reverse else 1,
                         str(aligned_seq),
                     )
                     chunks.append(chnk)
-                    aligned_seq = ''
-                    read_start_chunk = clip_start + l + n
-                    
-                p += n
-                l += n
+                    aligned_seq = ""
+                    read_start_chunk = clip_start + read_pos + n
+                    ref_start_chunk = ref_pos
+                    insertions += n
 
-            elif op == 2: # deletion
-                aligned_seq+='-'*n
+                al_pos += n
+                read_pos += n
 
-            elif op == 4: # soft clip
-                if p == 0: # add to clip_start if at beginning
+            elif op == 2:  # deletion
+                aligned_seq += "-" * n
+                ref_pos += n
+
+            elif op == 4:  # soft clip
+                if read_pos == 0:  # add to clip_start if at beginning
                     read_start_chunk += n
                     clip_start += n
-                p += n
-
+                else:
+                    clip_end += n
+                al_pos += n
+        
             elif op != 5:
-                raise ValueError('CIGAR op {0} not implemented'.format(op))
+                raise ValueError("CIGAR op {0} not implemented".format(op))
 
         chnk = (
             read_start_chunk,
-            clip_start + l - read_start_chunk,
+            clip_start + read_pos - read_start_chunk,
             read_len,
             rec.reference_name,
-            rec.reference_start,
-            rec.reference_length,
-            -1 if rec.is_reverse else 1, 
+            rec.reference_start + ref_start_chunk,
+            ref_pos - ref_start_chunk,
+            -1 if rec.is_reverse else 1,
             str(aligned_seq),
         )
         chunks.append(chnk)
@@ -204,31 +212,28 @@ def parse_sam(sam_input, min_gap=75):
             read_id = rec.query_name
             read_matches = []
 
+        assert sum(c[5] for c in chunks) == rec.reference_length, 'ref lengths dont match!'
+        assert sum(c[1] for c in chunks) + clip_start + clip_end + insertions == read_len, 'read lengths dont match!'
+
         read_matches += chunks
 
     yield read_id, read_matches
 
 
 def parse_maf(alignments, min_gap=75):
-
-    from collections import defaultdict
     import re
-    from logzero import logger
-    import pysam
     from Bio import AlignIO
 
     read_matches = []
-    read_id = ''
+    read_id = ""
 
     for ref, read in AlignIO.parse(alignments, "maf", seq_count=2):
-
         read_name = read.id
-        read_start = read.annotations['start']
-        read_len = read.annotations['srcSize']
+        read_start = read.annotations["start"]
+        read_len = read.annotations["srcSize"]
         read_seq = str(read.seq)
         ref_name = ref.id
-        ref_start = ref.annotations['start']
-        ref_len = ref.annotations['size']
+        ref_start = ref.annotations["start"]
         ref_seq = str(ref.seq)
         orientation = read.annotations["strand"]
 
@@ -238,7 +243,6 @@ def parse_maf(alignments, min_gap=75):
         chunks = []
         # find ref gaps of at least min_gap
         for m in re.finditer(r"\-{{{0},}}".format(min_gap), ref_seq):
-
             new_ref_gaps = ref_seq[pos : m.start()].count("-")
             ref_start_chunk = ref_start + pos - num_ref_gaps
             ref_end_chunk = ref_start + m.start() - num_ref_gaps - new_ref_gaps
@@ -263,7 +267,7 @@ def parse_maf(alignments, min_gap=75):
                 orientation,
                 str(aligned_seq_chunk),
             )
-            
+
             chunks.append(chnk)
 
             num_read_gaps += new_read_gaps
@@ -280,7 +284,9 @@ def parse_maf(alignments, min_gap=75):
 
         # get sequence of read at non-gap positions in ref
         ref_seq_chunk = ref_seq[pos:]
-        aligned_seq_chunk = "".join(x for k, x in enumerate(read_seq[pos:]) if ref_seq_chunk[k] != "-")
+        aligned_seq_chunk = "".join(
+            x for k, x in enumerate(read_seq[pos:]) if ref_seq_chunk[k] != "-"
+        )
 
         chnk = (
             read_start_chunk,
@@ -290,7 +296,7 @@ def parse_maf(alignments, min_gap=75):
             ref_start_chunk,
             ref_end_chunk - ref_start_chunk,
             orientation,
-            str(aligned_seq_chunk)
+            str(aligned_seq_chunk),
         )
 
         chunks.append(chnk)
@@ -306,8 +312,152 @@ def parse_maf(alignments, min_gap=75):
     yield read_id, read_matches
 
 
-def run(args):
+def combine_alignments(al1, al2, pad):
 
+    s1 = ""
+    s0 = ""
+    s2 = ""
+    m1 = ""
+    m2 = ""
+    i = 0
+    j = 0
+    s1A = al1[0]
+    s1B = al1[1]
+    s2A = al2[0]
+    s2B = al2[1]
+    while i < len(s1A) and j < len(s2A):
+        if s1A[i] == "-":
+            s1 += s1B[i].lower()
+            m1 += " "
+            s0 += "-"
+            s2 += "-"
+            m2 += " "
+            i += 1
+        elif s2A[j] == "-":
+            s1 += "-"
+            m1 += " "
+            s0 += "-"
+            m2 += " "
+            s2 += s2B[j].lower()
+            j += 1
+        elif s1A[i] == s2A[j]:
+            s1 += s1B[i]
+            m1 += "|" if s1A[i] == s1B[i] else (" " if s1B[i] == "-" else ".")
+            s0 += s1A[i]
+            m2 += "|" if s2A[j] == s2B[j] else (" " if s2B[j] == "-" else ".")
+            s2 += s2B[j]
+            i += 1
+            j += 1
+        else:
+            raise Exception("stop")
+        if len(s1A[:i].replace("-", "")) != len(s2A[:j].replace("-", "")):
+            raise Exception("stop")
+        if (
+            len(s1A[:i].replace("-", "")) == pad or len(s1A[i:].replace("-", "")) == pad
+        ) and not (s1A[i] == "-" or s2A[j] == "-"):
+            s1 += "/"
+            s0 += "/"
+            s2 += "/"
+            m1 += "/"
+            m2 += "/"
+    return s1, m1, s0, m2, s2
+
+
+def realign_breakpoints(matches, genome, read_seq, pad=20):
+    from Bio import Align
+
+    def revcomp(seq):
+        from swibrid.scripts.utils import RC
+
+        return "".join(RC[s] for s in seq[::-1])
+
+    aligner = Align.PairwiseAligner()
+    aligner.mode = 'global'
+    aligner.match_score = 2
+    aligner.mismatch_score = -4
+    aligner.open_gap_score = -4
+    aligner.extend_gap_score = -2
+
+    res = []
+    for i in range(len(matches) - 1):
+        rseq = read_seq[
+            min(matches[i][1], matches[i + 1][0])
+            - pad : max(matches[i][1], matches[i + 1][0])
+            + pad
+        ]
+        orientation = (matches[i][5], matches[i + 1][5])
+        if orientation[0] == -1:
+            pos_left = matches[i][2] + ":" + str(matches[i][3])
+            gseq1 = revcomp(
+                genome.fetch(matches[i][2], matches[i][3] - pad, matches[i][3] + pad).upper()
+            )
+        else:
+            pos_left = matches[i][2] + ":" + str(matches[i][4])
+            gseq1 = genome.fetch(matches[i][2], matches[i][4] - pad, matches[i][4] + pad).upper()
+        if orientation[1] == -1:
+            pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][4])
+            gseq2 = revcomp(
+                genome.fetch(
+                    matches[i + 1][2], matches[i + 1][4] - pad, matches[i + 1][4] + pad
+                ).upper()
+            )
+        else:
+            pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][3])
+            gseq2 = genome.fetch(
+                matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
+            ).upper()
+
+        #al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
+        #al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
+
+        al1 = aligner.align(rseq, gseq1)
+        al2 = aligner.align(rseq, gseq2)
+
+        s1, m1, s0, m2, s2 = combine_alignments(al1[0], al2[0], pad)
+
+        m1s = m1.split("/")
+        m2s = m2.split("/")
+        s0s = s0.split("/")
+
+        n_homology = 0
+        n_untemplated = 0
+
+        # check for homology on the left side of the breakpoint
+        k = m2s[0].rfind(" ") + 1
+        n_homology += sum(x == "|" and y == "|" for x, y in zip(m1s[0][k:], m2s[0][k:]))
+        # check for homology on the right side of the breakpoint
+        k = m1s[-1].find(" ")
+        n_homology += sum(x == "|" and y == "|" for x, y in zip(m1s[-1][:k], m2s[-1][:k]))
+
+        # check for untemplated or homologous nucleotides between the breakpoints on the read
+        if len(m1s) > 2 and len(m2s) > 2:
+            n_homology += sum(
+                x == "|" and y == "|" and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
+            )
+            n_untemplated = sum(
+                x == " " and y == " " and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
+            )
+
+        r = {
+            "pos_left": pos_left,
+            "pos_right": pos_right,
+            "n_homology": n_homology,
+            "n_untemplated": n_untemplated,
+            "orientation": orientation,
+            "type": "insert" if "insert" in [matches[i][-1], matches[i + 1][-1]] else "switch",
+            "left_seq": s1,
+            "match_left": m1,
+            "read_seq": s0,
+            "match_right": m2,
+            "right_seq": s2,
+        }
+
+        res.append(r)
+
+    return res
+
+
+def run(args):
     import os
     import operator
     import numpy as np
@@ -323,6 +473,14 @@ def run(args):
         interval_length,
         merge_intervals,
     )
+
+    if args.realign_breakpoints is not None:
+        import pysam
+
+        logger.info("getting raw reads from " + args.raw_reads)
+        raw_reads = SeqIO.index(args.raw_reads, "fasta")
+        logger.info("loading genomes from " + args.genome)
+        genome = pysam.FastaFile(args.genome)
 
     if args.telo:
         telo = pd.read_csv(args.telo, index_col=0, sep="\t")
@@ -357,18 +515,22 @@ def run(args):
         "small_gap": 0,
     }
 
-    if args.alignments.endswith('.maf'):
-        logger.info("processing reads from MAF file " + args.alignments)
-        alignments = parse_maf(args.alignments)
+    logger.info("processing reads from " + args.alignments)
+    if args.alignments.endswith(".sam"):
+        alignments = parse_sam(args.alignments, min_gap=args.min_gap)
     else:
-        logger.info("processing reads from SAM file " + args.alignments)
-        alignments = parse_sam(args.alignments)
+        alignments = parse_maf(args.alignments, min_gap=args.min_gap)
 
     outf = open(args.outfile, "w")
-    seq_out = gzip.open(args.sequences, "wt") if args.sequences.endswith(".gz") else open(args.sequences, "w")
+    seq_out = (
+        gzip.open(args.sequences, "wt")
+        if args.sequences.endswith(".gz")
+        else open(args.sequences, "w")
+    )
+
+    realignments = {}
 
     for read, matches in alignments:
-
         use = True
         stats["nreads"] += 1
 
@@ -380,15 +542,18 @@ def run(args):
 
         # get positions of matches to switch region and to elsewhere ("inserts")
         for (
-                read_start,
-                read_len,
-                tot_read_len,
-                ref_chrom,
-                ref_start,
-                ref_len,
-                orientation,
-                aligned_seq,
-            ) in matches:
+            read_start,
+            read_len,
+            tot_read_len,
+            ref_chrom,
+            ref_start,
+            ref_len,
+            orientation,
+            aligned_seq,
+        ) in matches:
+
+            assert read_len > 0 and ref_len > 0 and tot_read_len > 0, 'negative lengths in parsed alignments!'
+
             if orientation == -1:
                 read_start = tot_read_len - read_start - read_len
             read_end = read_start + read_len
@@ -442,17 +607,13 @@ def run(args):
         for read_start, read_end, _, _, _, orientation, _ in switch_matches:
             orientations[str(orientation)] += read_end - read_start
         main_orientation = max([1, -1], key=lambda x: orientations[str(x)])
-        read_overlap = interval_length(
-            intersect_intervals(
-                sorted(
-                    [("", m[0], m[1]) for m in switch_matches if m[5] == 1],
-                    key=lambda x: x[1],
-                ),
-                sorted(
-                    [("", m[0], m[1]) for m in switch_matches if m[5] == -1],
-                    key=lambda x: x[1],
-                ),
-            )
+
+        # check overlap of aligned segments
+        read_overlap = sum(
+            [
+                switch_matches[i][1] - switch_matches[i + 1][0]
+                for i in range(len(switch_matches) - 1)
+            ]
         )
         ref_overlap = interval_length(
             intersect_intervals(
@@ -477,9 +638,7 @@ def run(args):
         filtered_inserts = []
         # focus now on reads with structure switch - insert - switch
         if len(switch_matches) >= args.min_num_switch_matches:
-
             for insert in inserts:
-
                 # ignore inserts at beginning or ends of reads
                 if insert[0] < min(sw[0] for sw in switch_matches) or insert[1] > max(
                     sw[1] for sw in switch_matches
@@ -526,7 +685,7 @@ def run(args):
                         switch_left[5],
                     )
                 elif switch_left[1] > insert[1] or switch_right[0] < insert[0]:
-                    raise Exception("interval error for insert-adjoining switch matches!")
+                    raise ValueError("interval error for insert-adjoining switch matches!")
 
                 # number of unmapped bases in read between switch parts and inserts
                 gaps = (switch_right[0] - insert[1], insert[0] - switch_left[1])
@@ -595,17 +754,17 @@ def run(args):
             use = False
 
         # check that there are no small gaps < args.min_gap
-        switch_maps = defaultdict(list)
-        for rec in intersect_intervals(read_mappings, switch_anno, loj=False):
-            if rec[3][3].startswith("S"):
-                switch_maps[rec[3][3]].append((rec[1], rec[2]))
+        #switch_maps = defaultdict(list)
+        #for rec in intersect_intervals(read_mappings, switch_anno, loj=False):
+        #    if rec[3][3].startswith("S"):
+        #        switch_maps[rec[3][3]].append((rec[1], rec[2]))
 
-        gaps = [
-            val[i][1] - val[i - 1][0] for val in switch_maps.values() for i in range(1, len(val))
-        ]
-        if len(gaps) > 0 and min(gaps) < args.min_gap:
-            stats["small_gap"] += 1
-            use = False
+        #gaps = [
+        #    val[i][1] - val[i - 1][0] for val in switch_maps.values() for i in range(1, len(val))
+        #]
+        #if len(gaps) > 0 and min(gaps) < args.min_gap:
+        #    stats["small_gap"] += 1
+        #    use = False
 
         # check that more than args.min_cov of the read maps to the genome
         if any(fi[8] < fi[7] for fi in filtered_inserts):
@@ -625,9 +784,6 @@ def run(args):
         if not (read_order == genomic_order).all():
             stats["switch_order"] += 1
             use = False
-
-        if args.interrupt_for_read is not None and read in args.interrupt_for_read.split(","):
-            raise Exception("breaking for read {0}".format(read))
 
         if not use:
             continue
@@ -721,11 +877,27 @@ def run(args):
                 )
             SeqIO.write(sequences, seq_out, "fasta")
 
+        # re-align breakpoints
+        if args.realign_breakpoints is not None:
+            processed_matches = sorted(
+                [sm[:6] + ("switch",) for sm in switch_matches]
+                + [(f[7], f[8], f[0], f[1], f[2], f[9], "insert") for f in filtered_inserts if f[0] != 'telomer'],
+                key=operator.itemgetter(0),
+            )
+            realignments[read] = realign_breakpoints(
+                processed_matches, genome, str(raw_reads[read].seq)
+            )
+
     outf.close()
     seq_out.close()
 
-    logger.info('done. saving stats to ' + args.stats)
+    logger.info("done. saving stats to " + args.stats)
     if args.stats:
         pd.Series(stats).to_csv(args.stats)
 
-        
+    if args.realign_breakpoints is not None:
+        logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)
+        df = pd.DataFrame(
+            [pd.Series(al, name=read) for read, als in realignments.items() for al in als]
+        )
+        df.to_csv(args.realign_breakpoints)

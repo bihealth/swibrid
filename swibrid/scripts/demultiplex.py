@@ -61,7 +61,6 @@ def setup_argparse(parser):
 
 
 def run(args):
-
     import os
     import sys
     import gzip
@@ -142,7 +141,6 @@ def run(args):
         combs = whitelist
 
     if args.outdir is not None:
-
         logger.info("using these barcode combinations for demultiplexing: " + ", ".join(combs))
 
         outf = {}
@@ -167,7 +165,6 @@ def run(args):
 
         nsplit = 0
         for n, rec in enumerate(SeqIO.parse(inf, "fastq")):
-
             if n % 1000 == 0:
                 logger.info("{0:4d}k reads processed".format(n // 1000))
             if args.nmax and n >= args.nmax:
@@ -342,7 +339,6 @@ def run(args):
         nreads.to_csv(args.report)
 
     if args.figure is not None:
-
         import matplotlib
 
         matplotlib.use("Agg")

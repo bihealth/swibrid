@@ -2,7 +2,6 @@
 
 
 def setup_argparse(parser):
-
     parser.add_argument(
         "--msa",
         dest="msa",
@@ -111,6 +110,7 @@ def setup_argparse(parser):
         dest="haplotypes",
         help="""file with haplotype clustering (from find_variants.py)""",
     )
+    parser.add_argument("--realignments", dest="realignments", help="""file with breakpoint realignments""")
     parser.add_argument(
         "--dpi",
         dest="dpi",
@@ -240,7 +240,7 @@ def rand_cmap(
 
 
 def run(args):
-
+    import os
     import sys
     import numpy as np
     import scipy.sparse
@@ -369,7 +369,7 @@ def run(args):
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
     elif args.color_by == "haplotype" and args.haplotypes is not None:
-        values = haplotypes.loc[clustering['cluster'].astype(int).values,'haplotype'].values
+        values = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values
         cmap = plt.cm.coolwarm
     else:
         logger.warn("no info on {0}!".format(args.color_by))
@@ -435,11 +435,13 @@ def run(args):
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
-    if args.haplotypes: # and not args.color_by=='haplotype':
+    if args.haplotypes:  # and not args.color_by=='haplotype':
         logger.info("adding haplotype information")
-        ax = fig.add_axes([left-.005, bottom, .01, height])
-        ht = haplotypes.loc[clustering['cluster'].astype(int).values,'haplotype'].values[order][:,np.newaxis]
-        ax.imshow(ht, aspect='auto', interpolation='none', cmap=plt.cm.coolwarm, vmin=0, vmax=1)
+        ax = fig.add_axes([left - 0.005, bottom, 0.01, height])
+        ht = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values[order][
+            :, np.newaxis
+        ]
+        ax.imshow(ht, aspect="auto", interpolation="none", cmap=plt.cm.coolwarm, vmin=0, vmax=1)
         ax.set_axis_off()
 
     logger.info("plotting MSA")
@@ -481,15 +483,15 @@ def run(args):
                 vmax=max(1, values.max()),
             )
             x, y = vmat[order_chunk].nonzero()
-            use = np.isin(y, variants['rel_pos'])
+            use = np.isin(y, variants["rel_pos"])
             ax.scatter(
                 y[use],
                 nreads - (x[use] + n * args.chunksize),
                 marker=".",
                 lw=0,
-                s=.1,
+                s=0.1,
                 zorder=2,
-                color='k',
+                color="k",
                 edgecolor=None,
             )
         else:
@@ -505,11 +507,19 @@ def run(args):
 
     if args.variants_table:
         logger.info("adding variant positions")
-        for typ, c in zip(('n.d.', 'het0', 'het1', 'hom'),
-                           ('gray', 'b', 'r', 'k')):
-            take = variants['type'] == typ
-            ax.scatter(variants[take]['rel_pos'].values, nreads*np.ones(take.sum()),
-                       s=6, c=c, marker=7, lw=0, zorder=2, edgecolor=None, clip_on=False)
+        for typ, c in zip(("n.d.", "het0", "het1", "hom"), ("gray", "b", "r", "k")):
+            take = variants["type"] == typ
+            ax.scatter(
+                variants[take]["rel_pos"].values,
+                nreads * np.ones(take.sum()),
+                s=6,
+                c=c,
+                marker=7,
+                lw=0,
+                zorder=2,
+                edgecolor=None,
+                clip_on=False,
+            )
 
     ax.spines["top"].set_visible(False)
     ax.spines["left"].set_visible(False)
@@ -678,12 +688,40 @@ def run(args):
 
         fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
 
+    if args.realignments is not None and os.path.isfile(args.realignments):
+
+        logger.info("adding breakpoint realignment results")
+        realignments = pd.read_csv(args.realignments, header=0, index_col=0)
+        realignments = realignments.loc[realignments.index.intersection(clustering.index)]
+        realignments = realignments[realignments['type'] == 'switch']
+        realignments['cluster'] = clustering.loc[realignments.index, 'cluster']
+
+        pleft = realignments['pos_left'].apply(lambda x: shift_coord(int(x.split(':')[1]), cov_int) - eff_start).values
+        pright = realignments['pos_right'].apply(lambda x: shift_coord(int(x.split(':')[1]), cov_int) - eff_start).values
+        nh = realignments['n_homology'].values
+        nu = realignments['n_untemplated'].values
+
+        pos = clustering.iloc[order].index.get_indexer(realignments.index)
+
+        ax.scatter(
+            np.maximum(pleft, pright),
+            nreads - pos, 
+            s=.1*(1+nu),
+            c=nh,
+            lw=0,
+            zorder=2,
+            edgecolor=None,
+            clip_on=False,
+            vmin=0, 
+            vmax=10,
+            cmap=plt.cm.winter,
+        )
+
     if args.figure is not None:
         logger.info("saving figure to {0}".format(args.figure))
         fig.savefig(args.figure, dpi=args.dpi)
 
     if args.plot_circles is not None:
-
         if not args.color_by == "cluster":
             logger.error("can't create bubble chart when not coloring by cluster!")
         logger.info("creating bubble chart")

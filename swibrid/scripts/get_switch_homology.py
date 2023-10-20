@@ -26,8 +26,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--range",
         dest="range",
-        default="4-7",
-        help="""range of kmer sizes, e.g., 3,5-7 [4-7]""",
+        default="5",
+        help="""range of kmer sizes, e.g., 3,5-7 [5]""",
     )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
 

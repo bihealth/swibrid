@@ -694,37 +694,40 @@ def run(args):
         logger.info("adding breakpoint realignment results")
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
-        realignments = realignments[realignments["type"] == "switch"]
-        realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
 
-        pleft = (
-            realignments["pos_left"]
-            .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
-            .values
-        )
-        pright = (
-            realignments["pos_right"]
-            .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
-            .values
-        )
-        nh = realignments["n_homology"].values
-        nu = realignments["n_untemplated"].values
+        if realignments.shape[0] > 0:
 
-        pos = clustering.iloc[order].index.get_indexer(realignments.index)
+            realignments = realignments[realignments["type"] == "switch"]
+            realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
 
-        ax.scatter(
-            np.maximum(pleft, pright),
-            nreads - pos,
-            s=0.1 * (1 + nu),
-            c=nh,
-            lw=0,
-            zorder=2,
-            edgecolor=None,
-            clip_on=False,
-            vmin=0,
-            vmax=10,
-            cmap=plt.cm.winter,
-        )
+            pleft = (
+                realignments["pos_left"]
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .values
+            )
+            pright = (
+                realignments["pos_right"]
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .values
+            )
+            nh = realignments["n_homology"].values
+            nu = realignments["n_untemplated"].values
+
+            pos = clustering.iloc[order].index.get_indexer(realignments.index)
+
+            ax.scatter(
+                np.maximum(pleft, pright),
+                nreads - pos,
+                s=0.1 * (1 + nu),
+                c=nh,
+                lw=0,
+                zorder=2,
+                edgecolor=None,
+                clip_on=False,
+                vmin=0,
+                vmax=10,
+                cmap=plt.cm.winter,
+            )
 
     if args.figure is not None:
         logger.info("saving figure to {0}".format(args.figure))

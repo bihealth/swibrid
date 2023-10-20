@@ -513,6 +513,7 @@ def run(args):
         "low_cov": 0,
         "switch_order": 0,
         "small_gap": 0,
+        "no_isotype": 0
     }
 
     logger.info("processing reads from " + args.alignments)
@@ -522,11 +523,12 @@ def run(args):
         alignments = parse_maf(args.alignments, min_gap=args.min_gap)
 
     outf = open(args.outfile, "w")
-    seq_out = (
-        gzip.open(args.sequences, "wt")
-        if args.sequences.endswith(".gz")
-        else open(args.sequences, "w")
-    )
+    if args.sequences is not None:
+        seq_out = (
+            gzip.open(args.sequences, "wt")
+            if args.sequences.endswith(".gz")
+            else open(args.sequences, "w")
+        )
 
     realignments = {}
 
@@ -609,6 +611,9 @@ def run(args):
             orientations[str(orientation)] += read_end - read_start
         main_orientation = max([1, -1], key=lambda x: orientations[str(x)])
 
+        # sort switch matches by their order along the read
+        switch_matches = sorted(switch_matches, key=operator.itemgetter(0))
+
         # check overlap of aligned segments
         read_overlap = sum(
             [
@@ -631,10 +636,8 @@ def run(args):
 
         if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
             stats["overlap_mismatch"] += 1
+            logger.warn('overlap mismatch (read: {0}, ref {1}) for read {2}'.format(read_overlap, ref_overlap, read))
             use = False
-
-        # sort switch matches by their order along the read
-        switch_matches = sorted(switch_matches, key=operator.itemgetter(0))
 
         filtered_inserts = []
         # focus now on reads with structure switch - insert - switch
@@ -686,7 +689,9 @@ def run(args):
                         switch_left[5],
                     )
                 elif switch_left[1] > insert[1] or switch_right[0] < insert[0]:
-                    raise ValueError("interval error for insert-adjoining switch matches!")
+                    logger.warn("interval error for insert-adjoining switch matches; discarding read " + read)
+                    use = False
+                    continue
 
                 # number of unmapped bases in read between switch parts and inserts
                 gaps = (switch_right[0] - insert[1], insert[0] - switch_left[1])
@@ -786,28 +791,38 @@ def run(args):
             stats["switch_order"] += 1
             use = False
 
-        if not use:
-            continue
+        if args.interrupt_for_read and read in args.interrupt_for_read:
+            print([sm[:5] for sm in switch_matches])
+            break
+
+        # isotype
+        isotype = ''
+        i = 0
+        while len(isotype) == 0 and i < len(read_mappings):
+            last_map = read_mappings[-(i+1)] if switch_orientation == "+" else read_mappings[i]
+            tmp = intersect_intervals(
+                [
+                    (
+                        last_map[0],
+                        last_map[1] - args.isotype_extra,
+                        last_map[2] + args.isotype_extra,
+                        )
+                    ],
+                switch_anno,
+                loj=True,
+                )
+            isotype = ",".join(rec[3][3] for rec in tmp)
+            i += 1
+
+        if isotype == '':
+            use = False
+            stats['no_isotype'] += 1
 
         if orientations["1"] > 0 and orientations["-1"] > 0:
             stats["inversions"] += 1
 
-        # isotype
-        last_map = read_mappings[-1] if switch_orientation == "+" else read_mappings[0]
-        tmp = intersect_intervals(
-            [
-                (
-                    last_map[0],
-                    last_map[1] - args.isotype_extra,
-                    last_map[2] + args.isotype_extra,
-                )
-            ],
-            switch_anno,
-            loj=True,
-        )
-        isotype = ",".join(rec[3][3] for rec in tmp)
-        if len(isotype) == 0:
-            isotype = "none"
+        if not use:
+            continue
 
         outf.write(
             "{0}\t{1}\t{2}\t{3:.4f}".format(
@@ -894,7 +909,8 @@ def run(args):
             )
 
     outf.close()
-    seq_out.close()
+    if args.sequences is not None:
+        seq_out.close()
 
     logger.info("done. saving stats to " + args.stats)
     if args.stats:

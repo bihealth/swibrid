@@ -147,7 +147,7 @@ def run(args):
 
         def get_insert_isotype(x):
             left_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -161,7 +161,7 @@ def run(args):
                 )
             )
             right_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
                 for rec in intersect_intervals(
                     [
                         (
@@ -267,13 +267,18 @@ def run(args):
 
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
-        realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
-        realignment_stats = (
-            realignments.groupby(["type", "cluster"])
-            .agg({"n_homology": "mean", "n_untemplated": "mean"})
-            .unstack(level=0)
-        )
-        realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
+
+        if realignments.shape[0] > 0:
+
+            realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
+            realignment_stats = (
+                realignments.groupby(["type", "cluster"])
+                .agg({"n_homology": "mean", "n_untemplated": "mean"})
+                .unstack(level=0)
+            )
+            realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
+        else:
+            realignment_stats = pd.DataFrame([], columns=['n_homology_switch','n_untemplated_switch'])
 
     df = pd.DataFrame(
         {
@@ -289,6 +294,7 @@ def run(args):
         },
         index=clusters,
     )
+
     df = pd.concat([df, insert_stats, realignment_stats], axis=1)
 
     switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, 1)

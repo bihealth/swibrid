@@ -139,6 +139,8 @@ def run(args):
         combs = pd.Index(list(set([bc for c in combs for bc in c.split("+")])))
     if args.sample_sheet is not None:
         combs = whitelist
+    else:
+        whitelist = combs
 
     if args.outdir is not None:
         logger.info("using these barcode combinations for demultiplexing: " + ", ".join(combs))
@@ -211,6 +213,7 @@ def run(args):
                     for rh in read_hits
                     if "primer" not in rh[0]
                     and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
+                    and rh[0] in whitelist
                 ]
                 primers = [
                     rh
@@ -218,7 +221,8 @@ def run(args):
                     if "primer" in rh[0] and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
                 ]
                 internal = [
-                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist) or 
+                    not ('primer' in rh[0] or rh[0] in whitelist)
                 ]
                 if args.collapse:
                     comb = "+".join(set(bc[0] for bc in barcodes))
@@ -250,7 +254,7 @@ def run(args):
                 sp = [0]
                 for cl in clusters:
                     rhs = [read_hits[i] for i in range(cl[0], cl[-1] + 1)]
-                    is_bc = [not lb.startswith("primer") for lb, _, _, _ in rhs]
+                    is_bc = [not lb.startswith("primer") for lb, _, _, _ in rhs if lb in whitelist]
                     if sum(is_bc) == 2:
                         # if there are two barcodes, split between them
                         si = min(i for i, t in enumerate(is_bc) if t)
@@ -275,6 +279,7 @@ def run(args):
                         if not lb.startswith("primer")
                         and (st >= sp[k] and en <= sp[k + 1])
                         and (st <= sp[k] + args.dist or en >= sp[k + 1] - args.dist)
+                        and lb in whitelist
                     ]
                     primers = [
                         (lb, st - sp[k], en - sp[k], o)
@@ -287,7 +292,8 @@ def run(args):
                         (lb, st - sp[k], en - sp[k], o)
                         for lb, st, en, o in read_hits
                         if (st >= sp[k] and en <= sp[k + 1])
-                        and (st > sp[k] + args.dist and en < sp[k + 1] - args.dist)
+                        and ((st > sp[k] + args.dist and en < sp[k + 1] - args.dist) or 
+                             not (lb.startswith('primer') or lb in whitelist))
                     ]
                     if args.collapse:
                         comb = "+".join(set(bc[0] for bc in barcodes))

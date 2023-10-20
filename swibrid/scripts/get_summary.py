@@ -130,7 +130,7 @@ def run(args):
         clones = list(map(int, args.use_clones.split(",")))
     else:
         clusters = clustering["filtered_cluster"].dropna()
-        clones = clusters[clusters >= 0].astype(int)
+        clones = clusters[clusters >= 0].astype(int).unique()
 
     logger.info("using {0} clones".format(len(clones)))
 
@@ -185,15 +185,21 @@ def run(args):
             ).sum()
         )
 
-        stats["PCR_length_bias"] = scipy.stats.linregress(
-            clustering_analysis.loc[clones, "length"],
-            np.log(clustering_analysis.loc[clones, "size"]),
-        )[0]
+        try:
+            stats["PCR_length_bias"] = scipy.stats.linregress(
+                clustering_analysis.loc[clones, "length"],
+                np.log(clustering_analysis.loc[clones, "size"]),
+                )[0]
+        except ValueError:
+            stats["PCR_length_bias"] = 0
 
-        stats["PCR_GC_bias"] = scipy.stats.linregress(
-            clustering_analysis.loc[clones, "GC"],
-            np.log(clustering_analysis.loc[clones, "size"]),
-        )[0]
+        try:
+            stats["PCR_GC_bias"] = scipy.stats.linregress(
+                clustering_analysis.loc[clones, "GC"],
+                np.log(clustering_analysis.loc[clones, "size"]),
+                )[0]
+        except ValueError:
+            stats["PCR_GC_bias"] = 0
 
     logger.info("reading read info")
     read_info = pd.read_csv(args.info, header=0, index_col=0)
@@ -201,8 +207,9 @@ def run(args):
     barcode_locs = (
         [
             (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
-            for bc, l in read_info[["barcodes", "length"]].values
-            for x in bc.split(";")
+            for bc, l in read_info[["barcodes", "length"]].dropna().values
+            for x in bc.split(";") 
+            if 'BC' in bc
         ]
         if "barcodes" in read_info.columns
         else []
@@ -212,7 +219,8 @@ def run(args):
         [
             (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
             for pr, l in read_info[["primers", "length"]].dropna().values
-            for x in pr.split(";")
+            for x in pr.split(";") 
+            if 'primer' in pr
         ]
         if "primers" in read_info.columns
         else []
@@ -241,8 +249,8 @@ def run(args):
         else []
     )
 
-    read_isotype_count = clustering["isotype"].value_counts()
-    cluster_isotype_count = clustering_analysis.loc[clones, "isotype"].value_counts()
+    read_isotype_count = clustering["isotype"].dropna().value_counts()
+    cluster_isotype_count = clustering_analysis.loc[clones, "isotype"].dropna().value_counts()
     insert_isotype_count = clustering_analysis["insert_pos_isotype"].dropna().value_counts()
 
     nreads = read_isotype_count.sum()

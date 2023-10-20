@@ -35,6 +35,13 @@ def setup_argparse(parser):
         help="""binsize [50]""",
     )
     parser.add_argument(
+        "--scale_factor",
+        dest="scale_factor",
+        default=10,
+        type=int,
+        help="""factor to increase binsize for 2D histogram [10]""",
+    )
+    parser.add_argument(
         "--max_gap",
         dest="max_gap",
         default=75,
@@ -68,8 +75,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--range",
         dest="range",
-        default="4-7",
-        help="""range of kmer sizes, e.g., 3,5-7 [4-7]""",
+        default="5",
+        help="""range of kmer sizes, e.g., 3,5-7 [5]""",
     )
     parser.add_argument(
         "-n",
@@ -152,7 +159,7 @@ def run(args):
                 clones = list(map(int, args.use_clones.split(",")))
         else:
             clusters = clustering["filtered_cluster"].dropna()
-            clones = clusters[clusters >= 0].astype(int)
+            clones = clusters[clusters >= 0].astype(int).unique()
         logger.info("using {0} clones".format(len(clones)))
         nc = clustering["cluster"].dropna().astype(int).value_counts()
         singletons = nc.index[nc == 1]
@@ -179,12 +186,27 @@ def run(args):
     gap_left = gaps["pos_left"]
     gap_right = gaps["pos_right"]
     gap_size = gaps["gap_size"]
+    inversion = gaps["inversion"]
     Leff = Ltot // binsize
-    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff)
+
+    # breaks in consistent orientation
+    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff) & ~inversion
     bp_hist = scipy.sparse.csr_matrix(
         (
             weights[gap_reads[take]],
-            (gap_left[take] // binsize, gap_right[take] // binsize),
+            (np.minimum(gap_left[take], gap_right[take]) // binsize, 
+             np.maximum(gap_left[take], gap_right[take]) // binsize),
+        ),
+        shape=(Leff, Leff),
+    ).todense()
+
+    # breaks with inversions
+    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff) & inversion
+    bp_hist_neg = scipy.sparse.csr_matrix(
+        (
+            weights[gap_reads[take]],
+            (np.maximum(gap_left[take], gap_right[take]) // binsize, 
+             np.minimum(gap_left[take], gap_right[take]) // binsize),
         ),
         shape=(Leff, Leff),
     ).todense()
@@ -194,8 +216,10 @@ def run(args):
     xx, yy = np.meshgrid(np.arange(Leff), np.arange(Leff), indexing="ij")
     iu = np.triu_indices(Leff)
 
-    nbreaks = bp_hist[iu].A1.sum()
+    nbreaks = bp_hist.sum()
+    ninversions = bp_hist_neg.sum()
     stats["breaks_normalized"] = nbreaks
+    stats["frac_inversions"] = ninversions / (nbreaks + ninversions)
 
     single_event = ((switch_iis[xx] == "SM") | (switch_iis[yy] == "SM")) & (
         switch_iis[xx] != switch_iis[yy]
@@ -205,9 +229,10 @@ def run(args):
     )
     within_event = switch_iis[xx] == switch_iis[yy]
 
-    stats["frac_single_break"] = bp_hist[single_event].sum() / nbreaks
-    stats["frac_multiple_breaks"] = bp_hist[multiple_event].sum() / nbreaks
-    stats["frac_within_break"] = bp_hist[within_event].sum() / nbreaks
+    stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
+    stats["frac_breaks_multiple"] = bp_hist[multiple_event].sum() / nbreaks
+    stats["frac_breaks_within"] = bp_hist[within_event].sum() / nbreaks
+    stats["frac_inversions_within"] = bp_hist_neg[within_event].sum() / ninversions
 
     regions = np.unique(switch_iis)
     if args.switch_coords.split(":")[-1] == "-":
@@ -219,7 +244,8 @@ def run(args):
             take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
                 switch_iis[xx] == r2
             )
-            stats["frac_break_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / nbreaks
+            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (nbreaks + ninversions)
+            # stats["frac_inversions_{1}_{0}".format(r1, r2)] = bp_hist_neg[take].sum() / ninversions
 
     # check if certain regions in SM break to different isotypes with different frequencies
     df = {}
@@ -237,16 +263,6 @@ def run(args):
         / m.sum().sum()
     )
 
-    if args.homology:
-        homology = np.load(args.homology)
-        for n in parse_range(args.range):
-            stats["homology_fw_{0}".format(n)] = (
-                np.sum(bp_hist[iu].A1 * homology["fw_{0}".format(n)][iu]) / nbreaks
-            )
-            stats["homology_rv_{0}".format(n)] = (
-                np.sum(bp_hist[iu].A1 * homology["rv_{0}".format(n)][iu]) / nbreaks
-            )
-
     bps = (bp_hist + bp_hist.T).sum(1).A1
     for sr in np.unique(switch_iis):
         bps_here = bps[switch_iis == sr]
@@ -255,9 +271,28 @@ def run(args):
         m2 = np.sum(pos**2 * bps_here) / np.sum(bps_here)
         stats["spread_" + sr] = np.sqrt(m2 - m**2)
 
+    if args.homology:
+        homology = np.load(args.homology)
+
+        # collapse different gamma and alpha isotypes for homology scores
+        switch_iis = np.array([si[:2] for si in switch_iis])
+        regions = np.unique(switch_iis)
+        if args.switch_coords.split(":")[-1] == "-":
+            regions = regions[::-1]
+
+        for i in range(len(regions)):
+            r1 = regions[i]
+            for j in range(i + 1):
+                r2 = regions[j]
+                take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
+                    switch_iis[xx] == r2
+                )
+                for n in parse_range(args.range):
+                    stats["homology_fw_{1}_{0}".format(r1, r2)] = np.sum(bp_hist[take].A1 * homology["fw_{0}".format(n)][take]) / np.sum(bp_hist[take])
+                    stats["homology_rv_{1}_{0}".format(r1, r2)] = np.sum(bp_hist[take].A1 * homology["rv_{0}".format(n)][take]) / np.sum(bp_hist[take])
+
     if args.motifs:
         motif_counts = np.load(args.motifs)
-
         for motif in motif_counts.files:
             counts = motif_counts[motif]
             stats["donor_score_" + motif] = np.sum(bp_hist.sum(0).A1 * counts) / (
@@ -288,15 +323,31 @@ def run(args):
 
         fig.text(0.535, 0.99, args.sample, size="large", ha="center", va="top")
 
+        scale_factor = args.scale_factor
+        assert Leff % scale_factor == 0, "Leff is not a multiple of scale_factor"
+        bph_p = (np.asarray(bp_hist.T)
+               .reshape((Leff, Leff // scale_factor, scale_factor))
+               .sum(-1)
+               .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+               .sum(1))
+        bph_n = (np.asarray(bp_hist_neg.T)
+               .reshape((Leff, Leff // scale_factor, scale_factor))
+               .sum(-1)
+               .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+               .sum(1))
+
         ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
-        ax.imshow(np.log(bp_hist.T), cmap=plt.cm.viridis, origin="lower", interpolation="none")
-        ax.set_xlim([Leff, 0])
-        ax.set_ylim([Leff, 0])
+        ax.imshow(np.log(bph_p), 
+                  cmap=plt.cm.Greens, origin="lower", interpolation="none")
+        ax.imshow(np.log(bph_n), 
+                  cmap=plt.cm.Reds, origin="lower", interpolation="none")
+        ax.set_xlim([Leff // scale_factor, 0])
+        ax.set_ylim([Leff // scale_factor, 0])
         ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)
-        ax.set_yticks(np.array(major_ticks) // binsize)
-        ax.set_xticks(np.array(major_ticks) // binsize)
-        ax.set_yticks(np.array(minor_ticks) // binsize, minor=True)
-        ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)
+        ax.set_yticks(np.array(major_ticks) // (binsize * scale_factor))
+        ax.set_xticks(np.array(major_ticks) // (binsize * scale_factor))
+        ax.set_yticks(np.array(minor_ticks) // (binsize * scale_factor), minor=True)
+        ax.set_xticks(np.array(minor_ticks) // (binsize * scale_factor), minor=True)
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_yticklabels(minor_labels, minor=True)
@@ -305,7 +356,8 @@ def run(args):
         ax.set_title("2D breakpoint histogram", size="medium")
 
         ax = fig.add_axes([0.12, 0.07, 0.83, 0.15])
-        ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "k-", lw=0.5)
+        ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "g-", lw=0.5)
+        ax.plot(np.arange(Leff), -(bp_hist_neg + bp_hist_neg.T).mean(0).A1, "r-", lw=0.5)
         ax.set_xlim([Leff, 0])
         ax.set_xticks(np.array(major_ticks) // binsize)
         ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)

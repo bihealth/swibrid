@@ -349,8 +349,9 @@ def get_gap_positions(msa):
     pos_right = pos_left + np.diff(jj)[cps] - 1
     read_idx = ii[cps]
     gap_sizes = pos_right - pos_left
+    inversions = np.sign(msa.data[cps]) != np.sign(msa.data[cps+1])
 
-    return read_idx, pos_left, pos_right, gap_sizes
+    return read_idx, pos_left, pos_right, gap_sizes, inversions
 
 
 def vrange(starts, stops):
@@ -383,7 +384,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     import scipy.sparse
 
     if gaps is None:
-        read_idx, pos_left, pos_right, gap_sizes = get_gap_positions(msa)
+        read_idx, pos_left, pos_right, gap_sizes, inversions = get_gap_positions(msa)
     else:
         read_idx = gaps["read_idx"]
         pos_left = gaps["pos_left"]

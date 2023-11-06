@@ -32,5 +32,5 @@ def run(args):
         pos_left=pos_left,
         pos_right=pos_right,
         gap_size=gap_size,
-        inversion=inversion
+        inversion=inversion,
     )

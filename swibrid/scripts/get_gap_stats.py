@@ -190,23 +190,37 @@ def run(args):
     Leff = Ltot // binsize
 
     # breaks in consistent orientation
-    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff) & ~inversion
+    take = (
+        (gap_size >= args.max_gap)
+        & (gap_left // binsize < Leff)
+        & (gap_right // binsize < Leff)
+        & ~inversion
+    )
     bp_hist = scipy.sparse.csr_matrix(
         (
             weights[gap_reads[take]],
-            (np.minimum(gap_left[take], gap_right[take]) // binsize, 
-             np.maximum(gap_left[take], gap_right[take]) // binsize),
+            (
+                np.minimum(gap_left[take], gap_right[take]) // binsize,
+                np.maximum(gap_left[take], gap_right[take]) // binsize,
+            ),
         ),
         shape=(Leff, Leff),
     ).todense()
 
     # breaks with inversions
-    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff) & inversion
+    take = (
+        (gap_size >= args.max_gap)
+        & (gap_left // binsize < Leff)
+        & (gap_right // binsize < Leff)
+        & inversion
+    )
     bp_hist_neg = scipy.sparse.csr_matrix(
         (
             weights[gap_reads[take]],
-            (np.maximum(gap_left[take], gap_right[take]) // binsize, 
-             np.minimum(gap_left[take], gap_right[take]) // binsize),
+            (
+                np.maximum(gap_left[take], gap_right[take]) // binsize,
+                np.minimum(gap_left[take], gap_right[take]) // binsize,
+            ),
         ),
         shape=(Leff, Leff),
     ).todense()
@@ -244,7 +258,9 @@ def run(args):
             take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
                 switch_iis[xx] == r2
             )
-            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (nbreaks + ninversions)
+            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (
+                nbreaks + ninversions
+            )
             # stats["frac_inversions_{1}_{0}".format(r1, r2)] = bp_hist_neg[take].sum() / ninversions
 
     # check if certain regions in SM break to different isotypes with different frequencies
@@ -288,8 +304,12 @@ def run(args):
                     switch_iis[xx] == r2
                 )
                 for n in parse_range(args.range):
-                    stats["homology_fw_{1}_{0}".format(r1, r2)] = np.sum(bp_hist[take].A1 * homology["fw_{0}".format(n)][take]) / np.sum(bp_hist[take])
-                    stats["homology_rv_{1}_{0}".format(r1, r2)] = np.sum(bp_hist[take].A1 * homology["rv_{0}".format(n)][take]) / np.sum(bp_hist[take])
+                    stats["homology_fw_{1}_{0}".format(r1, r2)] = np.sum(
+                        bp_hist[take].A1 * homology["fw_{0}".format(n)][take]
+                    ) / np.sum(bp_hist[take])
+                    stats["homology_rv_{1}_{0}".format(r1, r2)] = np.sum(
+                        bp_hist[take].A1 * homology["rv_{0}".format(n)][take]
+                    ) / np.sum(bp_hist[take])
 
     if args.motifs:
         motif_counts = np.load(args.motifs)
@@ -325,22 +345,24 @@ def run(args):
 
         scale_factor = args.scale_factor
         assert Leff % scale_factor == 0, "Leff is not a multiple of scale_factor"
-        bph_p = (np.asarray(bp_hist.T)
-               .reshape((Leff, Leff // scale_factor, scale_factor))
-               .sum(-1)
-               .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
-               .sum(1))
-        bph_n = (np.asarray(bp_hist_neg.T)
-               .reshape((Leff, Leff // scale_factor, scale_factor))
-               .sum(-1)
-               .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
-               .sum(1))
+        bph_p = (
+            np.asarray(bp_hist.T)
+            .reshape((Leff, Leff // scale_factor, scale_factor))
+            .sum(-1)
+            .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+            .sum(1)
+        )
+        bph_n = (
+            np.asarray(bp_hist_neg.T)
+            .reshape((Leff, Leff // scale_factor, scale_factor))
+            .sum(-1)
+            .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+            .sum(1)
+        )
 
         ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
-        ax.imshow(np.log(bph_p), 
-                  cmap=plt.cm.Greens, origin="lower", interpolation="none")
-        ax.imshow(np.log(bph_n), 
-                  cmap=plt.cm.Reds, origin="lower", interpolation="none")
+        ax.imshow(np.log(bph_p), cmap=plt.cm.Greens, origin="lower", interpolation="none")
+        ax.imshow(np.log(bph_n), cmap=plt.cm.Reds, origin="lower", interpolation="none")
         ax.set_xlim([Leff // scale_factor, 0])
         ax.set_ylim([Leff // scale_factor, 0])
         ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)

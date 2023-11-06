@@ -269,7 +269,6 @@ def run(args):
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
 
         if realignments.shape[0] > 0:
-
             realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
             realignment_stats = (
                 realignments.groupby(["type", "cluster"])
@@ -278,7 +277,9 @@ def run(args):
             )
             realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
         else:
-            realignment_stats = pd.DataFrame([], columns=['n_homology_switch','n_untemplated_switch'])
+            realignment_stats = pd.DataFrame(
+                [], columns=["n_homology_switch", "n_untemplated_switch"]
+            )
 
     df = pd.DataFrame(
         {

@@ -513,7 +513,7 @@ def run(args):
         "low_cov": 0,
         "switch_order": 0,
         "small_gap": 0,
-        "no_isotype": 0
+        "no_isotype": 0,
     }
 
     logger.info("processing reads from " + args.alignments)
@@ -636,7 +636,11 @@ def run(args):
 
         if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
             stats["overlap_mismatch"] += 1
-            logger.warn('overlap mismatch (read: {0}, ref {1}) for read {2}'.format(read_overlap, ref_overlap, read))
+            logger.warn(
+                "overlap mismatch (read: {0}, ref {1}) for read {2}".format(
+                    read_overlap, ref_overlap, read
+                )
+            )
             use = False
 
         filtered_inserts = []
@@ -689,7 +693,10 @@ def run(args):
                         switch_left[5],
                     )
                 elif switch_left[1] > insert[1] or switch_right[0] < insert[0]:
-                    logger.warn("interval error for insert-adjoining switch matches; discarding read " + read)
+                    logger.warn(
+                        "interval error for insert-adjoining switch matches; discarding read "
+                        + read
+                    )
                     use = False
                     continue
 
@@ -782,6 +789,10 @@ def run(args):
             stats["low_cov"] += 1
             use = False
 
+        # check how much genomic sequence is covered multiple times
+        unmerged_switch_coverage = sum(sm[4] - sm[3] for sm in switch_matches)
+        merged_switch_coverage = sum(rm[2] - rm[1] for rm in read_mappings)
+
         # check that switch matches are in consistent order along the read and the genome (but ignore inverted segments)
         read_order = np.argsort([sm[0] for sm in switch_matches if sm[5] == main_orientation])
         genomic_order = np.argsort([sm[3] for sm in switch_matches if sm[5] == main_orientation])
@@ -796,27 +807,27 @@ def run(args):
             break
 
         # isotype
-        isotype = ''
+        isotype = ""
         i = 0
         while len(isotype) == 0 and i < len(read_mappings):
-            last_map = read_mappings[-(i+1)] if switch_orientation == "+" else read_mappings[i]
+            last_map = read_mappings[-(i + 1)] if switch_orientation == "+" else read_mappings[i]
             tmp = intersect_intervals(
                 [
                     (
                         last_map[0],
                         last_map[1] - args.isotype_extra,
                         last_map[2] + args.isotype_extra,
-                        )
-                    ],
+                    )
+                ],
                 switch_anno,
                 loj=True,
-                )
+            )
             isotype = ",".join(rec[3][3] for rec in tmp)
             i += 1
 
-        if isotype == '':
+        if isotype == "":
             use = False
-            stats['no_isotype'] += 1
+            stats["no_isotype"] += 1
 
         if orientations["1"] > 0 and orientations["-1"] > 0:
             stats["inversions"] += 1
@@ -832,6 +843,7 @@ def run(args):
                 tot_cov / tot_read_len,
             )
         )
+        # outf.write("\t{0:.4f}".format(unmerged_switch_coverage / merged_switch_coverage)
         for chrom, start, end, orientation in read_mappings:
             outf.write("\t{0}:{1}-{2}:{3}".format(chrom, start, end, orientation))
         for (
@@ -865,6 +877,7 @@ def run(args):
 
         outf.write("\n")
 
+        # write genomic alignments to fasta file for MSA construction
         if args.sequences is not None:
             seq = ["-" * (rm[2] - rm[1]) for rm in read_mappings]
             for (

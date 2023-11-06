@@ -696,7 +696,6 @@ def run(args):
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
 
         if realignments.shape[0] > 0:
-
             realignments = realignments[realignments["type"] == "switch"]
             realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
 

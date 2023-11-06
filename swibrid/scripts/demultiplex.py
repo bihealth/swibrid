@@ -221,8 +221,10 @@ def run(args):
                     if "primer" in rh[0] and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
                 ]
                 internal = [
-                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist) or 
-                    not ('primer' in rh[0] or rh[0] in whitelist)
+                    rh
+                    for rh in read_hits
+                    if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                    or not ("primer" in rh[0] or rh[0] in whitelist)
                 ]
                 if args.collapse:
                     comb = "+".join(set(bc[0] for bc in barcodes))
@@ -292,8 +294,10 @@ def run(args):
                         (lb, st - sp[k], en - sp[k], o)
                         for lb, st, en, o in read_hits
                         if (st >= sp[k] and en <= sp[k + 1])
-                        and ((st > sp[k] + args.dist and en < sp[k + 1] - args.dist) or 
-                             not (lb.startswith('primer') or lb in whitelist))
+                        and (
+                            (st > sp[k] + args.dist and en < sp[k + 1] - args.dist)
+                            or not (lb.startswith("primer") or lb in whitelist)
+                        )
                     ]
                     if args.collapse:
                         comb = "+".join(set(bc[0] for bc in barcodes))

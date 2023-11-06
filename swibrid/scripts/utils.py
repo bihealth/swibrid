@@ -349,7 +349,7 @@ def get_gap_positions(msa):
     pos_right = pos_left + np.diff(jj)[cps] - 1
     read_idx = ii[cps]
     gap_sizes = pos_right - pos_left
-    inversions = np.sign(msa.data[cps]) != np.sign(msa.data[cps+1])
+    inversions = np.sign(msa.data[cps]) != np.sign(msa.data[cps + 1])
 
     return read_idx, pos_left, pos_right, gap_sizes, inversions
 

@@ -68,6 +68,13 @@ def setup_argparse(parser):
         default="cluster",
         help="""specify weights ("cluster" | "reads" | "adjusted") [cluster]""",
     )
+    parser.add_argument(
+        "--max_n_blunt",
+        dest="max_n_blunt",
+        default=0.5,
+        type=float,
+        help="""max avg. number of untemplated / homologous nucleotides of reads in cluster to be considered a blunt end [.5]""",
+    )
 
 
 def run(args):
@@ -189,7 +196,7 @@ def run(args):
             stats["PCR_length_bias"] = scipy.stats.linregress(
                 clustering_analysis.loc[clones, "length"],
                 np.log(clustering_analysis.loc[clones, "size"]),
-                )[0]
+            )[0]
         except ValueError:
             stats["PCR_length_bias"] = 0
 
@@ -197,7 +204,7 @@ def run(args):
             stats["PCR_GC_bias"] = scipy.stats.linregress(
                 clustering_analysis.loc[clones, "GC"],
                 np.log(clustering_analysis.loc[clones, "size"]),
-                )[0]
+            )[0]
         except ValueError:
             stats["PCR_GC_bias"] = 0
 
@@ -208,8 +215,8 @@ def run(args):
         [
             (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
             for bc, l in read_info[["barcodes", "length"]].dropna().values
-            for x in bc.split(";") 
-            if 'BC' in bc
+            for x in bc.split(";")
+            if "BC" in bc
         ]
         if "barcodes" in read_info.columns
         else []
@@ -219,8 +226,8 @@ def run(args):
         [
             (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
             for pr, l in read_info[["primers", "length"]].dropna().values
-            for x in pr.split(";") 
-            if 'primer' in pr
+            for x in pr.split(";")
+            if "primer" in pr
         ]
         if "primers" in read_info.columns
         else []
@@ -287,18 +294,39 @@ def run(args):
         axis=0,
     )
 
+    clustering_analysis["isotype_simple"] = clustering_analysis["isotype"].str[:2]
+
     realignment_stats = (
         clustering_analysis.loc[clones]
-        .groupby("isotype")[["n_untemplated_switch", "n_homology_switch"]]
+        .groupby("isotype_simple")[["n_untemplated_switch", "n_homology_switch"]]
         .mean()
         .unstack()
     )
     realignment_stats.index = ["_".join(i) for i in realignment_stats.index.tolist()]
+    blunt_ends = (
+        clustering_analysis.loc[clones]
+        .groupby("isotype_simple")
+        .apply(
+            lambda x: (x[["n_untemplated_switch", "n_homology_switch"]] < args.max_n_blunt)
+            .all(axis=1)
+            .mean()
+        )
+    )
+    blunt_ends.index = "frac_blunt_" + blunt_ends.index
+    blunt_ends["frac_blunt"] = (
+        (
+            clustering_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]]
+            < args.max_n_blunt
+        )
+        .all(axis=1)
+        .mean()
+    )
 
     realignment_stats = pd.concat(
         [
             clustering_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]].mean(),
             realignment_stats,
+            blunt_ends,
         ],
         axis=0,
     )

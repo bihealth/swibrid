@@ -222,9 +222,14 @@ def run(args):
                 ]
                 internal = [
                     rh
+                    for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                ]
+                ignored = [
+                    rh
                     for rh in read_hits
-                    if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
-                    or not ("primer" in rh[0] or rh[0] in whitelist)
+                    if "primer" not in rh[0]
+                    and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
+                    and rh[0] not in whitelist
                 ]
                 if args.collapse:
                     comb = "+".join(set(bc[0] for bc in barcodes))
@@ -233,6 +238,7 @@ def run(args):
                 barcodes = ";".join("{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes)
                 primers = ";".join("{0}@{1}-{2}:{3}".format(*pr) for pr in primers)
                 internal = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in internal)
+                ignored = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in ignored)
                 if comb in combs:
                     comb = comb
                 else:
@@ -248,6 +254,7 @@ def run(args):
                         barcodes=barcodes,
                         primers=primers,
                         internal=internal,
+                        ignored=ignored,
                     )
                 )
             else:
@@ -294,10 +301,15 @@ def run(args):
                         (lb, st - sp[k], en - sp[k], o)
                         for lb, st, en, o in read_hits
                         if (st >= sp[k] and en <= sp[k + 1])
-                        and (
-                            (st > sp[k] + args.dist and en < sp[k + 1] - args.dist)
-                            or not (lb.startswith("primer") or lb in whitelist)
-                        )
+                        and (st > sp[k] + args.dist and en < sp[k + 1] - args.dist)
+                    ]
+                    ignored = [
+                        (lb, st - sp[k], en - sp[k], o)
+                        for lb, st, en, o in read_hits
+                        if not lb.startswith("primer")
+                        and (st >= sp[k] and en <= sp[k + 1])
+                        and (st <= sp[k] + args.dist or en >= sp[k + 1] - args.dist)
+                        and lb not in whitelist
                     ]
                     if args.collapse:
                         comb = "+".join(set(bc[0] for bc in barcodes))
@@ -306,6 +318,7 @@ def run(args):
                     barcodes = ";".join("{0}@{1}-{2}:{3}".format(*bc) for bc in barcodes)
                     primers = ";".join("{0}@{1}-{2}:{3}".format(*pr) for pr in primers)
                     internal = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in internal)
+                    ignored = ";".join("{0}@{1}-{2}:{3}".format(*h) for h in ignored)
                     if comb in combs:
                         comb = comb
                     else:
@@ -321,6 +334,7 @@ def run(args):
                             barcodes=barcodes,
                             primers=primers,
                             internal=internal,
+                            ignored=ignored,
                         )
                     )
 
@@ -359,7 +373,7 @@ def run(args):
         fig = plt.figure(figsize=(8, 8))
         fig.clf()
 
-        ax = fig.add_axes([0.25, 0.55, 0.6, 0.4])
+        ax = fig.add_axes([0.25, 0.6, 0.6, 0.4])
         labels = []
         for n, comb in enumerate(nreads.index):
             ax.barh([n], [nreads[comb]], lw=0.5, edgecolor="k")
@@ -370,7 +384,7 @@ def run(args):
                 size="x-small",
                 ha="left",
                 va="center",
-            )
+                )
             if args.sample_sheet is not None and comb in sample_sheet.index:
                 labels.append(sample_sheet[comb])
             else:
@@ -383,7 +397,34 @@ def run(args):
         ax.spines["right"].set_visible(False)
         ax.spines["bottom"].set_visible(False)
 
-        ax = fig.add_axes([0.13, 0.1, 0.35, 0.4])
+        ax = fig.add_axes([0.13, 0.53, 0.8, .03])
+        def classify_barcodes(bc, whitelist):
+            if pd.isnull(bc):
+                return 'none'
+            bcs = sorted(set(map(lambda x: x.split("@")[0], bc.split(';'))))
+            if len(bcs) > 1:
+                return 'multiple'
+            else:
+                return ';'.join(bcs)
+                
+        ignored = pd.Series(Counter(classify_barcodes(bc,whitelist) for bc in  read_info['undetermined']['ignored'])).sort_values(ascending=False)
+        cignored = ignored.cumsum() / ignored.sum()
+        for i in np.arange((ignored > .01*ignored.sum()).sum()):
+            left = 0 if i==0 else cignored.iloc[i-1]
+            ax.barh([0], [ignored.iloc[i]/ignored.sum()], left=[left], lw=.05, edgecolor='k')
+            ax.text(left + .5*ignored.iloc[i]/ignored.sum(), 0, ignored.index[i], size="x-small", ha="center", va='center', rotation=90)
+        left = cignored.iloc[i]
+        ax.barh([0], [1 - left], left=[left], lw=.05, edgecolor='k', color='#DDDDDD')
+        ax.text(left + .5 * (1 - left), 0, 'other', size="x-small", ha="center", va='center', rotation=90)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlim([0,1])
+        ax.set_title("undetermined reads", size='x-small')
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+
+        ax = fig.add_axes([0.13, 0.1, 0.35, 0.38])
         for comb in nreads.index:
             bc_pos = [
                 np.mean(list(map(int, re.split("[-:]", p.split("@")[1])[:2]))) / r["length"]
@@ -399,7 +440,7 @@ def run(args):
         ax.set_title("barcode position")
         ax.set_xlabel("rel pos in read")
 
-        ax = fig.add_axes([0.58, 0.1, 0.35, 0.4])
+        ax = fig.add_axes([0.58, 0.1, 0.35, 0.38])
         for comb in nreads.index:
             ax.hist(
                 np.log10(read_info[comb]["length"]),

@@ -11,6 +11,7 @@ from ruamel.yaml import YAML
 
 from .scripts import (
     demultiplex,
+    plot_demux_report,
     filter_reads,
     process_alignments,
     construct_msa,
@@ -135,6 +136,7 @@ def main(argv=None):
 
     swibrid get_unique_clones_bed  get bed file with unique clones
     swibrid get_synthetic_reads    create synthetic reads from bed file
+    swibrid plot_demux_report      make a graphical summary of demultiplexing output
     """
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -204,6 +206,7 @@ def main(argv=None):
     )
 
     demultiplex.setup_argparse(subparsers.add_parser("demultiplex", help="demultiplex minION run"))
+    plot_demux_report.setup_argparse(subparsers.add_parser("plot_demux_report", help="plot demultiplexing report"))
     filter_reads.setup_argparse(subparsers.add_parser("filter_reads", help="filter reads"))
     process_alignments.setup_argparse(
         subparsers.add_parser("process_alignments", help=argparse.SUPPRESS)
@@ -261,6 +264,7 @@ def main(argv=None):
     steps = {
         "setup": run_setup,
         "demultiplex": demultiplex.run,
+        "plot_demux_report": plot_demux_report.run,
         "filter_reads": filter_reads.run,
         "process_alignments": process_alignments.run,
         "get_alignment_pars": get_alignment_pars.run,

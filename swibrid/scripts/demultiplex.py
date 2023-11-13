@@ -77,6 +77,8 @@ def run(args):
         sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
         whitelist = sample_sheet.index
 
+    assert len(whitelist) == len(whitelist.unique()), "sample sheet contains repeated barcodes. exiting ..."
+
     if args.blast is not None:
         logger.info("reading and filtering BLAST output from " + args.blast)
         inf = open(args.blast)
@@ -363,94 +365,6 @@ def run(args):
         nreads.to_csv(args.report)
 
     if args.figure is not None:
-        import matplotlib
 
-        matplotlib.use("Agg")
-        from matplotlib import pyplot as plt
-
-        logger.info("creating report figure in " + args.figure)
-
-        fig = plt.figure(figsize=(8, 8))
-        fig.clf()
-
-        ax = fig.add_axes([0.25, 0.6, 0.6, 0.4])
-        labels = []
-        for n, comb in enumerate(nreads.index):
-            ax.barh([n], [nreads[comb]], lw=0.5, edgecolor="k")
-            ax.text(
-                nreads[comb],
-                n,
-                str(nreads[comb]),
-                size="x-small",
-                ha="left",
-                va="center",
-                )
-            if args.sample_sheet is not None and comb in sample_sheet.index:
-                labels.append(sample_sheet[comb])
-            else:
-                labels.append(comb)
-        ax.set_xticks([])
-        ax.set_yticks(range(len(nreads.index)))
-        ax.set_yticklabels(labels)
-        ax.set_title("{0} reads".format(nreads.sum()))
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_visible(False)
-
-        ax = fig.add_axes([0.13, 0.53, 0.8, .03])
-        def classify_barcodes(bc, whitelist):
-            if pd.isnull(bc):
-                return 'none'
-            bcs = sorted(set(map(lambda x: x.split("@")[0], bc.split(';'))))
-            if len(bcs) > 1:
-                return 'multiple'
-            else:
-                return ';'.join(bcs)
-                
-        ignored = pd.Series(Counter(classify_barcodes(bc,whitelist) for bc in  read_info['undetermined']['ignored'])).sort_values(ascending=False)
-        cignored = ignored.cumsum() / ignored.sum()
-        for i in np.arange((ignored > .01*ignored.sum()).sum()):
-            left = 0 if i==0 else cignored.iloc[i-1]
-            ax.barh([0], [ignored.iloc[i]/ignored.sum()], left=[left], lw=.05, edgecolor='k')
-            ax.text(left + .5*ignored.iloc[i]/ignored.sum(), 0, ignored.index[i], size="x-small", ha="center", va='center', rotation=90)
-        left = cignored.iloc[i]
-        ax.barh([0], [1 - left], left=[left], lw=.05, edgecolor='k', color='#DDDDDD')
-        ax.text(left + .5 * (1 - left), 0, 'other', size="x-small", ha="center", va='center', rotation=90)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_xlim([0,1])
-        ax.set_title("undetermined reads", size='x-small')
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["bottom"].set_visible(False)
-
-        ax = fig.add_axes([0.13, 0.1, 0.35, 0.38])
-        for comb in nreads.index:
-            bc_pos = [
-                np.mean(list(map(int, re.split("[-:]", p.split("@")[1])[:2]))) / r["length"]
-                for _, r in read_info[comb][["length", "barcodes"]].dropna().iterrows()
-                if len(r["barcodes"]) > 0
-                for p in r["barcodes"].split(";")
-                if comb in p
-            ]
-            ax.hist(bc_pos, bins=np.linspace(0, 1, 50), histtype="step")
-
-        ax.set_xticks([0, 0.5, 1])
-        ax.set_ylabel("# of reads")
-        ax.set_title("barcode position")
-        ax.set_xlabel("rel pos in read")
-
-        ax = fig.add_axes([0.58, 0.1, 0.35, 0.38])
-        for comb in nreads.index:
-            ax.hist(
-                np.log10(read_info[comb]["length"]),
-                bins=np.linspace(2, 4, 50),
-                histtype="step",
-            )
-
-        ax.set_xticks([2, 3, 4])
-        ax.set_xticklabels([100, 1000, 10000])
-        ax.set_title("length distribution")
-        ax.set_xlabel("read length")
-
-        fig.savefig(args.figure)
+        from .plot_demux_report import run as plot_demux_report
+        plot_demux_report(args)

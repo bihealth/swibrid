@@ -149,19 +149,17 @@ def run(args):
                 c_opt,
                 len(np.unique(clustering)),
                 sum(np.unique(filtered_clustering) >= 0),
-                np.sum(np.bincount(clustering) > 1),
                 np.mean(np.bincount(clustering)[np.unique(clustering)] == 1),
             ],
             index=(["p0", "p1", "p2", "p3"] if len(res) == 4 else [])
             + [
                 "c_opt",
-                "nclusters",
+                "nclusters_initial",
                 "eff_nclusters",
-                "nclusters_multi",
                 "frac_singletons",
             ],
         )
-        df.to_csv(args.stats)
+        df.to_csv(args.stats, header=False)
 
     if args.input:
         logger.info("reading read info from {0}".format(args.input))

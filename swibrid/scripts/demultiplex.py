@@ -77,7 +77,9 @@ def run(args):
         sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
         whitelist = sample_sheet.index
 
-    assert len(whitelist) == len(whitelist.unique()), "sample sheet contains repeated barcodes. exiting ..."
+    assert len(whitelist) == len(
+        whitelist.unique()
+    ), "sample sheet contains repeated barcodes. exiting ..."
 
     if args.blast is not None:
         logger.info("reading and filtering BLAST output from " + args.blast)
@@ -223,8 +225,7 @@ def run(args):
                     if "primer" in rh[0] and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
                 ]
                 internal = [
-                    rh
-                    for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
                 ]
                 ignored = [
                     rh
@@ -365,6 +366,6 @@ def run(args):
         nreads.to_csv(args.report)
 
     if args.figure is not None:
-
         from .plot_demux_report import run as plot_demux_report
+
         plot_demux_report(args)

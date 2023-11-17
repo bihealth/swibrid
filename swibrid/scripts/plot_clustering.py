@@ -289,14 +289,15 @@ def run(args):
         switch_anno, switch_chrom, switch_start, switch_end
     )
 
-    logger.info("using annotation from " + args.annotation)
-    annotation = defaultdict(list)
-    for line in open(args.annotation):
-        ls = line.strip("\n").split("\t")
-        chrom = ls[0]
-        start = int(ls[1])
-        end = int(ls[2])
-        annotation[chrom].append((chrom, start, end) + tuple(ls[3:]))
+    if args.annotation:
+        logger.info("using annotation from " + args.annotation)
+        annotation = defaultdict(list)
+        for line in open(args.annotation):
+            ls = line.strip("\n").split("\t")
+            chrom = ls[0]
+            start = int(ls[1])
+            end = int(ls[2])
+            annotation[chrom].append((chrom, start, end) + tuple(ls[3:]))
 
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa).tocsr()
@@ -367,6 +368,8 @@ def run(args):
             cmap = plt.cm.tab20
     elif args.color_by == "orientation":
         cmap = plt.cm.PiYG
+    elif args.color_by == "coverage":
+        cmap = plt.cm.Reds
     elif args.color_by == "strand" and args.info and "primers" in read_info.columns:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
@@ -469,6 +472,9 @@ def run(args):
             im[(i[pos], j[pos])] = 0.8
             im[(i[neg], j[neg])] = 0.1
             values = np.array([0, 1])
+        elif args.color_by == "coverage":
+            im[np.nonzero(msa_chunk)] = (np.abs(msa_chunk.data) // 10) / 3
+            values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
             im[np.nonzero(msa_chunk)] = tmp[np.nonzero(msa_chunk)]
@@ -570,20 +576,12 @@ def run(args):
     ax.set_ylim(ylim)
 
     if args.show_inserts:
-        if not args.coords:
-            logger.warn("need processed read coordinates to show inserts!")
-            exit(1)
-        read_inserts = {}
+
+        assert args.coords is not None, "need processed read coordinates to show inserts!"
+
         logger.info("reading processed read coordinates from {0}".format(args.coords))
-        for line in open(args.coords):
-            ls = line.strip("\n").split("\t")
-            read = ls[0]
-            inserts = []
-            for ll in ls[4:]:
-                if "insert" in ll:
-                    inserts.append(decode_insert(ll))
-            if len(inserts) > 0 and read in reads:
-                read_inserts[read] = inserts
+        process = pd.read_csv(args.coords, sep='\t', header=0, index_col=0)
+        read_inserts = dict((read, [decode_insert(insert) for insert in inserts.split(';')]) for read, inserts in process['inserts'].dropna().items())
 
         stat_string = (
             "{0}: {1} reads "
@@ -620,7 +618,7 @@ def run(args):
         n = nreads + 0.5 * dn
 
         arrows = []
-        for read in clustering.iloc[order].dropna(subset=["insert"]).index:
+        for read in clustering.iloc[order].dropna(subset=["inserts"]).index:
             p = nreads - reads[order].get_loc(read) - 1
             for m in read_inserts[read]:
                 insert_chrom = m.group("insert_chrom")
@@ -660,8 +658,9 @@ def run(args):
                 arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
                 insert_pos[uinsert] = n + 0.5
                 insert_anno = set()
-                for rec in intersect_intervals([uinsert], annotation[uinsert[0]], loj=True):
-                    insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
+                if args.annotation:
+                    for rec in intersect_intervals([uinsert], annotation[uinsert[0]], loj=True):
+                        insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
                 if len(insert_anno) == 0 or insert_anno == set("."):
                     insert_anno = "{0}:{1}-{2}".format(*uinsert)
                 else:

@@ -30,12 +30,12 @@ def run(args):
     dfs = dict(
         (
             sample,
-            pd.read_csv("stats/" + sample + "_summary.csv", header=None, index_col=0)
+            pd.read_csv(os.path.join("output", sample, sample + "_summary.csv"), header=None, index_col=0)
             .squeeze()
             .dropna(),
         )
         for sample in samples
-        if os.path.isfile("stats/" + sample + "_summary.csv")
+        if os.path.isfile(os.path.join("output", sample, sample + "_summary.csv"))
     )
     dfs = dict((k, v[v.index.notnull()]) for k, v in dfs.items())
     df = pd.concat(dfs.values(), keys=dfs.keys(), axis=1)
@@ -46,28 +46,24 @@ def run(args):
         wb = Workbook()
         with pd.ExcelWriter(args.inserts, engine="openpyxl") as writer:
             writer.workbook = wb
-            for rf in glob.glob(os.path.join("inserts", "*_inserts.tsv")):
-                name = rf.split("/")[-1].split("_inserts.tsv")[0]
-                try:
-                    tmp = pd.read_csv(rf, sep="\t", header=0)
-                    tmp.to_excel(writer, sheet_name=name, index=False)
-                    logger.info("adding inserts for {0}".format(name))
-                except pd.errors.EmptyDataError:
-                    logger.warn("no inserts for {0}".format(name))
-                    pass
+            for sample in samples:
+                if os.path.isfile(os.path.join("output", sample, sample + "_inserts.tsv")):
+                    try:
+                        tmp = pd.read_csv(os.path.join("output", sample, sample + "_inserts.tsv"), sep="\t", header=0)
+                    except pd.errors.EmptyDataError:
+                        pass
+                    tmp.to_excel(writer, sheet_name=sample, index=False)
+                    logger.info("adding inserts for {0}".format(sample))
 
     if args.cluster_stats is not None:
         wb = Workbook()
         with pd.ExcelWriter(args.cluster_stats, engine="openpyxl") as writer:
             writer.workbook = wb
-            for rf in glob.glob(os.path.join("cluster", "*_analysis.csv")):
-                name = rf.split("/")[-1].split("_analysis.csv")[0]
-                try:
-                    tmp = pd.read_csv(rf, header=0, index_col=0).sort_values(
+            for sample in samples:
+                if os.path.isfile(os.path.join("output", sample, sample + "_cluster_analysis.csv")):
+                    tmp = pd.read_csv(os.path.join("output", sample, sample + "_cluster_analysis.csv"), 
+                                      header=0, index_col=0).sort_values(
                         "size", ascending=False
-                    )
-                    tmp.to_excel(writer, sheet_name=name, index=True)
-                    logger.info("adding clustering stats for {0}".format(name))
-                except pd.errors.EmptyDataError:
-                    logger.warn("no clustering stats for {0}".format(name))
-                    pass
+                        )
+                    tmp.to_excel(writer, sheet_name=sample, index=True)
+                    logger.info("adding clustering stats for {0}".format(sample))

@@ -187,6 +187,7 @@ def run(args):
     gap_right = gaps["pos_right"]
     gap_size = gaps["gap_size"]
     inversion = gaps["inversion"]
+    duplication = gaps["duplication"]
     Leff = Ltot // binsize
 
     # breaks in consistent orientation
@@ -194,7 +195,7 @@ def run(args):
         (gap_size >= args.max_gap)
         & (gap_left // binsize < Leff)
         & (gap_right // binsize < Leff)
-        & ~inversion
+        & ~inversion & ~duplication
     )
     bp_hist = scipy.sparse.csr_matrix(
         (
@@ -209,12 +210,28 @@ def run(args):
 
     # breaks with inversions
     take = (
-        (gap_size >= args.max_gap)
-        & (gap_left // binsize < Leff)
+        (gap_left // binsize < Leff)
         & (gap_right // binsize < Leff)
-        & inversion
+        & inversion 
     )
-    bp_hist_neg = scipy.sparse.csr_matrix(
+    bp_hist_inv = scipy.sparse.csr_matrix(
+        (
+            weights[gap_reads[take]],
+            (
+                np.maximum(gap_left[take], gap_right[take]) // binsize,
+                np.minimum(gap_left[take], gap_right[take]) // binsize,
+            ),
+        ),
+        shape=(Leff, Leff),
+    ).todense()
+
+    # breaks with duplications
+    take = (
+        (gap_left // binsize < Leff)
+        & (gap_right // binsize < Leff)
+        & duplication
+    )
+    bp_hist_dup = scipy.sparse.csr_matrix(
         (
             weights[gap_reads[take]],
             (
@@ -231,9 +248,11 @@ def run(args):
     iu = np.triu_indices(Leff)
 
     nbreaks = bp_hist.sum()
-    ninversions = bp_hist_neg.sum()
+    ninversions = bp_hist_inv.sum()
+    nduplications = bp_hist_dup.sum()
     stats["breaks_normalized"] = nbreaks
-    stats["frac_inversions"] = ninversions / (nbreaks + ninversions)
+    stats["frac_breaks_inversions"] = ninversions / (nbreaks + ninversions + nduplications)
+    stats["frac_breaks_duplications"] = nduplications / (nbreaks + ninversions + nduplications)
 
     single_event = ((switch_iis[xx] == "SM") | (switch_iis[yy] == "SM")) & (
         switch_iis[xx] != switch_iis[yy]
@@ -246,7 +265,8 @@ def run(args):
     stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
     stats["frac_breaks_multiple"] = bp_hist[multiple_event].sum() / nbreaks
     stats["frac_breaks_within"] = bp_hist[within_event].sum() / nbreaks
-    stats["frac_inversions_within"] = bp_hist_neg[within_event].sum() / ninversions
+    stats["frac_breaks_inversions_within"] = bp_hist_inv[within_event].sum() / ninversions
+    stats["frac_breaks_duplications_within"] = bp_hist_dup[within_event].sum() / nduplications
 
     regions = np.unique(switch_iis)
     if args.switch_coords.split(":")[-1] == "-":
@@ -259,9 +279,8 @@ def run(args):
                 switch_iis[xx] == r2
             )
             stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (
-                nbreaks + ninversions
+                nbreaks 
             )
-            # stats["frac_inversions_{1}_{0}".format(r1, r2)] = bp_hist_neg[take].sum() / ninversions
 
     # check if certain regions in SM break to different isotypes with different frequencies
     df = {}
@@ -328,6 +347,7 @@ def run(args):
     if args.plot:
         logger.info("creating figure and saving to {0}\n".format(args.plot))
         from matplotlib import pyplot as plt
+        from matplotlib import colors
 
         major_ticks = []
         minor_ticks = []
@@ -345,24 +365,38 @@ def run(args):
 
         scale_factor = args.scale_factor
         assert Leff % scale_factor == 0, "Leff is not a multiple of scale_factor"
-        bph_p = (
+        bph_p = scipy.sparse.csr_matrix(
             np.asarray(bp_hist.T)
             .reshape((Leff, Leff // scale_factor, scale_factor))
             .sum(-1)
             .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
             .sum(1)
         )
-        bph_n = (
-            np.asarray(bp_hist_neg.T)
+        bph_p.eliminate_zeros()
+        bph_i = scipy.sparse.csr_matrix(
+            np.asarray(bp_hist_inv.T)
             .reshape((Leff, Leff // scale_factor, scale_factor))
             .sum(-1)
             .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
             .sum(1)
         )
+        bph_i.eliminate_zeros()
+        bph_d = scipy.sparse.csr_matrix(
+            np.asarray(bp_hist_dup.T)
+            .reshape((Leff, Leff // scale_factor, scale_factor))
+            .sum(-1)
+            .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+            .sum(1)
+        )
+        bph_d.eliminate_zeros()
 
         ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
-        ax.imshow(np.log(bph_p), cmap=plt.cm.Greens, origin="lower", interpolation="none")
-        ax.imshow(np.log(bph_n), cmap=plt.cm.Reds, origin="lower", interpolation="none")
+        ax.scatter(bph_p.nonzero()[1], bph_p.nonzero()[0], c=np.log(bph_p.data), 
+                   cmap=plt.cm.Greens, marker='s', s=10, alpha=.8, linewidths=0, edgecolors=None)
+        ax.scatter(bph_i.nonzero()[0], bph_i.nonzero()[1], c=np.log(bph_i.data), 
+                   cmap=plt.cm.Reds, marker='s', s=10, alpha=.8, linewidths=0, edgecolors=None)
+        ax.scatter(bph_d.nonzero()[1], bph_d.nonzero()[0], c=np.log(bph_d.data), 
+                   cmap=plt.cm.Blues, marker='s', s=10, alpha=.8, linewidths=0, edgecolors=None)
         ax.set_xlim([Leff // scale_factor, 0])
         ax.set_ylim([Leff // scale_factor, 0])
         ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)
@@ -379,7 +413,8 @@ def run(args):
 
         ax = fig.add_axes([0.12, 0.07, 0.83, 0.15])
         ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "g-", lw=0.5)
-        ax.plot(np.arange(Leff), -(bp_hist_neg + bp_hist_neg.T).mean(0).A1, "r-", lw=0.5)
+        ax.plot(np.arange(Leff), -(bp_hist_inv + bp_hist_inv.T).mean(0).A1, "r-", lw=0.5)
+        ax.plot(np.arange(Leff), (bp_hist_dup + bp_hist_dup.T).mean(0).A1, "b-", lw=0.5)
         ax.set_xlim([Leff, 0])
         ax.set_xticks(np.array(major_ticks) // binsize)
         ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)
@@ -393,7 +428,7 @@ def run(args):
         ax.spines["right"].set_visible(False)
         ax.set_title("1D breakpoint histogram", size="medium")
 
-        fig.savefig(args.plot)
+        fig.savefig(args.plot, dpi=300)
 
     if args.reference and args.top_donor and args.top_receiver:
         genome = pysam.FastaFile(args.reference)

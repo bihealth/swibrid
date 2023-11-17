@@ -120,19 +120,19 @@ def main(argv=None):
     swibrid get_alignment_pars     get alignment parameters (mismatch + gap rates) from align output
     swibrid create_bed             create bed files and summary tables for insert-containing reads
     swibrid construct_msa          construct a (pseudo) MSA
-    swibrid get_gaps               find gaps in MSA
+    swibrid get_gaps               find gaps / breakpoints in MSA
     swibrid construct_linkage      construct hierarchical clustering linkage
     swibrid find_clusters          get read clustering from linkage
     swibrid find_variants          variant calling
     swibrid plot_clustering        plot the read clustering
-    swibrid get_summary            get sample summary stats and plot
     swibrid get_gap_stats          get breakpoint histogram stats
     swibrid get_switch_homology    get switch sequence homology
     swibrid get_switch_motifs      get switch sequence motifs
     swibrid analyze_clustering     analyze clustering results
+    swibrid get_summary            get sample summary stats and plot
     swibrid collect results        collect results for multiple samples
 
-    additional subcommands to create synthetic reads for testing or benchmarking:
+    additional subcommands:
 
     swibrid get_unique_clones_bed  get bed file with unique clones
     swibrid get_synthetic_reads    create synthetic reads from bed file
@@ -206,7 +206,9 @@ def main(argv=None):
     )
 
     demultiplex.setup_argparse(subparsers.add_parser("demultiplex", help="demultiplex minION run"))
-    plot_demux_report.setup_argparse(subparsers.add_parser("plot_demux_report", help="plot demultiplexing report"))
+    plot_demux_report.setup_argparse(
+        subparsers.add_parser("plot_demux_report", help="plot demultiplexing report")
+    )
     filter_reads.setup_argparse(subparsers.add_parser("filter_reads", help="filter reads"))
     process_alignments.setup_argparse(
         subparsers.add_parser("process_alignments", help=argparse.SUPPRESS)

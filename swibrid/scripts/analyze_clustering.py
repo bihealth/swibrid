@@ -88,8 +88,9 @@ def run(args):
         shape=(len(clusters), len(cinv)),
     )
 
-    avg_coverage = clustering.groupby("cluster")["coverage"].mean()
-    avg_outside_range = clustering.groupby("cluster")["outside_range"].mean()
+    avg_frac_mapped = clustering.groupby("cluster")["frac_mapped"].mean()
+    avg_frac_multi = clustering.groupby("cluster")["frac_multi"].mean()
+    avg_frac_ignored = clustering.groupby("cluster")["frac_ignored"].mean()
 
     avg_isotype = (
         clustering.groupby("cluster")["isotype"].agg(lambda x: pd.Series.mode(x)[0]).loc[clusters]
@@ -101,8 +102,13 @@ def run(args):
     logger.info("loading MSA from " + args.msa)
     msa = scipy.sparse.load_npz(args.msa)
 
-    logger.info("getting cluster consensus sequences")
+    logger.info("averaging cleaned MSA by removing gaps > {0}".format(args.max_gap))
+    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
+    avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
+    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
 
+    logger.info("getting cluster consensus sequences")
+    msa.data = np.sign(msa.data) * (np.abs(msa.data) % 10)
     nogap = mm.dot(msa != 0)
     means = dict((n, mm.dot(msa == c)) for n, c in ncodes.items())
 
@@ -119,15 +125,9 @@ def run(args):
             (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
         )
 
-    logger.info("removing gaps < {0} from MSA".format(args.max_gap))
-    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
-    logger.info("averaging cleaned MSA")
-    avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
-    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
-
     try:
         inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
-    except pd.errors.EmptyDataError:
+    except (ValueError, pd.errors.EmptyDataError):
         inserts = None
 
     insert_stats = pd.DataFrame(
@@ -257,11 +257,14 @@ def run(args):
 
         tmp = pd.concat([clustering, inserts], axis=1)
         insert_frequency = (
-            tmp.groupby("cluster")["insert"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
+            tmp.groupby("cluster")["inserts"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
         )
         if tmp.dropna().shape[0] > 0:
             insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
 
+    realignment_stats = pd.DataFrame(
+            [], columns=["n_homology_switch", "n_untemplated_switch"]
+        )
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("reading breakpoint realignments from " + args.realignments)
 
@@ -276,17 +279,14 @@ def run(args):
                 .unstack(level=0)
             )
             realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
-        else:
-            realignment_stats = pd.DataFrame(
-                [], columns=["n_homology_switch", "n_untemplated_switch"]
-            )
 
     df = pd.DataFrame(
         {
             "size": csize,
             "isotype": avg_isotype,
-            "coverage": avg_coverage,
-            "outside_range": avg_outside_range,
+            "frac_mapped": avg_frac_mapped,
+            "frac_multi": avg_frac_multi,
+            "frac_ignored": avg_frac_ignored,
             "sequence": cluster_seq,
             "length": cluster_length,
             "GC": cluster_GC,

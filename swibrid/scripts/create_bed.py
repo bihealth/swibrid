@@ -4,8 +4,8 @@
 def setup_argparse(parser):
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with minION reads""")
     parser.add_argument(
-        "--processed_reads",
-        dest="processed_reads",
+        "--processed_alignments",
+        dest="processed_alignments",
         help="""output of process_alignments""",
     )
     parser.add_argument(
@@ -62,7 +62,7 @@ def run(args):
     ) = parse_switch_coords(args.switch_coords)
 
     logger.info("parsing raw reads file " + args.raw_reads)
-    raw_reads = SeqIO.to_dict(SeqIO.parse(args.raw_reads, "fasta"))
+    raw_reads = SeqIO.to_dict(SeqIO.parse(gzip.open(args.raw_reads,'rt') if args.raw_reads.endswith('.gz') else open(args.raw_reads), "fasta"))
 
     logger.info("adding annotation from " + args.annotation)
     annotation = defaultdict(list)
@@ -70,24 +70,17 @@ def run(args):
         ls = line.strip("\n").split("\t")
         annotation[ls[0]].append((ls[0], int(ls[1]), int(ls[2])) + tuple(ls[3:]))
 
-    logger.info("reading filtered read matches from " + args.processed_reads)
+    logger.info("reading processed alignments from " + args.processed_alignments)
+    process = pd.read_csv(args.processed_alignments, sep='\t', header=0, index_col=0)
+    
     logger.info("writing coordinates for selected reads to " + args.bed)
     logger.info("writing summary table to " + args.outfile)
 
     bed = open(args.bed, "w")
     out_table = dict()
-    for line in open(args.processed_reads):
-        ls = line.strip("\n").split("\t")
-        read = ls[0]
-        isotype = ls[1]
-        mappings = []
-        inserts = []
-        for ll in ls[4:]:
-            if "insert" not in ll:
-                coords = decode_coords(ll)
-                mappings.append(coords)
-            elif "insert" in ll:
-                inserts.append(decode_insert(ll))
+    for read, row in process.iterrows():
+
+        mappings = [decode_coords(m) for m in row['switch_mappings'].split(';')]
 
         tstart = mappings[0][1]
         tend = mappings[-1][2]
@@ -109,7 +102,10 @@ def run(args):
 
         bed.write("\t".join(map(str, bed_entries)) + "\n")
 
-        for insert in inserts:
+        if pd.isnull(row['inserts']):
+            continue
+
+        for insert in (decode_insert(i) for i in row['inserts'].split(';')):
             insert_chrom = insert.group("insert_chrom")
             insert_start = int(insert.group("insert_start"))
             insert_end = int(insert.group("insert_end"))
@@ -141,16 +137,13 @@ def run(args):
             seq = seq[:istart].lower() + seq[istart:iend].upper() + seq[iend:].lower()
             out_table[read] = dict(
                 read=read,
-                isotype=isotype,
+                isotype=row['isotype'],
                 switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
                 insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
                 insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
                 insert_anno=insert_anno,
                 sequence=seq,
             )
-
-            if args.interrupt_for_read is not None and read in args.interrupt_for_read.split(","):
-                return raw_reads[read].seq, ls
 
     bed.close()
 

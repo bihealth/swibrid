@@ -25,8 +25,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--method",
         dest="method",
-        default="complete",
-        help="""clustering method for hierarchical clustering [complete]""",
+        default="average",
+        help="""clustering method for hierarchical clustering [average]""",
     )
     parser.add_argument("--linkage", dest="linkage", help="""output file contains linkage""")
     parser.add_argument(
@@ -34,7 +34,7 @@ def setup_argparse(parser):
         dest="use_sparse",
         action="store_true",
         default=False,
-        help="""use sparse nearest-neighbor clustering""",
+        help="""EXPERIMENTAL: use sparse nearest-neighbor clustering""",
     )
     parser.add_argument(
         "--n_neighbors",

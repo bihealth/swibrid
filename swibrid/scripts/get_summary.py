@@ -37,8 +37,8 @@ def setup_argparse(parser):
         help="""find_clusters.py stats""",
     )
     parser.add_argument(
-        "--clustering_analysis",
-        dest="clustering_analysis",
+        "--cluster_analysis",
+        dest="cluster_analysis",
         help="""analyze_clusters.py output""",
     )
     parser.add_argument(
@@ -122,15 +122,17 @@ def run(args):
 
     stats = {}
     logger.info("reading filter stats")
-    stats["filter"] = pd.read_csv(args.filter, index_col=0, header=0).squeeze()
+    stats["filter"] = pd.read_csv(args.filter, index_col=0, header=None).squeeze()
     logger.info("reading processing stats")
     stats["process"] = (
-        pd.read_csv(args.process, index_col=0, header=0).squeeze().rename({"nreads": "mapped"})
+        pd.read_csv(args.process, index_col=0, header=None).squeeze()
     )
+    stats["filter"]["nreads_unmapped"] = stats["filter"]["nreads_pass"] - stats["process"]["nreads_mapped"]
+
     logger.info("reading clustering, clustering stats, clustering analysis")
     clustering = pd.read_csv(args.clustering, index_col=0, header=0)
-    clustering_analysis = pd.read_csv(args.clustering_analysis, index_col=0, header=0)
-    stats["cluster"] = pd.read_csv(args.cluster_stats, index_col=0, header=0).squeeze()
+    cluster_analysis = pd.read_csv(args.cluster_analysis, index_col=0, header=0)
+    stats["cluster"] = pd.read_csv(args.cluster_stats, index_col=0, header=None).squeeze()
     stats = pd.concat(stats.values(), axis=0)
 
     if args.use_clones:
@@ -146,119 +148,68 @@ def run(args):
         w = np.ones(len(clones))
     elif args.weights == "reads":
         logger.info("using uniform weights per read")
-        w = clustering_analysis.loc[clones, "size"]
+        w = cluster_analysis.loc[clones, "size"]
     elif args.weights == "adjusted":
         logger.info("using adjusted weights per cluster")
-        w = clustering_analysis.loc[clones, "adj_size"]
+        w = cluster_analysis.loc[clones, "adj_size"]
     else:
         raise ValueError("invalid value {0} for args.weights!".format(args.weights))
 
-    stats["nclusters_used"] = len(clones)
-    stats["clustered"] = sum(~clustering["cluster"].isna())
+    stats["nclusters_final"] = len(clones)
+    stats["nreads_final"] = sum(~clustering["cluster"].isna())
 
     if len(clones) > 0:
         stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
-            clustering_analysis.loc[clones, "length"], w
+            cluster_analysis.loc[clones, "length"], w
         )
         stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std(
-            clustering_analysis.loc[clones, "GC"], w
+            cluster_analysis.loc[clones, "GC"], w
         )
-        stats["mean_cluster_size"] = clustering_analysis.loc[clones, "size"].mean()
-        stats["std_cluster_size"] = clustering_analysis.loc[clones, "size"].std()
-        stats["mean_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].mean()
-        stats["std_adj_cluster_size"] = clustering_analysis.loc[clones, "adj_size"].std()
-
-        if "coverage" in clustering_analysis.columns:
-            stats["mean_cluster_coverage"] = clustering_analysis.loc[clones, "coverage"].mean()
-        if "outside_range" in clustering_analysis.columns:
-            stats["mean_cluster_outside_range"] = clustering_analysis.loc[
-                clones, "outside_range"
-            ].mean()
+        stats["mean_cluster_size"] = cluster_analysis.loc[clones, "size"].mean()
+        stats["std_cluster_size"] = cluster_analysis.loc[clones, "size"].std()
+        stats["mean_adj_cluster_size"] = cluster_analysis.loc[clones, "adj_size"].mean()
+        stats["std_adj_cluster_size"] = cluster_analysis.loc[clones, "adj_size"].std()
 
         stats["cluster_gini"] = calculate_gini(
             clustering["cluster"][clustering["cluster"].isin(clones)],
         )
         stats["cluster_entropy"] = scipy.stats.entropy(
-            clustering_analysis.loc[clones, "size"]
+            cluster_analysis.loc[clones, "size"]
         ) / np.log(len(clones))
         stats["cluster_inverse_simpson"] = (
             1.0
             / (
                 (
-                    clustering_analysis.loc[clones, "size"]
-                    / clustering_analysis.loc[clones, "size"].sum()
+                    cluster_analysis.loc[clones, "size"]
+                    / cluster_analysis.loc[clones, "size"].sum()
                 )
                 ** 2
             ).sum()
         )
 
+        stats["mean_frac_mapped"] = cluster_analysis.loc[clones, "frac_mapped"].mean()
+        stats["mean_frac_multi"] = cluster_analysis.loc[clones, "frac_multi"].mean()
+        stats["mean_frac_ignored"] = cluster_analysis.loc[clones, "frac_ignored"].mean()
+
         try:
             stats["PCR_length_bias"] = scipy.stats.linregress(
-                clustering_analysis.loc[clones, "length"],
-                np.log(clustering_analysis.loc[clones, "size"]),
+                cluster_analysis.loc[clones, "length"],
+                np.log(cluster_analysis.loc[clones, "size"]),
             )[0]
         except ValueError:
             stats["PCR_length_bias"] = 0
 
         try:
             stats["PCR_GC_bias"] = scipy.stats.linregress(
-                clustering_analysis.loc[clones, "GC"],
-                np.log(clustering_analysis.loc[clones, "size"]),
+                cluster_analysis.loc[clones, "GC"],
+                np.log(cluster_analysis.loc[clones, "size"]),
             )[0]
         except ValueError:
             stats["PCR_GC_bias"] = 0
 
-    logger.info("reading read info")
-    read_info = pd.read_csv(args.info, header=0, index_col=0)
-
-    barcode_locs = (
-        [
-            (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
-            for bc, l in read_info[["barcodes", "length"]].dropna().values
-            for x in bc.split(";")
-            if "BC" in bc
-        ]
-        if "barcodes" in read_info.columns
-        else []
-    )
-
-    primer_locs = (
-        [
-            (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
-            for pr, l in read_info[["primers", "length"]].dropna().values
-            for x in pr.split(";")
-            if "primer" in pr
-        ]
-        if "primers" in read_info.columns
-        else []
-    )
-
-    internal_primer_locs = (
-        [
-            (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
-            for pr, l in read_info[["internal", "length"]].dropna().values
-            if pr.count("primer") > 0
-            for x in pr.split(";")
-            if "primer" in x
-        ]
-        if "internal" in read_info.columns
-        else []
-    )
-
-    internal_barcode_locs = (
-        [
-            (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
-            for bc, l in read_info[["internal", "length"]].dropna().values
-            for x in bc.split(";")
-            if "BC" in x
-        ]
-        if "internal" in read_info.columns
-        else []
-    )
-
     read_isotype_count = clustering["isotype"].dropna().value_counts()
-    cluster_isotype_count = clustering_analysis.loc[clones, "isotype"].dropna().value_counts()
-    insert_isotype_count = clustering_analysis["insert_pos_isotype"].dropna().value_counts()
+    cluster_isotype_count = cluster_analysis.loc[clones, "isotype"].dropna().value_counts()
+    insert_isotype_count = cluster_analysis["insert_pos_isotype"].dropna().value_counts()
 
     nreads = read_isotype_count.sum()
     nclusters = cluster_isotype_count.sum()
@@ -275,15 +226,15 @@ def run(args):
     take = ~clustering["cluster"].isna()
     inserts = [
         decode_coords(m)
-        for insert in clustering[take]["insert"].dropna()
+        for insert in clustering[take]["inserts"].dropna()
         for m in insert.split(",")
     ]
     cluster_stats = {
         "n_inserts": len(inserts),
         "n_unique_inserts": len(merge_intervals(inserts)),
-        "n_clusters_inserts": len(clustering_analysis["insert_pos_isotype"].dropna()),
+        "n_clusters_inserts": len(cluster_analysis["insert_pos_isotype"].dropna()),
     }
-    insert_stats = clustering_analysis.agg(
+    insert_stats = cluster_analysis.agg(
         {
             "insert_frequency": "mean",
             "insert_overlap": "mean",
@@ -294,17 +245,17 @@ def run(args):
         axis=0,
     )
 
-    clustering_analysis["isotype_simple"] = clustering_analysis["isotype"].str[:2]
+    cluster_analysis["isotype_simple"] = cluster_analysis["isotype"].str[:2]
 
     realignment_stats = (
-        clustering_analysis.loc[clones]
+        cluster_analysis.loc[clones]
         .groupby("isotype_simple")[["n_untemplated_switch", "n_homology_switch"]]
         .mean()
         .unstack()
     )
     realignment_stats.index = ["_".join(i) for i in realignment_stats.index.tolist()]
     blunt_ends = (
-        clustering_analysis.loc[clones]
+        cluster_analysis.loc[clones]
         .groupby("isotype_simple")
         .apply(
             lambda x: (x[["n_untemplated_switch", "n_homology_switch"]] < args.max_n_blunt)
@@ -315,7 +266,7 @@ def run(args):
     blunt_ends.index = "frac_blunt_" + blunt_ends.index
     blunt_ends["frac_blunt"] = (
         (
-            clustering_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]]
+            cluster_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]]
             < args.max_n_blunt
         )
         .all(axis=1)
@@ -324,7 +275,7 @@ def run(args):
 
     realignment_stats = pd.concat(
         [
-            clustering_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]].mean(),
+            cluster_analysis.loc[clones][["n_untemplated_switch", "n_homology_switch"]].mean(),
             realignment_stats,
             blunt_ends,
         ],
@@ -370,14 +321,14 @@ def run(args):
         var_stats = pd.Series(
             {
                 "num_variants": len(ref),
-                "fraction_germline_variants": np.mean(germline),
-                "fraction_transitions": mm[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / len(ref),
-                "fraction_C>A": mm[(1, 2), (0, 3)].sum() / len(ref),
-                "fraction_C>G": mm[(1, 2), (2, 1)].sum() / len(ref),
-                "fraction_C>T": mm[(1, 2), (3, 0)].sum() / len(ref),
-                "fraction_T>A": mm[(3, 0), (0, 3)].sum() / len(ref),
-                "fraction_T>C": mm[(3, 0), (1, 2)].sum() / len(ref),
-                "fraction_T>G": mm[(3, 0), (2, 1)].sum() / len(ref),
+                "frac_germline_variants": np.mean(germline),
+                "frac_transitions": mm[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / len(ref),
+                "frac_variants_C>A": mm[(1, 2), (0, 3)].sum() / len(ref),
+                "frac_variants_C>G": mm[(1, 2), (2, 1)].sum() / len(ref),
+                "frac_variants_C>T": mm[(1, 2), (3, 0)].sum() / len(ref),
+                "frac_variants_T>A": mm[(3, 0), (0, 3)].sum() / len(ref),
+                "frac_variants_T>C": mm[(3, 0), (1, 2)].sum() / len(ref),
+                "frac_variants_T>G": mm[(3, 0), (2, 1)].sum() / len(ref),
             }
         )
 
@@ -392,6 +343,55 @@ def run(args):
         stats.to_csv(args.stats)
 
     if args.figure is not None:
+
+        logger.info("reading read info")
+        read_info = pd.read_csv(args.info, header=0, index_col=0)
+
+        barcode_locs = (
+            [
+                (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
+                for bc, l in read_info[["barcodes", "length"]].dropna().values
+                for x in bc.split(";")
+                if "BC" in bc
+            ]
+            if "barcodes" in read_info.columns
+            else []
+        )
+
+        primer_locs = (
+            [
+                (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
+                for pr, l in read_info[["primers", "length"]].dropna().values
+                for x in pr.split(";")
+                if "primer" in pr
+            ]
+            if "primers" in read_info.columns
+            else []
+        )
+
+        internal_primer_locs = (
+            [
+                (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
+                for pr, l in read_info[["internal", "length"]].dropna().values
+                if pr.count("primer") > 0
+                for x in pr.split(";")
+                if "primer" in x
+            ]
+            if "internal" in read_info.columns
+            else []
+        )
+
+        internal_barcode_locs = (
+            [
+                (int(re.split("[@:-]", x)[1]) + int(re.split("[@:-]", x)[2])) / (2 * l)
+                for bc, l in read_info[["internal", "length"]].dropna().values
+                for x in bc.split(";")
+                if "BC" in x
+            ]
+            if "internal" in read_info.columns
+            else []
+        )
+
         fig, axs = plt.subplots(4, 2, figsize=(6, 8))
         fig.subplots_adjust(hspace=0.5, wspace=0.4, bottom=0.1, top=0.95)
 
@@ -484,20 +484,20 @@ def run(args):
         ax = axs[2, 0]
         ax.hist(
             clustering["cluster"].dropna().value_counts(),
-            bins=np.geomspace(1, stats["clustered"], 50),
+            bins=np.geomspace(1, stats["nreads_final"], 50),
             histtype="step",
             label="all",
         )
         ax.hist(
             clustering["filtered_cluster"].dropna().value_counts(),
-            bins=np.geomspace(1, stats["clustered"], 50),
+            bins=np.geomspace(1, stats["nreads_final"], 50),
             histtype="stepfilled",
             label="filtered",
             alpha=0.5,
         )
         ax.hist(
-            clustering_analysis["adj_size"].dropna(),
-            bins=np.geomspace(1, stats["clustered"], 50),
+            cluster_analysis["adj_size"].dropna(),
+            bins=np.geomspace(1, stats["nreads_final"], 50),
             histtype="stepfilled",
             label="adjusted",
             alpha=0.5,
@@ -511,8 +511,8 @@ def run(args):
 
         ax = axs[2, 1]
         ax.plot(
-            clustering_analysis["size"],
-            clustering_analysis["break_spread"],
+            cluster_analysis["size"],
+            cluster_analysis["break_spread"],
             ".",
         )
         ax.set_xscale("log")

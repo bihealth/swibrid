@@ -23,7 +23,7 @@ def run(args):
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa)
 
-    read_idx, pos_left, pos_right, gap_size, inversion = get_gap_positions(msa)
+    read_idx, pos_left, pos_right, gap_size, inversion, duplication = get_gap_positions(msa)
 
     logger.info("saving results to {0}".format(args.out))
     np.savez(
@@ -33,4 +33,5 @@ def run(args):
         pos_right=pos_right,
         gap_size=gap_size,
         inversion=inversion,
+        duplication=duplication
     )

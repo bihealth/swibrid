@@ -145,6 +145,9 @@ def run(args):
         logger.info("restricting msa to {0} reads in clustering".format(nreads))
         msa = msa[:nreads]
 
+    # remove coverage and orientation info from msa
+    msa.data = np.abs(msa.data) % 10
+
     # get alignment pars
     logger.info("reading alignment pars from {0}".format(args.pars))
     pars = np.load(args.pars)
@@ -160,7 +163,7 @@ def run(args):
     # and also not near gaps (<70% local gap frequency)
 
     all_diff = scipy.sparse.csr_matrix(
-        ((np.abs(msa).data != ref[msa.nonzero()[1]]) & (msa.data != 0), msa.nonzero()),
+        ((msa.data != ref[msa.nonzero()[1]]) & (msa.data != 0), msa.nonzero()),
         shape=msa.shape,
     )
     all_diff.eliminate_zeros()
@@ -180,7 +183,7 @@ def run(args):
         )
     )
 
-    nuc_dist = np.vstack([np.sum(np.abs(msa) == k, 0).A1 for k in range(1, 5)]).T
+    nuc_dist = np.vstack([np.sum(msa == k, 0).A1 for k in range(1, 5)]).T
     # number of non-gaps at each position
     nr = nuc_dist.sum(1)
     # find most frequent alternative allele at each position
@@ -208,7 +211,7 @@ def run(args):
     pstrand = scipy.stats.chisquare(np.array([npos, nneg]), axis=0)[1]
 
     logger.info("aggregating counts over clusters")
-    i, j = all_diff.multiply(np.abs(msa) == alt).nonzero()
+    i, j = all_diff.multiply(msa == alt).nonzero()
     # create matrix with only positions that have these frequent non-reference nucleotides
     mat = scipy.sparse.csc_matrix((np.ones_like(i), (i, j)), shape=msa.shape, dtype=np.int8)
 

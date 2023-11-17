@@ -3,7 +3,7 @@
 
 def setup_argparse(parser):
     parser.add_argument(
-        "-i", "--inf", dest="inf", help="""input .sam or .maf file, or .par from LAST"""
+        "-i", "--inf", dest="inf", help="""input .bam or .maf.gz file, or .par from LAST"""
     )
     parser.add_argument("-r", "--ref", dest="ref", help="""reference genome""")
     parser.add_argument("-o", "--out", dest="out", help="""output file (.npz)""")
@@ -41,11 +41,11 @@ def run(args):
 
         return
 
-    elif args.inf.endswith(".sam"):
+    elif args.inf.endswith(".bam"):
         logger.info("loading reference from " + args.ref)
         genome = pysam.FastaFile(args.ref)
 
-        logger.info("reading sam file " + args.inf)
+        logger.info("reading bam file " + args.inf)
 
         for rec in pysam.Samfile(args.inf):
             if rec.is_unmapped or rec.seq is None or rec.is_secondary:
@@ -86,13 +86,13 @@ def run(args):
                     else:
                         stats[(read_nuc, ref_nuc)] += 1
 
-    elif args.inf.endswith(".maf"):
+    elif args.inf.endswith(".maf") or args.inf.endswith('.maf.gz'):
         logger.info("loading reference from " + args.ref)
         genome = pysam.FastaFile(args.ref)
 
         logger.info("reading maf file " + args.inf)
 
-        for ref, read in AlignIO.parse(args.inf, "maf", seq_count=2):
+        for ref, read in AlignIO.parse(gzip.open(args.inf, 'rt') if args.inf.endswith('.gz') else open(args.inf), "maf", seq_count=2):
             ref_gap_size = 0
             read_gap_size = 0
             seq_started = False

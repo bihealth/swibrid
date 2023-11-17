@@ -21,6 +21,7 @@ def run(args):
     import re
     from logzero import logger
     import matplotlib
+
     matplotlib.use("Agg")
     from matplotlib import pyplot as plt
 
@@ -59,7 +60,7 @@ def run(args):
             size="x-small",
             ha="left",
             va="center",
-            )
+        )
         if args.sample_sheet is not None and comb in sample_sheet.index:
             labels.append(sample_sheet[comb])
         else:
@@ -72,20 +73,27 @@ def run(args):
     ax.spines["right"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
 
-    ax = fig.add_axes([0.8, 0.7, 0.15, .2])
+    ax = fig.add_axes([0.8, 0.7, 0.15, 0.2])
+
     def classify_barcodes(bc, whitelist):
         if pd.isnull(bc):
-            return 'none'
-        bcs = sorted(set(map(lambda x: x.split("@")[0], bc.split(';'))))
+            return "none"
+        bcs = sorted(set(map(lambda x: x.split("@")[0], bc.split(";"))))
         if len(bcs) > 1:
-            return 'multiple'
+            return "multiple"
         else:
-            return ';'.join(bcs)
-    ignored = pd.Series(Counter(classify_barcodes(bc,whitelist) for bc in  read_info['undetermined']['ignored'])).sort_values(ascending=False)
-    labels = [i if ignored[i] >= .01*ignored.sum()  else "" for i in ignored.index]
-    colors = [plt.cm.Set2(k) if ignored[i] >= .01*ignored.sum() else (.5, .5, .5, 1.0) for k,i in enumerate(ignored.index)]
-    ax.pie(ignored.values, labels=labels, colors=colors, textprops={'size': 'x-small'})
-    ax.set_title("undetermined reads", size='small')
+            return ";".join(bcs)
+
+    ignored = pd.Series(
+        Counter(classify_barcodes(bc, whitelist) for bc in read_info["undetermined"]["ignored"])
+    ).sort_values(ascending=False)
+    labels = [i if ignored[i] >= 0.01 * ignored.sum() else "" for i in ignored.index]
+    colors = [
+        plt.cm.Set2(k) if ignored[i] >= 0.01 * ignored.sum() else (0.5, 0.5, 0.5, 1.0)
+        for k, i in enumerate(ignored.index)
+    ]
+    ax.pie(ignored.values, labels=labels, colors=colors, textprops={"size": "x-small"})
+    ax.set_title("undetermined reads", size="small")
 
     ax = fig.add_axes([0.13, 0.1, 0.35, 0.4])
     for comb in nreads.index:

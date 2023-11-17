@@ -42,14 +42,14 @@ def filter_reads(reads, info, args, stats):
     import re
 
     for rec in reads:
-        if args.nmax and stats["nreads"] > args.nmax:
+        if args.nmax and stats["nreads_initial"] > args.nmax:
             break
 
-        stats["nreads"] += 1
+        stats["nreads_initial"] += 1
 
         keep = True
         if len(rec) < args.min_length:
-            stats["short"] += 1
+            stats["nreads_removed_short"] += 1
             keep = False
 
         if info is not None:
@@ -66,16 +66,16 @@ def filter_reads(reads, info, args, stats):
             if args.only_complete and not (
                 any("rv" in p for p in primers) and any("fw" in p for p in primers)
             ):
-                stats["incomplete"] += 1
+                stats["nreads_removed_incomplete"] += 1
                 keep = False
 
             internal = info.loc[rec.id, "internal"]
             if not args.keep_internal and not pd.isna(internal) and "primer" in internal:
-                stats["internal"] += 1
+                stats["nreads_removed_internal_primer"] += 1
                 keep = False
 
         if keep:
-            stats["kept"] += 1
+            stats["nreads_to_map"] += 1
             yield rec
 
 
@@ -87,7 +87,7 @@ def run(args):
     if args.info:
         read_info = pd.read_csv(args.info, header=0, index_col=0)
 
-    stats = {"nreads": 0, "short": 0, "incomplete": 0, "internal": 0, "kept": 0}
+    stats = {"nreads_initial": 0, "nreads_removed_short": 0, "nreads_removed_incomplete": 0, "nreads_removed_internal_primer": 0, "nreads_to_map": 0}
 
     SeqIO.write(
         filter_reads(
@@ -97,8 +97,8 @@ def run(args):
             stats,
         ),
         gzip.open(args.output, "wt") if args.output.endswith(".gz") else args.output,
-        "fasta",
+        "fastq",
     )
 
     if args.stats:
-        pd.Series(stats).to_csv(args.stats)
+        pd.Series(stats).to_csv(args.stats, header=False)

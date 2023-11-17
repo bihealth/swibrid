@@ -344,14 +344,16 @@ def res2(p, x, y):
 
 def get_gap_positions(msa):
     ii, jj = msa.nonzero()
-    cps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
+    cov = msa.data // 10
+    cps = np.where(((np.diff(jj) > 1) | (np.diff(cov) > 0)) & (np.diff(ii) == 0))[0]
     pos_left = jj[cps] + 1
     pos_right = pos_left + np.diff(jj)[cps] - 1
     read_idx = ii[cps]
     gap_sizes = pos_right - pos_left
-    inversions = np.sign(msa.data[cps]) != np.sign(msa.data[cps + 1])
+    inversion = np.sign(cov[cps]) != np.sign(cov[cps + 1])
+    duplication = (cov[cps] != cov[cps + 1]) & ~inversion
 
-    return read_idx, pos_left, pos_right, gap_sizes, inversions
+    return read_idx, pos_left, pos_right, gap_sizes, inversion, duplication
 
 
 def vrange(starts, stops):
@@ -384,12 +386,13 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     import scipy.sparse
 
     if gaps is None:
-        read_idx, pos_left, pos_right, gap_sizes, inversions = get_gap_positions(msa)
+        read_idx, pos_left, pos_right, gap_sizes, inversion, duplication = get_gap_positions(msa)
     else:
         read_idx = gaps["read_idx"]
         pos_left = gaps["pos_left"]
         pos_right = gaps["pos_right"]
         gap_sizes = gaps["gap_size"]
+
     remove = gap_sizes <= max_gap
     gaps_to_remove = gap_sizes[remove]
     read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
@@ -397,7 +400,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
 
     if return_sparse:
         msa_cleaned = scipy.sparse.csr_matrix(
-            (np.sign(msa.data), (msa.row, msa.col)), shape=msa.shape, dtype=np.int8
+            (msa.data // 10, (msa.row, msa.col)), shape=msa.shape, dtype=np.int8
         ).tolil()
         vals_replace = np.repeat(
             np.max(
@@ -415,7 +418,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
         return msa_cleaned.tocsr()
     else:
         msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
-        msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
+        msa_cleaned[(msa.row, msa.col)] = msa.data // 10
         vals_replace = np.repeat(
             np.max(
                 np.array(

@@ -230,7 +230,11 @@ def parse_maf(alignments, min_gap=75):
     read_matches = []
     read_id = ""
 
-    for ref, read in AlignIO.parse(gzip.open(alignments, "rt") if alignments.endswith(".gz") else open(alignments), "maf", seq_count=2):
+    for ref, read in AlignIO.parse(
+        gzip.open(alignments, "rt") if alignments.endswith(".gz") else open(alignments),
+        "maf",
+        seq_count=2,
+    ):
         read_name = read.id
         read_start = read.annotations["start"]
         read_len = read.annotations["srcSize"]
@@ -475,14 +479,6 @@ def run(args):
         merge_intervals,
     )
 
-    if args.realign_breakpoints is not None:
-        import pysam
-
-        logger.info("getting raw reads from " + args.raw_reads)
-        raw_reads = SeqIO.index(gzip.open(args.raw_reads, 'rt') if args.raw_reads.endswith('.gz') else open(args.raw_reads), "fasta")
-        logger.info("loading genomes from " + args.genome)
-        genome = pysam.FastaFile(args.genome)
-
     if args.telo:
         telo = pd.read_csv(args.telo, index_col=0, sep="\t")
 
@@ -517,6 +513,9 @@ def run(args):
         "nreads_removed_no_isotype": 0,
     }
 
+    if args.realign_breakpoints is not None:
+        processed_matches = {}
+
     logger.info("processing reads from " + args.alignments)
     if args.alignments.endswith(".bam") or args.alignments.endswith(".bam"):
         alignments = parse_sam(args.alignments, min_gap=args.min_gap)
@@ -525,7 +524,7 @@ def run(args):
 
     outf = open(args.outfile, "w")
     outf.write(
-        "read\tisotype\torientation\tfrac_mapped\tfrac_multi\tswitch_mappings\tinserts\n"
+        "read\tisotype\torientation\tfrac_mapped\tfrac_mapped_multi\tswitch_mappings\tinserts\n"
     )
 
     if args.sequences is not None:
@@ -795,8 +794,12 @@ def run(args):
             use = False
 
         # check how much genomic sequence is covered multiple times
-        unmerged_switch_coverage = sum(sm[4] - sm[3] for sm in switch_matches) + sum(fi[8] + fi[7] for fi in filtered_inserts)
-        merged_switch_coverage = sum(rm[2] - rm[1] for rm in read_mappings) + sum(fi[8] + fi[7] for fi in filtered_inserts)
+        unmerged_switch_coverage = sum(sm[4] - sm[3] for sm in switch_matches) + sum(
+            fi[8] + fi[7] for fi in filtered_inserts
+        )
+        merged_switch_coverage = sum(rm[2] - rm[1] for rm in read_mappings) + sum(
+            fi[8] + fi[7] for fi in filtered_inserts
+        )
 
         # check that switch matches are in consistent order along the read and the genome (but ignore inverted segments)
         read_order = np.argsort([sm[0] for sm in switch_matches if sm[5] == main_orientation])
@@ -894,7 +897,13 @@ def run(args):
             sequences = (
                 SeqRecord.SeqRecord(
                     Seq.Seq(aligned_seq),
-                    id="{0}@{1}:{2}-{3}:{4}".format(read, ref_chrom, ref_start, ref_end, orientation),
+                    id="{0}@{1}:{2}-{3}:{4}".format(
+                        read,
+                        ref_chrom,
+                        ref_start,
+                        ref_end,
+                        "+" if orientation == main_orientation else "-",
+                    ),
                 )
                 for (
                     read_start,
@@ -910,7 +919,7 @@ def run(args):
 
         # re-align breakpoints
         if args.realign_breakpoints is not None:
-            processed_matches = sorted(
+            processed_matches[read] = sorted(
                 [sm[:6] + ("switch",) for sm in switch_matches]
                 + [
                     (f[7], f[8], f[0], f[1], f[2], f[9], "insert")
@@ -918,9 +927,6 @@ def run(args):
                     if f[0] != "telomer"
                 ],
                 key=operator.itemgetter(0),
-            )
-            realignments[read] = realign_breakpoints(
-                processed_matches, genome, str(raw_reads[read].seq)
             )
 
     outf.close()
@@ -932,6 +938,25 @@ def run(args):
         pd.Series(stats).to_csv(args.stats, header=False)
 
     if args.realign_breakpoints is not None:
+        import pysam
+
+        logger.info("loading genomes from " + args.genome)
+        genome = pysam.FastaFile(args.genome)
+
+        logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
+        for rec in SeqIO.parse(
+            gzip.open(args.raw_reads, "rt")
+            if args.raw_reads.endswith(".gz")
+            else open(args.raw_reads),
+            "fastq",
+        ):
+            if rec.id not in processed_matches:
+                continue
+
+            realignments[rec.id] = realign_breakpoints(
+                processed_matches[rec.id], genome, str(rec.seq)
+            )
+
         logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)
         df = pd.DataFrame(
             [pd.Series(al, name=read) for read, als in realignments.items() for al in als]

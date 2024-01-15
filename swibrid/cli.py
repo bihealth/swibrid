@@ -4,7 +4,6 @@ This is the main program entry point for the ``swibrid`` executable and its sub 
 
 import argparse
 import logging
-import warnings
 from logzero import logger, loglevel
 from pathlib import Path
 from ruamel.yaml import YAML
@@ -21,13 +20,15 @@ from .scripts import (
     plot_clustering,
     find_variants,
     get_summary,
-    get_gap_stats,
+    get_breakpoint_stats,
     get_switch_homology,
     get_switch_motifs,
     create_bed,
     get_synthetic_reads,
     get_alignment_pars,
     get_unique_clones_bed,
+    combine_replicates,
+    downsample,
     analyze_clustering,
     collect_results,
 )
@@ -125,7 +126,7 @@ def main(argv=None):
     swibrid find_clusters          get read clustering from linkage
     swibrid find_variants          variant calling
     swibrid plot_clustering        plot the read clustering
-    swibrid get_gap_stats          get breakpoint histogram stats
+    swibrid get_breakpoint_stats   get breakpoint histograms and stats
     swibrid get_switch_homology    get switch sequence homology
     swibrid get_switch_motifs      get switch sequence motifs
     swibrid analyze_clustering     analyze clustering results
@@ -137,6 +138,8 @@ def main(argv=None):
     swibrid get_unique_clones_bed  get bed file with unique clones
     swibrid get_synthetic_reads    create synthetic reads from bed file
     swibrid plot_demux_report      make a graphical summary of demultiplexing output
+    swibrid combine_replicate      combine (aligned & processed) reads from replicates
+    swibrid downsample             downsample (aligned & processed) reads from a sample
     """
 
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -156,7 +159,7 @@ def main(argv=None):
         help=argparse.SUPPRESS,
     )
 
-    setup_parser = subparsers.add_parser("setup", help="main command: setup current directory")
+    setup_parser = subparsers.add_parser("setup", description="main command: setup current directory")
     setup_parser.add_argument(
         "-f",
         "--overwrite",
@@ -166,7 +169,7 @@ def main(argv=None):
         help="""overwrite files if present [no]""",
     )
 
-    pipeline_parser = subparsers.add_parser("run", help="main command: run pipeline")
+    pipeline_parser = subparsers.add_parser("run", description="main command: run pipeline")
     pipeline_parser.add_argument(
         "-s",
         "--snakefile",
@@ -207,51 +210,57 @@ def main(argv=None):
 
     demultiplex.setup_argparse(subparsers.add_parser("demultiplex", help="demultiplex minION run"))
     plot_demux_report.setup_argparse(
-        subparsers.add_parser("plot_demux_report", help="plot demultiplexing report")
+        subparsers.add_parser("plot_demux_report", description="plot demultiplexing report")
     )
     filter_reads.setup_argparse(subparsers.add_parser("filter_reads", help="filter reads"))
     process_alignments.setup_argparse(
-        subparsers.add_parser("process_alignments", help=argparse.SUPPRESS)
+        subparsers.add_parser("process_alignments", description="process alignments")
     )
     get_alignment_pars.setup_argparse(
-        subparsers.add_parser("get_alignment_pars", help=argparse.SUPPRESS)
+        subparsers.add_parser("get_alignment_pars", description="get alignment parameters")
     )
     create_bed.setup_argparse(subparsers.add_parser("create_bed", help="step: create bed file"))
     construct_msa.setup_argparse(
         subparsers.add_parser("construct_msa", help="step: construct (pseudo) MSA")
     )
-    get_gaps.setup_argparse(subparsers.add_parser("get_gaps", help="step: find gaps in MSA"))
+    get_gaps.setup_argparse(subparsers.add_parser("get_gaps", description="step: find gaps in MSA"))
     construct_linkage.setup_argparse(
-        subparsers.add_parser("construct_linkage", help="step: construct linkage")
+        subparsers.add_parser("construct_linkage", description="step: construct linkage")
     )
-    find_clusters.setup_argparse(subparsers.add_parser("find_clusters", help="step: find clusters"))
-    find_variants.setup_argparse(subparsers.add_parser("find_variants", help="step: find variants"))
+    find_clusters.setup_argparse(subparsers.add_parser("find_clusters", description="step: find clusters"))
+    find_variants.setup_argparse(subparsers.add_parser("find_variants", description="step: find variants"))
     plot_clustering.setup_argparse(
-        subparsers.add_parser("plot_clustering", help="step: plot clustering")
+        subparsers.add_parser("plot_clustering", description="step: plot clustering")
     )
     get_summary.setup_argparse(
-        subparsers.add_parser("get_summary", help="step: get sample summary and plot")
+        subparsers.add_parser("get_summary", description="step: get sample summary and plot")
     )
-    get_gap_stats.setup_argparse(
-        subparsers.add_parser("get_gap_stats", help="step: get gap statistics")
+    get_breakpoint_stats.setup_argparse(
+        subparsers.add_parser("get_breakpoint_stats", description="step: get breakpoint statistics")
     )
     get_switch_homology.setup_argparse(
-        subparsers.add_parser("get_switch_homology", help="step: get switch sequence homology")
+        subparsers.add_parser("get_switch_homology", description="step: get switch sequence homology")
     )
     get_switch_motifs.setup_argparse(
-        subparsers.add_parser("get_switch_motifs", help="step: get switch sequence motifs")
+        subparsers.add_parser("get_switch_motifs", description="step: get switch sequence motifs")
     )
     analyze_clustering.setup_argparse(
-        subparsers.add_parser("analyze_clustering", help="step: analyze clustering")
+        subparsers.add_parser("analyze_clustering", description="step: analyze clustering")
     )
     get_synthetic_reads.setup_argparse(
-        subparsers.add_parser("get_synthetic_reads", help="step: create synthetic reads")
+        subparsers.add_parser("get_synthetic_reads", description="create synthetic reads")
     )
     get_unique_clones_bed.setup_argparse(
-        subparsers.add_parser("get_unique_clones_bed", help="step: get unique clones from bed")
+        subparsers.add_parser("get_unique_clones_bed", description="get unique clones from bed")
+    )
+    combine_replicates.setup_argparse(
+        subparsers.add_parser("combine_replicates", description="combine reads from replicates")
+    )
+    downsample.setup_argparse(
+        subparsers.add_parser("downsample", description="downsample reads from sample")
     )
     collect_results.setup_argparse(
-        subparsers.add_parser("collect_results", help="step: collect results")
+        subparsers.add_parser("collect_results", description="step: collect results")
     )
 
     args, extra = parser.parse_known_args(argv)
@@ -278,12 +287,14 @@ def main(argv=None):
         "find_variants": find_variants.run,
         "plot_clustering": plot_clustering.run,
         "get_summary": get_summary.run,
-        "get_gap_stats": get_gap_stats.run,
+        "get_breakpoint_stats": get_breakpoint_stats.run,
         "get_switch_homology": get_switch_homology.run,
         "get_switch_motifs": get_switch_motifs.run,
         "analyze_clustering": analyze_clustering.run,
         "get_synthetic_reads": get_synthetic_reads.run,
         "get_unique_clones_bed": get_unique_clones_bed.run,
+        "combine_replicates": combine_replicates.run,
+        "downsample": downsample.run,
         "collect_results": collect_results.run,
     }
 

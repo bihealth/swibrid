@@ -15,6 +15,7 @@ def run(args):
     import pandas as pd
     import pysam
     from Bio import AlignIO
+    import gzip
     from logzero import logger
     from .utils import RC
 
@@ -86,13 +87,17 @@ def run(args):
                     else:
                         stats[(read_nuc, ref_nuc)] += 1
 
-    elif args.inf.endswith(".maf") or args.inf.endswith('.maf.gz'):
+    elif args.inf.endswith(".maf") or args.inf.endswith(".maf.gz"):
         logger.info("loading reference from " + args.ref)
         genome = pysam.FastaFile(args.ref)
 
         logger.info("reading maf file " + args.inf)
 
-        for ref, read in AlignIO.parse(gzip.open(args.inf, 'rt') if args.inf.endswith('.gz') else open(args.inf), "maf", seq_count=2):
+        for ref, read in AlignIO.parse(
+            gzip.open(args.inf, "rt") if args.inf.endswith(".gz") else open(args.inf),
+            "maf",
+            seq_count=2,
+        ):
             ref_gap_size = 0
             read_gap_size = 0
             seq_started = False

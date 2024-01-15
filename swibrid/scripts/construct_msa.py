@@ -72,12 +72,15 @@ def run(args):
     logger.info("reading processed read coordinates from {0}".format(args.coords))
 
     if args.nmax:
-        process = pd.read_csv(args.coords, sep='\t', header=0, index_col=0, nrows=args.nmax)
+        process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0, nrows=args.nmax)
     else:
-        process = pd.read_csv(args.coords, sep='\t', header=0, index_col=0)
+        process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0)
     nreads = process.shape[0]
 
-    read_mappings = dict((read, [decode_coords(m) for m in row.split(';')]) for read, row in process['switch_mappings'].items())
+    read_mappings = dict(
+        (read, [decode_coords(m) for m in row.split(";")])
+        for read, row in process["switch_mappings"].items()
+    )
 
     logger.info("reading processed read sequences from {0}".format(args.sequences))
     nt_ignored = defaultdict(int)
@@ -131,19 +134,31 @@ def run(args):
     j = np.array(j)
     x = np.array(x)
 
-    _, ind, inv, cts = np.unique(np.vstack([i, j]), axis=1, return_index=True, return_inverse=True, return_counts=True)
+    _, ind, inv = np.unique(np.vstack([i, j]), axis=1, return_index=True, return_inverse=True)
 
-    cov = np.ones(len(ind))
-    cons = x[ind]
+    cov = np.sign(x[ind])
+    cons = np.abs(x[ind])
+
     if len(ind) < len(i):
-        mpos = np.where(cts > 1)[0]
-        logger.warn("{0} positions in MSA are covered multiple times; getting consensus".format(len(mpos)))
-        for p in mpos:
-            ii = np.where(inv==p)[0]
-            cov[p] = np.sum(np.sign(x[ii]))
-            cons[p] = np.bincount(x[ii]).argmax()
+        xx = scipy.sparse.csr_matrix((x, (np.arange(len(inv)), inv)))
+        cts = (xx != 0).sum(0).A1
+        p1 = np.where(cts > 1)[0]
+        xx = xx[:, p1]
+        p2 = np.where((xx != 0).sum(1).A1 > 0)[0]
+        xx = xx[p2, :]
+        logger.warn(
+            "{0} positions in MSA are covered multiple times; getting consensus".format(len(p1))
+        )
+        for k, p in enumerate(p1):
+            cov[p] = np.sum(np.sign(xx[:, k].data))
+            cons[p] = np.bincount(np.abs(xx[:, k].data)).argmax()
 
-    msa = scipy.sparse.csr_matrix((10*cov + cons, (i[ind], j[ind])), shape=(nreads, Ltot), dtype=np.int8)
+    msa = scipy.sparse.csr_matrix(
+        (10 * cov + cons, (i[ind], j[ind])), shape=(nreads, Ltot), dtype=np.int8
+    )
+
+    unique_entries = np.unique(msa.data % 10)
+    assert np.max(unique_entries) < 5 and np.min(unique_entries > 0), "invalid entries in MSA"
 
     use = np.abs(msa).sum(1).A1 > 0
     logger.info("removing {0} reads without coverage".format((~use).sum()))
@@ -156,7 +171,10 @@ def run(args):
     nt_assigned = pd.Series(nt_assigned)
     nt_ignored = pd.Series(nt_ignored)
     process["frac_ignored"] = (nt_ignored / (nt_assigned + nt_ignored)).fillna(0)
-    process["inserts"] = process["inserts"].dropna().apply(
+    process["inserts"] = (
+        process["inserts"]
+        .dropna()
+        .apply(
             lambda x: ",".join(
                 map(
                     lambda y: "{0}:{1}-{2}:{3}".format(
@@ -164,10 +182,13 @@ def run(args):
                         y.group("insert_start"),
                         y.group("insert_end"),
                         y.group("orientation"),
-                        ),
-                [decode_insert(insert) for insert in x.split(";")]
+                    ),
+                    [decode_insert(insert) for insert in x.split(";")],
+                )
             )
         )
     )
 
-    process[use][['isotype','orientation','frac_mapped','frac_multi','frac_ignored','inserts']].to_csv(args.out)
+    process[use][
+        ["isotype", "orientation", "frac_mapped", "frac_mapped_multi", "frac_ignored", "inserts"]
+    ].to_csv(args.out)

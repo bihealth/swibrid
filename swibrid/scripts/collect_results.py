@@ -19,7 +19,6 @@ def setup_argparse(parser):
 def run(args):
     import os
     import pandas as pd
-    import glob
     from logzero import logger
     from openpyxl import Workbook
 
@@ -30,7 +29,9 @@ def run(args):
     dfs = dict(
         (
             sample,
-            pd.read_csv(os.path.join("output", sample, sample + "_summary.csv"), header=None, index_col=0)
+            pd.read_csv(
+                os.path.join("output", sample, sample + "_summary.csv"), header=None, index_col=0
+            )
             .squeeze()
             .dropna(),
         )
@@ -49,7 +50,11 @@ def run(args):
             for sample in samples:
                 if os.path.isfile(os.path.join("output", sample, sample + "_inserts.tsv")):
                     try:
-                        tmp = pd.read_csv(os.path.join("output", sample, sample + "_inserts.tsv"), sep="\t", header=0)
+                        tmp = pd.read_csv(
+                            os.path.join("output", sample, sample + "_inserts.tsv"),
+                            sep="\t",
+                            header=0,
+                        )
                     except pd.errors.EmptyDataError:
                         pass
                     tmp.to_excel(writer, sheet_name=sample, index=False)
@@ -61,9 +66,10 @@ def run(args):
             writer.workbook = wb
             for sample in samples:
                 if os.path.isfile(os.path.join("output", sample, sample + "_cluster_analysis.csv")):
-                    tmp = pd.read_csv(os.path.join("output", sample, sample + "_cluster_analysis.csv"), 
-                                      header=0, index_col=0).sort_values(
-                        "size", ascending=False
-                        )
+                    tmp = pd.read_csv(
+                        os.path.join("output", sample, sample + "_cluster_analysis.csv"),
+                        header=0,
+                        index_col=0,
+                    ).sort_values("size", ascending=False)
                     tmp.to_excel(writer, sheet_name=sample, index=True)
                     logger.info("adding clustering stats for {0}".format(sample))

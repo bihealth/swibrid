@@ -79,8 +79,8 @@ rule last:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    last-train -P4 {params.index} {input} > output/{wildcards.sample}/{wildcards.sample}.par  2> {log}
-    lastal -P4 -p output/{wildcards.sample}/{wildcards.sample}.par {params.index} {input} | last-split -m1e-6 | grep -v "^p" | gzip > {output.maf} 2>> {log}
+    last-train -P4 -Q fastx {params.index} {input} > output/{wildcards.sample}/{wildcards.sample}.par  2> {log}
+    lastal -P4 -Q fastx -p output/{wildcards.sample}/{wildcards.sample}.par {params.index} {input} | last-split -m1e-6 | grep -v "^p" | gzip > {output.maf} 2>> {log}
     swibrid get_alignment_pars  -i output/{wildcards.sample}/{wildcards.sample}.par -o {output.par} 2>> {log}
     """
 

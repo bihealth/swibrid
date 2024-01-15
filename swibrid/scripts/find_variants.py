@@ -1,4 +1,4 @@
-"""find variants in MSA"""
+"""find single-nucleotide variants and rearrangements (inversions/duplications) in MSA"""
 
 
 def setup_argparse(parser):
@@ -61,6 +61,13 @@ def setup_argparse(parser):
         help="""max. local gap frequency in window [.7]""",
     )
     parser.add_argument(
+        "--max_rearrangement_gap",
+        dest="max_rearrangement_gap",
+        default=25,
+        type=int,
+        help="""max gap within rearrangements to ignore [25]""",
+    )
+    parser.add_argument(
         "--min_cluster_cov",
         dest="min_cluster_cov",
         default=10,
@@ -76,6 +83,12 @@ def setup_argparse(parser):
     )
     parser.add_argument("-o", "--out", dest="out", help="""output file (text)""")
     parser.add_argument("-m", "--mat", dest="mat", help="""output file (matrix)""")
+    parser.add_argument(
+        "-r",
+        "--rearrangements",
+        dest="rearrangements",
+        help="""output file for inversions / duplications""",
+    )
     parser.add_argument(
         "--variant_annotation",
         dest="variant_annotation",
@@ -145,8 +158,89 @@ def run(args):
         logger.info("restricting msa to {0} reads in clustering".format(nreads))
         msa = msa[:nreads]
 
+    if args.rearrangements:
+        logger.info("finding rearrangements (inversions / duplications)")
+
+        # get indices of nonzero elements
+        ii, jj = msa.nonzero()
+        # get coverage of nonzero entries
+        cov = msa.data // 10
+
+        # find positions where coverage is larger or smaller than 1
+        # and within that, get intervals of consecutive positions containing only gaps smaller than max_rearrangement_gap
+        def get_intervals(pp):
+            if len(pp) == 0:
+                return [], [], []
+            rr = ii[pp]
+            pos = jj[pp] + 1
+            inds = np.concatenate(
+                [
+                    [0],
+                    np.where((np.diff(pos) > args.max_rearrangement_gap) | (np.diff(rr) != 0))[0]
+                    + 1,
+                    [len(pos)],
+                ]
+            )
+            return (
+                np.asarray(rr[inds[:-1]]),
+                np.asarray(pos[inds[:-1]]),
+                np.asarray(pos[(inds[1:] - 1)]),
+            )
+
+        inv_read, inv_left, inv_right = get_intervals(np.where(cov < 1)[0])
+        dup_read, dup_left, dup_right = get_intervals(np.where(cov > 1)[0])
+        inv_size = inv_right - inv_left if len(inv_read) > 0 else np.array([])
+        dup_size = dup_right - dup_left if len(dup_read) > 0 else np.array([])
+
+        assert np.all(inv_size >= 0) & np.all(dup_size >= 0), "negative inv/dup sizes!"
+
+        if len(inv_read) >= 0:
+            msa_inv = msa.tocsr()[inv_read]
+            inv_cov = np.array(
+                [
+                    (msa_inv[k, pl:pr].data // 10).mean()
+                    for k, (pl, pr) in enumerate(zip(inv_left, inv_right))
+                ]
+            )
+
+            if np.any(inv_cov > -0.5):
+                logger.warn(
+                    "{0} of {1} inversions have mean coverage > -0.5".format(
+                        np.sum(inv_cov > -0.5), len(inv_read)
+                    )
+                )
+
+        if len(dup_read) >= 0:
+            msa_dup = msa.tocsr()[dup_read]
+            dup_cov = np.array(
+                [
+                    (msa_dup[k, pl:pr].data // 10).mean()
+                    for k, (pl, pr) in enumerate(zip(dup_left, dup_right))
+                ]
+            )
+
+            if np.any(dup_cov < 1.5):
+                logger.warn(
+                    "{0} of {1} duplications have mean coverage < 1.5".format(
+                        np.sum(dup_cov < 1.5), len(dup_read)
+                    )
+                )
+
+        logger.info("saving results to {0}".format(args.rearrangements))
+        np.savez(
+            args.rearrangements,
+            inv_read=inv_read,
+            inv_left=inv_left,
+            inv_right=inv_right,
+            inv_size=inv_size,
+            dup_read=dup_read,
+            dup_left=dup_left,
+            dup_right=dup_right,
+            dup_size=dup_size,
+        )
+
     # remove coverage and orientation info from msa
-    msa.data = np.abs(msa.data) % 10
+    msa.data = msa.data % 10
 
     # get alignment pars
     logger.info("reading alignment pars from {0}".format(args.pars))

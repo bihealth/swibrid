@@ -14,7 +14,6 @@ def setup_argparse(parser):
 
 def run(args):
     import os
-    import sys
     import numpy as np
     from collections import Counter
     import pandas as pd

@@ -47,6 +47,7 @@ def run(args):
     from collections import defaultdict
     from Bio import SeqIO
     from logzero import logger
+    import gzip
     from .utils import (
         parse_switch_coords,
         intersect_intervals,
@@ -61,9 +62,6 @@ def run(args):
         switch_orientation,
     ) = parse_switch_coords(args.switch_coords)
 
-    logger.info("parsing raw reads file " + args.raw_reads)
-    raw_reads = SeqIO.to_dict(SeqIO.parse(gzip.open(args.raw_reads,'rt') if args.raw_reads.endswith('.gz') else open(args.raw_reads), "fasta"))
-
     logger.info("adding annotation from " + args.annotation)
     annotation = defaultdict(list)
     for line in open(args.annotation):
@@ -71,16 +69,15 @@ def run(args):
         annotation[ls[0]].append((ls[0], int(ls[1]), int(ls[2])) + tuple(ls[3:]))
 
     logger.info("reading processed alignments from " + args.processed_alignments)
-    process = pd.read_csv(args.processed_alignments, sep='\t', header=0, index_col=0)
-    
+    process = pd.read_csv(args.processed_alignments, sep="\t", header=0, index_col=0)
+
     logger.info("writing coordinates for selected reads to " + args.bed)
     logger.info("writing summary table to " + args.outfile)
 
     bed = open(args.bed, "w")
-    out_table = dict()
+    inserts = defaultdict(list)
     for read, row in process.iterrows():
-
-        mappings = [decode_coords(m) for m in row['switch_mappings'].split(';')]
+        mappings = [decode_coords(m) for m in row["switch_mappings"].split(";")]
 
         tstart = mappings[0][1]
         tend = mappings[-1][2]
@@ -102,10 +99,10 @@ def run(args):
 
         bed.write("\t".join(map(str, bed_entries)) + "\n")
 
-        if pd.isnull(row['inserts']):
+        if pd.isnull(row["inserts"]):
             continue
 
-        for insert in (decode_insert(i) for i in row['inserts'].split(';')):
+        for insert in (decode_insert(i) for i in row["inserts"].split(";")):
             insert_chrom = insert.group("insert_chrom")
             insert_start = int(insert.group("insert_start"))
             insert_end = int(insert.group("insert_end"))
@@ -126,18 +123,36 @@ def run(args):
             bed_str = "{0}\t{1}\t{2}\t{3}\t0\t.\t{1}\t{2}\t0,0,0\t1\t{4},\t0,\n"
             bed.write(bed_str.format(insert_chrom, insert_start, insert_end, read, insert_len))
 
+            inserts[read].append((insert, insert_anno, tstart, tend, row["isotype"]))
+
+    bed.close()
+
+    insert_table = {}
+    logger.info("parsing raw reads from " + args.raw_reads)
+    for rec in SeqIO.parse(
+        gzip.open(args.raw_reads, "rt") if args.raw_reads.endswith(".gz") else open(args.raw_reads),
+        "fastq",
+    ):
+        if rec.id not in inserts:
+            continue
+
+        for insert, insert_anno, tstart, tend, isotype in inserts[rec.id]:
+            insert_chrom = insert.group("insert_chrom")
+            insert_start = int(insert.group("insert_start"))
+            insert_end = int(insert.group("insert_end"))
+            insert_len = insert_end - insert_start
             cstart = int(insert.group("switch_left")) - 1
             cend = int(insert.group("switch_right")) + 1
             if cend < cstart:
                 cstart, cend = cend, cstart
-
-            seq = str(raw_reads[read].seq)
             istart = int(insert.group("istart"))
             iend = int(insert.group("iend"))
-            seq = seq[:istart].lower() + seq[istart:iend].upper() + seq[iend:].lower()
-            out_table[read] = dict(
-                read=read,
-                isotype=row['isotype'],
+
+            seq = rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
+
+            insert_table[rec.id] = dict(
+                read=rec.id,
+                isotype=isotype,
                 switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
                 insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
                 insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
@@ -145,8 +160,6 @@ def run(args):
                 sequence=seq,
             )
 
-    bed.close()
-
-    pd.DataFrame.from_dict(out_table, orient="index").to_csv(
+    pd.DataFrame.from_dict(insert_table, orient="index").to_csv(
         args.outfile, header=True, index=False, sep="\t"
     )

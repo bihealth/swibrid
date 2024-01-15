@@ -75,7 +75,7 @@ def filter_reads(reads, info, args, stats):
                 keep = False
 
         if keep:
-            stats["nreads_to_map"] += 1
+            stats["nreads_pass"] += 1
             yield rec
 
 
@@ -87,7 +87,13 @@ def run(args):
     if args.info:
         read_info = pd.read_csv(args.info, header=0, index_col=0)
 
-    stats = {"nreads_initial": 0, "nreads_removed_short": 0, "nreads_removed_incomplete": 0, "nreads_removed_internal_primer": 0, "nreads_to_map": 0}
+    stats = {
+        "nreads_initial": 0,
+        "nreads_removed_short": 0,
+        "nreads_removed_incomplete": 0,
+        "nreads_removed_internal_primer": 0,
+        "nreads_pass": 0,
+    }
 
     SeqIO.write(
         filter_reads(

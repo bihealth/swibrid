@@ -342,18 +342,19 @@ def res2(p, x, y):
     return np.log(f2(p, x)) - np.log(y)
 
 
-def get_gap_positions(msa):
+def get_gap_positions(msa, max_gap=25):
+    # get indices of nonzero elements
     ii, jj = msa.nonzero()
-    cov = msa.data // 10
-    cps = np.where(((np.diff(jj) > 1) | (np.diff(cov) > 0)) & (np.diff(ii) == 0))[0]
-    pos_left = jj[cps] + 1
-    pos_right = pos_left + np.diff(jj)[cps] - 1
-    read_idx = ii[cps]
-    gap_sizes = pos_right - pos_left
-    inversion = np.sign(cov[cps]) != np.sign(cov[cps + 1])
-    duplication = (cov[cps] != cov[cps + 1]) & ~inversion
+    # find all "normal" breakpoint positions (between empty and nonzero)
+    bps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
+    gap_left = jj[bps] + 1
+    gap_right = jj[bps] + np.diff(jj)[bps]
+    gap_read = ii[bps]
+    gap_size = gap_right - gap_left
 
-    return read_idx, pos_left, pos_right, gap_sizes, inversion, duplication
+    assert np.all(gap_size >= 0), "negative gap sizes!"
+
+    return gap_read, gap_left, gap_right, gap_size
 
 
 def vrange(starts, stops):
@@ -386,17 +387,17 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     import scipy.sparse
 
     if gaps is None:
-        read_idx, pos_left, pos_right, gap_sizes, inversion, duplication = get_gap_positions(msa)
+        read_idx, pos_left, pos_right, gap_size = get_gap_positions(msa)
     else:
         read_idx = gaps["read_idx"]
-        pos_left = gaps["pos_left"]
-        pos_right = gaps["pos_right"]
-        gap_sizes = gaps["gap_size"]
+        gap_left = gaps["gap_left"]
+        gap_right = gaps["gap_right"]
+        gap_size = gaps["gap_size"]
 
-    remove = gap_sizes <= max_gap
-    gaps_to_remove = gap_sizes[remove]
+    remove = gap_size <= max_gap
+    gaps_to_remove = gap_size[remove]
     read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
-    pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
+    pos_idx_to_remove = vrange(gap_left[remove], gap_right[remove])
 
     if return_sparse:
         msa_cleaned = scipy.sparse.csr_matrix(
@@ -406,8 +407,8 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
             np.max(
                 np.array(
                     [
-                        msa_cleaned[(read_idx, pos_left - 1)].todense().A1,
-                        msa_cleaned[(read_idx, pos_right)].todense().A1,
+                        msa_cleaned[(read_idx, gap_left - 1)].todense().A1,
+                        msa_cleaned[(read_idx, gap_right)].todense().A1,
                     ]
                 ),
                 0,
@@ -422,7 +423,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
         vals_replace = np.repeat(
             np.max(
                 np.array(
-                    [msa_cleaned[(read_idx, pos_left - 1)], msa_cleaned[(read_idx, pos_right)]]
+                    [msa_cleaned[(read_idx, gap_left - 1)], msa_cleaned[(read_idx, gap_right)]]
                 ),
                 0,
             )[remove],

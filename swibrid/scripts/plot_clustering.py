@@ -31,7 +31,7 @@ def setup_argparse(parser):
         dest="clustering_stats",
         help="""file contains clustering stats""",
     )
-    parser.add_argument("--linkage", dest="linkage", help="""file contains linkage""")
+    parser.add_argument("--linkage", dest="linkage", help="""file containing flinkage""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -53,6 +53,12 @@ def setup_argparse(parser):
         dest="color_by",
         default="isotype",
         help="""color reads by isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
+    )
+    parser.add_argument(
+        "--sidebar_color_by",
+        dest="sidebar_color_by",
+        default="isotype",
+        help="""color sidebar reads by isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
     )
     parser.add_argument(
         "--show_inserts",
@@ -369,8 +375,8 @@ def run(args):
     elif args.color_by == "orientation":
         cmap = plt.cm.PiYG
     elif args.color_by == "coverage":
-        cmap = plt.cm.Reds
-    elif args.color_by == "strand" and args.info and "primers" in read_info.columns:
+        cmap = plt.cm.rainbow_r
+    elif args.color_by == "strand" and args.info:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
     elif args.color_by == "haplotype" and args.haplotypes is not None:
@@ -440,13 +446,53 @@ def run(args):
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
-    if args.haplotypes:  # and not args.color_by=='haplotype':
-        logger.info("adding haplotype information")
+    if args.sidebar_color_by is not None:
+        logger.info("adding sidebar")
         ax = fig.add_axes([left - 0.005, bottom, 0.01, height])
-        ht = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values[order][
-            :, np.newaxis
-        ]
-        ax.imshow(ht, aspect="auto", interpolation="none", cmap=plt.cm.coolwarm, vmin=0, vmax=1)
+        if args.sidebar_color_by == "isotype":
+            sidebar_values = (clustering['isotype'].astype("category").cat.codes.values % 20)
+            sidebar_cmap = plt.cm.tab20
+        elif args.sidebar_color_by == "cluster":
+            csize = clustering["cluster"].value_counts()
+            nclust = len(csize)
+            crank = pd.Series(range(nclust), csize.index)
+            sidebar_cmap = rand_cmap(
+                max(2, nclust),
+                type="bright",
+                first_color_black=False,
+                last_color_black=False,
+                verbose=False,
+                seed=10,
+            )
+            sidebar_values = (crank[clustering["cluster"].astype(int)].values % nclust)
+        elif args.sidebar_color_by == 'haplotype':
+            sidebar_values = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values
+            sidebar_cmap = plt.cm.coolwarm
+        elif args.info and args.sidebar_color_by in read_info.columns:
+            info_col = read_info.loc[reads, args.sidebar_color_by]
+            if pd.api.types.is_numeric_dtype(read_info[args.sidebar_color_by]):
+                sidebar_values = ((info_col - info_col.min()) / (info_col.max() - info_col.min())).values
+                sidebar_cmap = plt.cm.cool
+            else:
+                if args.sidebar_color_by in ["primers", "barcodes"]:
+                    info_col = info_col.apply(
+                        lambda x: "+".join(
+                            set(
+                                map(
+                                    lambda y: re.sub("primer_", "", y.split("@")[0]),
+                                    x.split(";"),
+                                )
+                            )
+                        )
+                    )
+                sidebar_values = (info_col.astype("category").cat.codes.values % 20)
+                sidebar_cmap = plt.cm.tab20
+        elif args.color_by == "strand" and args.info:
+            sidebar_values = (clustering["orientation"] == "+").astype(int) + 1
+            sidebar_cmap = plt.cm.PiYG
+
+        ax.imshow(sidebar_values[order, np.newaxis], aspect="auto", interpolation="none", 
+                  cmap=sidebar_cmap, vmin=0, vmax=max(1, sidebar_values.max()))
         ax.set_axis_off()
 
     logger.info("plotting MSA")
@@ -473,7 +519,7 @@ def run(args):
             im[(i[neg], j[neg])] = 0.1
             values = np.array([0, 1])
         elif args.color_by == "coverage":
-            im[np.nonzero(msa_chunk)] = (np.abs(msa_chunk.data) // 10) / 3
+            im[np.nonzero(msa_chunk)] = (msa_chunk.data // 10 + 2) / 4
             values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
@@ -576,12 +622,14 @@ def run(args):
     ax.set_ylim(ylim)
 
     if args.show_inserts:
-
         assert args.coords is not None, "need processed read coordinates to show inserts!"
 
         logger.info("reading processed read coordinates from {0}".format(args.coords))
-        process = pd.read_csv(args.coords, sep='\t', header=0, index_col=0)
-        read_inserts = dict((read, [decode_insert(insert) for insert in inserts.split(';')]) for read, inserts in process['inserts'].dropna().items())
+        process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0)
+        read_inserts = dict(
+            (read, [decode_insert(insert) for insert in inserts.split(";")])
+            for read, inserts in process["inserts"].dropna().items()
+        )
 
         stat_string = (
             "{0}: {1} reads "
@@ -773,6 +821,10 @@ def run(args):
                 lim = m
         ax.set_xlim(-lim, lim)
         ax.set_ylim(-lim, lim)
+
+        stat_string = "{0}: {1} reads ({2} clusters; {3} eff. clusters)"
+        stats = stat_string.format(args.sample, nreads, nclusts, nclusts_eff)
+        fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
 
         logger.info("saving bubble chart to " + args.plot_circles)
         fig.savefig(args.plot_circles, dpi=args.dpi)

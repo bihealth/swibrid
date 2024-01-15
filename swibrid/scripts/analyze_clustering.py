@@ -42,6 +42,13 @@ def setup_argparse(parser):
         action="store_true",
         help="""calculate cluster size adjusted for fragment length and QC content""",
     )
+    parser.add_argument(
+        "--isotype_extra",
+        dest="isotype_extra",
+        default=500,
+        type=int,
+        help="""extra space added to define isotypes [500]""",
+    )
 
 
 def run(args):
@@ -89,7 +96,7 @@ def run(args):
     )
 
     avg_frac_mapped = clustering.groupby("cluster")["frac_mapped"].mean()
-    avg_frac_multi = clustering.groupby("cluster")["frac_multi"].mean()
+    avg_frac_mapped_multi = clustering.groupby("cluster")["frac_mapped_multi"].mean()
     avg_frac_ignored = clustering.groupby("cluster")["frac_ignored"].mean()
 
     avg_isotype = (
@@ -102,13 +109,15 @@ def run(args):
     logger.info("loading MSA from " + args.msa)
     msa = scipy.sparse.load_npz(args.msa)
 
-    logger.info("averaging cleaned MSA by removing gaps > {0}".format(args.max_gap))
+    logger.info("averaging MSA coverage after removing gaps > {0}".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
-    avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
+    avg_msa = np.asarray(mm.dot(msa_cleaned).todense())
     break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
+    inversion_size = np.sum(avg_msa < 0, 1)
+    duplication_size = np.sum(avg_msa > 1, 1)
 
     logger.info("getting cluster consensus sequences")
-    msa.data = np.sign(msa.data) * (np.abs(msa.data) % 10)
+    msa.data = msa.data % 10
     nogap = mm.dot(msa != 0)
     means = dict((n, mm.dot(msa == c)) for n, c in ncodes.items())
 
@@ -122,7 +131,7 @@ def run(args):
         cluster_seq.append(seq)
         cluster_length.append(len(seq))
         cluster_GC.append(
-            (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
+            (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq) if len(seq) > 0 else .5
         )
 
     try:
@@ -147,13 +156,13 @@ def run(args):
 
         def get_insert_isotype(x):
             left_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3]).upper()
                 for rec in intersect_intervals(
                     [
                         (
                             switch_chrom,
-                            x["insert_pos_left"],
-                            x["insert_pos_left"] + 1,
+                            x["insert_pos_left"] - args.isotype_extra,
+                            x["insert_pos_left"] + args.isotype_extra,
                         )
                     ],
                     switch_anno,
@@ -161,13 +170,13 @@ def run(args):
                 )
             )
             right_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3]).upper()
                 for rec in intersect_intervals(
                     [
                         (
                             switch_chrom,
-                            x["insert_pos_right"],
-                            x["insert_pos_right"] + 1,
+                            x["insert_pos_right"] - args.isotype_extra,
+                            x["insert_pos_right"] + args.isotype_extra,
                         )
                     ],
                     switch_anno,
@@ -253,18 +262,20 @@ def run(args):
         ) - 1, insert_pos.max(axis=1)
 
         inserts = pd.concat([inserts, insert_coords, insert_pos], axis=1)
-        inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
+        if inserts.shape[0] > 0:
+            inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
+        else:
+            inserts["insert_isotype"] = pd.Series()
 
         tmp = pd.concat([clustering, inserts], axis=1)
+
         insert_frequency = (
             tmp.groupby("cluster")["inserts"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
         )
         if tmp.dropna().shape[0] > 0:
             insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
 
-    realignment_stats = pd.DataFrame(
-            [], columns=["n_homology_switch", "n_untemplated_switch"]
-        )
+    realignment_stats = pd.DataFrame([], columns=["n_homology_switch", "n_untemplated_switch"])
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("reading breakpoint realignments from " + args.realignments)
 
@@ -285,12 +296,14 @@ def run(args):
             "size": csize,
             "isotype": avg_isotype,
             "frac_mapped": avg_frac_mapped,
-            "frac_multi": avg_frac_multi,
+            "frac_mapped_multi": avg_frac_mapped_multi,
             "frac_ignored": avg_frac_ignored,
             "sequence": cluster_seq,
             "length": cluster_length,
             "GC": cluster_GC,
             "break_spread": break_spread,
+            "inversion_size": inversion_size,
+            "duplication_size": duplication_size,
             "insert_frequency": insert_frequency,
         },
         index=clusters,

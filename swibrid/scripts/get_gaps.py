@@ -12,7 +12,6 @@ def setup_argparse(parser):
 
 def run(args):
     import os
-    import sys
     import numpy as np
     import scipy.sparse
     from logzero import logger
@@ -23,15 +22,13 @@ def run(args):
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa)
 
-    read_idx, pos_left, pos_right, gap_size, inversion, duplication = get_gap_positions(msa)
+    read_idx, gap_left, gap_right, gap_size = get_gap_positions(msa)
 
     logger.info("saving results to {0}".format(args.out))
     np.savez(
         args.out,
         read_idx=read_idx,
-        pos_left=pos_left,
-        pos_right=pos_right,
+        gap_left=gap_left,
+        gap_right=gap_right,
         gap_size=gap_size,
-        inversion=inversion,
-        duplication=duplication
     )

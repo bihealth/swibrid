@@ -139,6 +139,13 @@ def setup_argparse(parser):
         help="""plot another graph displaying circular packing of clusters""",
     )
     parser.add_argument(
+        "--use_circlify",
+        dest="use_circlify",
+        default=False,
+        action="store_true",
+        help="""use circify package for circular packing""",
+    )
+    parser.add_argument(
         "--cmax",
         dest="cmax",
         type=float,
@@ -784,7 +791,7 @@ def run(args):
             logger.error("can't create bubble chart when not coloring by cluster!")
         logger.info("creating bubble chart")
 
-        if nclust < 500:
+        if nclust < 500 and args.use_circlify:
             import circlify
 
             circles = circlify.circlify(

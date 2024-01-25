@@ -31,17 +31,22 @@ def setup_argparse(parser):
     parser.add_argument(
         "--scanning",
         dest="scanning",
-        help="""find_clusters.py dendrogram scanning""",
+        help="""find_clusters dendrogram scanning""",
     )
     parser.add_argument(
         "--cluster_stats",
         dest="cluster_stats",
-        help="""find_clusters.py stats""",
+        help="""find_clusters stats""",
     )
     parser.add_argument(
         "--cluster_analysis",
         dest="cluster_analysis",
-        help="""analyze_clusters.py output""",
+        help="""analyze_clusters output""",
+    )
+    parser.add_argument(
+        "--cluster_downsampling",
+        dest="cluster_downsampling",
+        help="""downsample_clusters output""",
     )
     parser.add_argument(
         "--variants",
@@ -76,6 +81,13 @@ def setup_argparse(parser):
         default=0.5,
         type=float,
         help="""max avg. number of untemplated / homologous nucleotides of reads in cluster to be considered a blunt end [.5]""",
+    )
+    parser.add_argument(
+        "--big_clone_cutoff",
+        dest="big_clone_cutoff",
+        default=0.01,
+        type=float,
+        help="""cutoff to determine a "big" clone as fraction of clustered reads [.01]""",
     )
 
 
@@ -139,6 +151,11 @@ def run(args):
     )
     stats = pd.concat(stats.values(), axis=0)
 
+    stats["frac_reads_unused"] = (
+        stats[["nreads_removed_incomplete", "nreads_unmapped", "nreads_removed_no_switch"]].sum()
+        / stats["nreads_initial"]
+    )
+
     if args.use_clones:
         clones = list(map(int, args.use_clones.split(",")))
     else:
@@ -164,30 +181,26 @@ def run(args):
     stats["nreads_final"] = sum(~clustering["cluster"].isna())
 
     if len(clones) > 0:
+
+        rel_size = cluster_analysis.loc[clones, "size"] / cluster_analysis.loc[clones, "size"].sum()
+
+        assert (rel_size.sum() > .999) & (rel_size.sum() < 1.001), "relative sizes don't sum up to 1"
+
         stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
             cluster_analysis.loc[clones, "length"], w
         )
         stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std(
             cluster_analysis.loc[clones, "GC"], w
         )
-        stats["mean_cluster_size"] = cluster_analysis.loc[clones, "size"].mean()
-        stats["std_cluster_size"] = cluster_analysis.loc[clones, "size"].std()
-        stats["mean_adj_cluster_size"] = cluster_analysis.loc[clones, "adj_size"].mean()
-        stats["std_adj_cluster_size"] = cluster_analysis.loc[clones, "adj_size"].std()
+        stats["mean_cluster_size"] = rel_size.mean()
+        stats["std_cluster_size"] = rel_size.std()
 
-        stats["cluster_gini"] = calculate_gini(
-            clustering["cluster"][clustering["cluster"].isin(clones)],
-        )
-        stats["cluster_entropy"] = scipy.stats.entropy(
-            cluster_analysis.loc[clones, "size"]
-        ) / np.log(len(clones))
-        stats["cluster_inverse_simpson"] = (
-            1.0
-            / (
-                (cluster_analysis.loc[clones, "size"] / cluster_analysis.loc[clones, "size"].sum())
-                ** 2
-            ).sum()
-        )
+        stats["cluster_gini"] = calculate_gini(rel_size)
+        stats["cluster_entropy"] = scipy.stats.entropy(rel_size) / np.log(len(rel_size))
+        stats["cluster_inverse_simpson"] = 1.0 / (rel_size**2).sum()
+
+        stats["top_clone_occupancy"] = rel_size.max()
+        stats["big_clones_occupancy"] = rel_size[rel_size > args.big_clone_cutoff].sum()
 
         stats["mean_frac_mapped"] = cluster_analysis.loc[clones, "frac_mapped"].mean()
         stats["mean_frac_mapped_multi"] = cluster_analysis.loc[clones, "frac_mapped_multi"].mean()
@@ -215,6 +228,13 @@ def run(args):
             )[0]
         except ValueError:
             stats["PCR_GC_bias"] = 0
+
+    if args.cluster_downsampling:
+        logger.info(
+            "reading cluster downsampling results from {0}".format(args.cluster_downsampling)
+        )
+        downsampling = pd.read_csv(args.cluster_downsampling, header=0, index_col=0).mean(0)
+        stats = pd.concat([stats, downsampling], axis=0)
 
     read_isotype_count = clustering["isotype"].dropna().value_counts()
     cluster_isotype_count = cluster_analysis.loc[clones, "isotype"].dropna().value_counts()

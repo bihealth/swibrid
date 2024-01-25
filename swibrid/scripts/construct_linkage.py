@@ -65,6 +65,25 @@ def setup_argparse(parser):
         default=False,
         help="""ignore positions that have no coverage""",
     )
+    parser.add_argument(
+        "--downsample_nreads",
+        dest="downsample_nreads",
+        type=int,
+        default=0,
+        help="""construct additional linkage from downsampling to xx reads [0]""",
+    )
+    parser.add_argument(
+        "--downsample_nreps",
+        dest="downsample_nreps",
+        type=int,
+        default=0,
+        help="""construct additional linkage from downsampling xx times [0]""",
+    )
+    parser.add_argument(
+        "--downsampled_linkage",
+        dest="downsampled_linkage",
+        help="""output file for downsampled linkage(s)""",
+    )
 
 
 def run(args):
@@ -144,5 +163,35 @@ def run(args):
         else:
             Z = fastcluster.linkage(msa_cleaned.todense(), metric=args.metric, method=args.method)
 
-    logger.info("saving linkage to {0}\n".format(args.linkage))
+    logger.info("saving linkage to {0}".format(args.linkage))
     np.savez(args.linkage, Z=Z)
+
+    if (
+        args.downsample_nreads > 0
+        and args.downsample_nreps > 0
+        and args.downsample_nreads < msa_cleaned.shape[0]
+        and args.downsampled_linkage
+    ):
+        import fastcluster
+
+        logger.info(
+            "running {0} replicates of linkage construction for {1} downsampled reads".format(
+                args.downsample_nreps, args.downsample_nreads
+            )
+        )
+
+        Z = {}
+        for n in range(args.downsample_nreps):
+            ii = np.random.choice(msa_cleaned.shape[0], args.downsample_nreads, replace=False)
+            msa_here = msa_cleaned[ii]
+            logger.info(
+                "rep {3}: running fastcluster hierarchical clustering of {2} reads with {0} metric and {1} method".format(
+                    args.metric, args.method, msa_here.shape[0], n
+                )
+            )
+            Z["Z" + str(n)] = fastcluster.linkage(
+                msa_here.todense(), metric=args.metric, method=args.method
+            )
+
+        logger.info("saving downsampled linkages to {0}".format(args.downsampled_linkage))
+        np.savez(args.downsampled_linkage, **Z)

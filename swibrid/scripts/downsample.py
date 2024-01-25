@@ -34,7 +34,9 @@ def run(args):
 
     assert args.output, "please provide an output sample name"
 
-    assert os.path.isfile("output/{0}/{0}_msa.npz".format(sample)), "please run pipeline on input sample at least up to construct_msa"
+    assert os.path.isfile(
+        "output/{0}/{0}_msa.npz".format(sample)
+    ), "please run pipeline on input sample at least up to construct_msa"
 
     logger.info("getting reads from MSA")
     logger.info("reading MSA for " + sample)
@@ -54,12 +56,12 @@ def run(args):
 
     logger.info("getting filter stats")
     filter_stats = pd.read_csv(
-            "output/{0}/{0}_filter_stats.csv".format(sample), header=None, index_col=0
-        ).squeeze()
+        "output/{0}/{0}_filter_stats.csv".format(sample), header=None, index_col=0
+    ).squeeze()
     filter_stats.to_csv("output/{0}/{0}_filter_stats.csv".format(args.output), header=False)
 
     logger.info("getting alignment pars")
-    pars=np.load("output/{0}/{0}_{1}_pars.npz".format(sample, args.aligner))
+    pars = np.load("output/{0}/{0}_{1}_pars.npz".format(sample, args.aligner))
     np.savez("output/{0}/{0}_{1}_pars.npz".format(args.output, args.aligner), **pars)
 
     logger.info("getting output from process_alignments")
@@ -68,12 +70,14 @@ def run(args):
     )
     process_stats = pd.read_csv(
         "output/{0}/{0}_process_stats.csv".format(sample), header=None, index_col=0
-        ).squeeze()
+    ).squeeze()
     breakpoint_alignments = pd.read_csv(
-            "output/{0}/{0}_breakpoint_alignments.csv".format(sample), header=0, index_col=0
-            )
+        "output/{0}/{0}_breakpoint_alignments.csv".format(sample), header=0, index_col=0
+    )
 
-    process.loc[reads].to_csv("output/{0}/{0}_processed.out".format(args.output), sep="\t", index=True)
+    process.loc[reads].to_csv(
+        "output/{0}/{0}_processed.out".format(args.output), sep="\t", index=True
+    )
     process_stats.to_csv("output/{0}/{0}_process_stats.csv".format(args.output), header=False)
     breakpoint_alignments.loc[reads.intersection(breakpoint_alignments.index)].to_csv(
         "output/{0}/{0}_breakpoint_alignments.csv".format(args.output)
@@ -83,7 +87,7 @@ def run(args):
     try:
         inserts = pd.read_csv(
             "output/{0}/{0}_inserts.tsv".format(sample), index_col=0, header=0, sep="\t"
-            )
+        )
     except (ValueError, pd.errors.EmptyDataError):
         inserts = pd.DataFrame(
             [],
@@ -94,18 +98,16 @@ def run(args):
                 "insert_coords",
                 "insert_anno",
                 "sequence",
-                ],
-            )
-    bed = pd.read_csv(
-        "output/{0}/{0}_inserts.bed".format(sample), header=None, sep="\t"
-       )
+            ],
+        )
+    bed = pd.read_csv("output/{0}/{0}_inserts.bed".format(sample), header=None, sep="\t")
 
     insert_reads = reads.intersection(inserts.index)
-    inserts = inserts.loc[insert_reads].reset_index(names='read')
+    inserts = inserts.loc[insert_reads].reset_index(names="read")
     inserts.to_csv("output/{0}/{0}_inserts.tsv".format(args.output), index=False, sep="\t")
     bed.set_index(3).loc[reads].reset_index()[[0, 1, 2, "read", 4, 5, 6, 7, 8, 9, 10, 11]].to_csv(
         "output/{0}/{0}_inserts.bed".format(args.output), header=False, index=False, sep="\t"
-        )
+    )
 
     logger.info("writing MSA to output/{0}/{0}_msa.npz".format(args.output))
     msa_df.loc[reads].to_csv("output/{0}/{0}_msa.csv".format(args.output))

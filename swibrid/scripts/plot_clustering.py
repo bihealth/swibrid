@@ -134,18 +134,6 @@ def setup_argparse(parser):
         help="""plot image in chunks of reads of this size [5000]""",
     )
     parser.add_argument(
-        "--plot_circles",
-        dest="plot_circles",
-        help="""plot another graph displaying circular packing of clusters""",
-    )
-    parser.add_argument(
-        "--use_circlify",
-        dest="use_circlify",
-        default=False,
-        action="store_true",
-        help="""use circify package for circular packing""",
-    )
-    parser.add_argument(
         "--cmax",
         dest="cmax",
         type=float,
@@ -457,7 +445,7 @@ def run(args):
         logger.info("adding sidebar")
         ax = fig.add_axes([left - 0.005, bottom, 0.01, height])
         if args.sidebar_color_by == "isotype":
-            sidebar_values = (clustering['isotype'].astype("category").cat.codes.values % 20)
+            sidebar_values = clustering["isotype"].astype("category").cat.codes.values % 20
             sidebar_cmap = plt.cm.tab20
         elif args.sidebar_color_by == "cluster":
             csize = clustering["cluster"].value_counts()
@@ -471,14 +459,18 @@ def run(args):
                 verbose=False,
                 seed=10,
             )
-            sidebar_values = (crank[clustering["cluster"].astype(int)].values % nclust)
-        elif args.sidebar_color_by == 'haplotype':
-            sidebar_values = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values
+            sidebar_values = crank[clustering["cluster"].astype(int)].values % nclust
+        elif args.sidebar_color_by == "haplotype":
+            sidebar_values = haplotypes.loc[
+                clustering["cluster"].astype(int).values, "haplotype"
+            ].values
             sidebar_cmap = plt.cm.coolwarm
         elif args.info and args.sidebar_color_by in read_info.columns:
             info_col = read_info.loc[reads, args.sidebar_color_by]
             if pd.api.types.is_numeric_dtype(read_info[args.sidebar_color_by]):
-                sidebar_values = ((info_col - info_col.min()) / (info_col.max() - info_col.min())).values
+                sidebar_values = (
+                    (info_col - info_col.min()) / (info_col.max() - info_col.min())
+                ).values
                 sidebar_cmap = plt.cm.cool
             else:
                 if args.sidebar_color_by in ["primers", "barcodes"]:
@@ -492,14 +484,20 @@ def run(args):
                             )
                         )
                     )
-                sidebar_values = (info_col.astype("category").cat.codes.values % 20)
+                sidebar_values = info_col.astype("category").cat.codes.values % 20
                 sidebar_cmap = plt.cm.tab20
         elif args.color_by == "strand" and args.info:
             sidebar_values = (clustering["orientation"] == "+").astype(int) + 1
             sidebar_cmap = plt.cm.PiYG
 
-        ax.imshow(sidebar_values[order, np.newaxis], aspect="auto", interpolation="none", 
-                  cmap=sidebar_cmap, vmin=0, vmax=max(1, sidebar_values.max()))
+        ax.imshow(
+            sidebar_values[order, np.newaxis],
+            aspect="auto",
+            interpolation="none",
+            cmap=sidebar_cmap,
+            vmin=0,
+            vmax=max(1, sidebar_values.max()),
+        )
         ax.set_axis_off()
 
     logger.info("plotting MSA")
@@ -785,53 +783,3 @@ def run(args):
     if args.figure is not None:
         logger.info("saving figure to {0}".format(args.figure))
         fig.savefig(args.figure, dpi=args.dpi)
-
-    if args.plot_circles is not None:
-        if not args.color_by == "cluster":
-            logger.error("can't create bubble chart when not coloring by cluster!")
-        logger.info("creating bubble chart")
-
-        if nclust < 500 and args.use_circlify:
-            import circlify
-
-            circles = circlify.circlify(
-                clustering["cluster"].value_counts().tolist(),
-                show_enclosure=False,
-                target_enclosure=circlify.Circle(x=0, y=0, r=1),
-            )
-        else:
-            import packcircles
-
-            circles = packcircles.pack(np.sqrt(clustering["cluster"].value_counts())[::-1].tolist())
-
-        figsize = (args.fig_height + 0.5, args.fig_height + 0.5)
-        fig = plt.figure(figsize=figsize)
-        fig.clf()
-
-        ax = fig.add_axes([bottom, bottom, width, width])
-        ax.axis("off")
-
-        lim = 0
-        for n, (x, y, r) in enumerate(circles):
-            ax.add_patch(
-                plt.Circle(
-                    (x, y),
-                    r,
-                    facecolor=cmap(nclust - n - 1),
-                    edgecolor="k",
-                    linewidth=0.25,
-                    clip_on=False,
-                )
-            )
-            m = max(abs(x) + r, abs(y) + r)
-            if m > lim:
-                lim = m
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
-
-        stat_string = "{0}: {1} reads ({2} clusters; {3} eff. clusters)"
-        stats = stat_string.format(args.sample, nreads, nclusts, nclusts_eff)
-        fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
-
-        logger.info("saving bubble chart to " + args.plot_circles)
-        fig.savefig(args.plot_circles, dpi=args.dpi)

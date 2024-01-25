@@ -141,7 +141,7 @@ def run(args):
 
     inserts = pd.concat(inserts.values(), axis=0)
     insert_reads = reads.intersection(inserts.index)
-    inserts = inserts.loc[insert_reads].reset_index(names='read')
+    inserts = inserts.loc[insert_reads].reset_index(names="read")
     inserts.to_csv("output/{0}/{0}_inserts.tsv".format(args.combined), index=False, sep="\t")
     bed = (
         pd.concat(bed.values(), axis=0)

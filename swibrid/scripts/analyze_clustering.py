@@ -131,7 +131,9 @@ def run(args):
         cluster_seq.append(seq)
         cluster_length.append(len(seq))
         cluster_GC.append(
-            (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq) if len(seq) > 0 else .5
+            (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
+            if len(seq) > 0
+            else 0.5
         )
 
     try:

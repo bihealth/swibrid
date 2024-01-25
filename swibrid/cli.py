@@ -30,6 +30,7 @@ from .scripts import (
     combine_replicates,
     downsample,
     analyze_clustering,
+    downsample_clustering,
     collect_results,
 )
 
@@ -130,6 +131,7 @@ def main(argv=None):
     swibrid get_switch_homology    get switch sequence homology
     swibrid get_switch_motifs      get switch sequence motifs
     swibrid analyze_clustering     analyze clustering results
+    swibrid downsample_clustering  downsample and analyze clustering
     swibrid get_summary            get sample summary stats and plot
     swibrid collect results        collect results for multiple samples
 
@@ -159,7 +161,9 @@ def main(argv=None):
         help=argparse.SUPPRESS,
     )
 
-    setup_parser = subparsers.add_parser("setup", description="main command: setup current directory")
+    setup_parser = subparsers.add_parser(
+        "setup", description="main command: setup current directory"
+    )
     setup_parser.add_argument(
         "-f",
         "--overwrite",
@@ -227,8 +231,12 @@ def main(argv=None):
     construct_linkage.setup_argparse(
         subparsers.add_parser("construct_linkage", description="step: construct linkage")
     )
-    find_clusters.setup_argparse(subparsers.add_parser("find_clusters", description="step: find clusters"))
-    find_variants.setup_argparse(subparsers.add_parser("find_variants", description="step: find variants"))
+    find_clusters.setup_argparse(
+        subparsers.add_parser("find_clusters", description="step: find clusters")
+    )
+    find_variants.setup_argparse(
+        subparsers.add_parser("find_variants", description="step: find variants")
+    )
     plot_clustering.setup_argparse(
         subparsers.add_parser("plot_clustering", description="step: plot clustering")
     )
@@ -239,13 +247,18 @@ def main(argv=None):
         subparsers.add_parser("get_breakpoint_stats", description="step: get breakpoint statistics")
     )
     get_switch_homology.setup_argparse(
-        subparsers.add_parser("get_switch_homology", description="step: get switch sequence homology")
+        subparsers.add_parser(
+            "get_switch_homology", description="step: get switch sequence homology"
+        )
     )
     get_switch_motifs.setup_argparse(
         subparsers.add_parser("get_switch_motifs", description="step: get switch sequence motifs")
     )
     analyze_clustering.setup_argparse(
         subparsers.add_parser("analyze_clustering", description="step: analyze clustering")
+    )
+    downsample_clustering.setup_argparse(
+        subparsers.add_parser("downsample_clustering", description="step: downsample clustering")
     )
     get_synthetic_reads.setup_argparse(
         subparsers.add_parser("get_synthetic_reads", description="create synthetic reads")
@@ -291,6 +304,7 @@ def main(argv=None):
         "get_switch_homology": get_switch_homology.run,
         "get_switch_motifs": get_switch_motifs.run,
         "analyze_clustering": analyze_clustering.run,
+        "downsample_clustering": downsample_clustering.run,
         "get_synthetic_reads": get_synthetic_reads.run,
         "get_unique_clones_bed": get_unique_clones_bed.run,
         "combine_replicates": combine_replicates.run,

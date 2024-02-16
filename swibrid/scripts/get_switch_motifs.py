@@ -1,8 +1,14 @@
-""" analyze sequence content within switch region bins by a number of motifs """
+"""\
+analyze sequence content within switch region bins by a number of motifs
+given a list of motifs, genome file and switch region coordinates, this script
+counts the occurrences of these motifs in coordinate bins
+output is a .npz file with count arrays for each motif
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
+    parser.add_argument("-g", "--genome", dest="genome", help="""required: genome fasta file""")
+    parser.add_argument("-o", "--output", dest="output", help="""required: output file (npz)""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -22,7 +28,6 @@ def setup_argparse(parser):
         default=100,
         help="""binsize [100]""",
     )
-    parser.add_argument("-o", "--output", dest="output", help="""output file (npz)""")
     parser.add_argument(
         "--motifs",
         dest="motifs",
@@ -101,8 +106,8 @@ def run(args):
         minor_ticks = []
         minor_labels = []
         for rec in anno_recs:
-            start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-            end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+            start = shift_coord(int(rec[3][1]), cov_int)
+            end = shift_coord(int(rec[3][2]), cov_int)
             major_ticks += [start, end]
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])

@@ -61,7 +61,7 @@ def get_switch_coverage(switch_anno, switch_chrom, switch_start, switch_end):
     return cov_int, Ltot, eff_start, eff_end, anno_recs
 
 
-def merge_intervals(intervals):
+def merge_intervals(intervals, add_count=False):
     """interval merging function from here: http://codereview.stackexchange.com/questions/69242/merging-overlapping-intervals but extended to include chromosome as first entry of tuple"""
 
     sorted_by_lower_bound = sorted(intervals, key=lambda tup: (tup[0], tup[1]))
@@ -69,7 +69,7 @@ def merge_intervals(intervals):
 
     for higher in sorted_by_lower_bound:
         if not merged:
-            merged.append(higher)
+            merged.append(higher + ((1,) if add_count else ()))
         else:
             lower = merged[-1]
             # test for intersection between lower and higher:
@@ -80,9 +80,10 @@ def merge_intervals(intervals):
                     lower[0],
                     lower[1],
                     upper_bound,
-                )  # replace by merged interval
+                )  + ((merged[-1][3] + 1,) if add_count else ()) # replace by merged interval
+                
             else:
-                merged.append(higher)
+                merged.append(higher + ((1,) if add_count else ()))
 
     return merged
 
@@ -293,7 +294,7 @@ def nonzero_intervals(vec, start):
 
 
 def shift_coord(coord, cov_int, ignore=False):
-    shift = 0
+    shift = cov_int[0][0]
     for k in range(1, len(cov_int)):
         if coord >= cov_int[k][0]:
             shift += cov_int[k][0] - cov_int[k - 1][1]
@@ -498,8 +499,8 @@ def nmf_consistency(U_max, U_all):
 def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
     switch_iis = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-        end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+        start = shift_coord(int(rec[3][1]), cov_int) 
+        end = shift_coord(int(rec[3][2]), cov_int) 
         switch_iis.append([rec[3][3].upper()] * (end // binsize - start // binsize))
     return np.concatenate(switch_iis)
 

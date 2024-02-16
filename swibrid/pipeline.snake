@@ -3,11 +3,22 @@ import os
 shell.executable("/bin/bash")
 shell.prefix("set -e pipefail;")
 
+def increase_mem (wildcards, attempt):
+  return 32000*attempt
+
+def get_partition (wildcards, attempt):
+  return 'medium' # if attempt <= 5 else 'highmem')
+
+if "INPUT_CLONES" in config and os.path.isfile(config["INPUT_CLONES"]):
+  ruleorder: simulate > demux
+else:
+  ruleorder: demux > simulate
+
 
 rule all:
   input:
-     expand('output/{sample}/{sample}_reads.png',sample=config['SAMPLES']),
-     expand('output/{sample}/{sample}_gaps.png',sample=config['SAMPLES']),
+     expand('output/{sample}/{sample}_reads_by_cluster.png',sample=config['SAMPLES']),
+     expand('output/{sample}/{sample}_reads_by_coverage.png',sample=config['SAMPLES']),
      'output/summary/{0}_stats.csv'.format(config['STUDY'])
 
 
@@ -36,34 +47,35 @@ rule demux:
     """
 
 
-rule filter:
-  input:
-    fastq='input/{sample}.fastq.gz',
-    info='input/{sample}_info.csv'
+rule simulate:
   output:
-    fastq='output/{sample}/{sample}_filtered.fastq.gz',
-    csv='output/{sample}/{sample}_filter_stats.csv'
+    fastq='input/{sample}.fastq.gz',
+    info='input/{sample}_info.csv',
   params:
-    minlength=config['MINLENGTH'],
-    complete=lambda wildcards: "--only-complete" if 'plasmid' not in wildcards.sample else "",
-    internal=lambda wildcards: "--keep-internal" if ('exon' in wildcards.sample or 'plasmid' in wildcards.sample) else ""
-  threads: 1
+    clones=config['INPUT_CLONES'],
+    variants=config['INPUT_VARIANTS'],
+    reference=config['REFERENCE'],
+    input_pars=config['INPUT_PARS'],
+    nclones=lambda wildcards: config['SIMULATION_PARAMS'][wildcards.sample]["nclones"],
+    nreads=lambda wildcards: config['SIMULATION_PARAMS'][wildcards.sample]["nreads"],
+    model=lambda wildcards: config['SIMULATION_PARAMS'][wildcards.sample]["model"],
+    seed=lambda wildcards: config['SIMULATION_PARAMS'][wildcards.sample]["seed"],
   resources:
-    mem_mb=4000,
-    time='04:00:00'
+    mem_mb=32000,
+    time='02:00:00'
   conda:
     config['ENV']
-  log: "logs/filter/{sample}.log"
+  log: "logs/simulate/{sample}.log"
   shell:
     r"""
-    mkdir -p output/{wildcards.sample}
-    swibrid filter_reads -i {input.fastq} -o {output.fastq} --info {input.info} --stats {output.csv} --min-length {params.minlength} {params.complete} {params.internal} 2> {log}
+    mkdir -p input 
+    swibrid get_synthetic_reads -b {params.clones} -r {params.reference} -p {params.input_pars} -n {params.nclones} -k {params.nreads} -d {params.model} -s {params.seed} --variants {params.variants} -o {output.fastq} -i {output.info} 2> {log}
     """
 
 
 rule last:
   input:
-    'output/{sample}/{sample}_filtered.fastq.gz'
+    'input/{sample}.fastq.gz'
   output:
     maf='output/{sample}/{sample}_aligned.maf.gz',
     par='output/{sample}/{sample}_last_pars.npz'
@@ -87,7 +99,7 @@ rule last:
 
 rule minimap:
   input:
-    'output/{sample}/{sample}_filtered.fastq.gz'
+    'input/{sample}.fastq.gz'
   output:
     bam='output/{sample}/{sample}_aligned.bam',
   params:
@@ -129,11 +141,11 @@ rule minimap_pars:
 
 rule telo:
   input:
-    'output/{sample}/{sample}_filtered.fastq.gz'
+    'input/{sample}.fastq.gz'
   output:
     'output/{sample}/{sample}_telo.out'
   params:
-    telo_repeat=config['TELO_REPEAT']
+    telo_repeat=config['TELO_REPEAT'] if os.path.isfile(config['TELO_REPEAT'])  else "NO_TELO"
   threads: 1
   resources:
     mem_mb=16000,
@@ -145,7 +157,9 @@ rule telo:
     r"""
     mkdir -p output/{wildcards.sample}
     echo -e "qseqid\tslen\tqlen\tpident\tlength\tqstart\tqend\tevalue" > {output}
-    zcat {input} | awk '{{if(NR%4==1) {{printf(">%s\n",substr($0,2));}} else if(NR%4==2) print;}}' | blastn -subject {params.telo_repeat} -query - -task blastn-short -outfmt "6 qseqid slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -perc_identity 75 -dust no | uniq >> {output} 2> {log}
+    if [[ -f {params.telo_repeat} ]]; then 
+        zcat {input} | awk '{{if(NR%4==1) {{printf(">%s\n",substr($0,2));}} else if(NR%4==2) print;}}' | blastn -subject {params.telo_repeat} -query - -task blastn-short -outfmt "6 qseqid slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -perc_identity 75 -dust no | uniq >> {output} 2> {log}
+    fi
     """
 
 
@@ -153,13 +167,17 @@ rule process:
   input:
     alignments='output/{sample}/{sample}_aligned.maf.gz' if config['ALIGNER']=='LAST' else 'output/{sample}/{sample}_aligned.bam',
     telo='output/{sample}/{sample}_telo.out',
-    reads='output/{sample}/{sample}_filtered.fastq.gz'
+    reads='input/{sample}.fastq.gz',
+    info='input/{sample}_info.csv'
   output:
     out='output/{sample}/{sample}_processed.out',
     stats='output/{sample}/{sample}_process_stats.csv',
     fasta='output/{sample}/{sample}_aligned.fasta.gz',
     alignments='output/{sample}/{sample}_breakpoint_alignments.csv'
   params:
+    minlength=config['MINLENGTH'],
+    complete=lambda wildcards: "--only-complete" if 'plasmid' not in wildcards.sample else "",
+    internal=lambda wildcards: "--keep-internal" if ('exon' in wildcards.sample or 'plasmid' in wildcards.sample) else "",
     switch=config['SWITCH'],
     switch_anno=config['SWITCH_ANNOTATION'],
     genome=config['REFERENCE'],
@@ -167,7 +185,7 @@ rule process:
     blacklist_regions="--blacklist_regions="+config['BLACKLIST_REGIONS'] if 'BLACKLIST_REGIONS' in config else ""
   threads: 1
   resources:
-    mem_mb=16000,
+    mem_mb=increase_mem,
     time='04:00:00'
   conda:
     config['ENV']
@@ -175,20 +193,20 @@ rule process:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} {params.blacklist_regions} --realign_breakpoints {output.alignments} --raw_reads {input.reads} --genome {params.genome} 2> {log}
+    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} {params.blacklist_regions} --realign_breakpoints {output.alignments} --raw_reads {input.reads} --genome {params.genome} --info {input.info} --min-length {params.minlength} {params.complete} {params.internal} 2> {log}
     """
 
 
 rule inserts:
   input:
     processed='output/{sample}/{sample}_processed.out',
-    reads='output/{sample}/{sample}_filtered.fastq.gz'
+    reads='input/{sample}.fastq.gz'
   output:
     tsv='output/{sample}/{sample}_inserts.tsv',
-    bed='output/{sample}/{sample}_inserts.bed',
+    bed='output/{sample}/{sample}.bed',
   params:
     switch=config['SWITCH'],
-    annotation=config['ANNOTATION'],
+    annotation="--annotation " + config['ANNOTATION'] if 'ANNOTATION' in config else '',
     switch_anno=config['SWITCH_ANNOTATION'],
   threads: 1
   resources:
@@ -200,14 +218,8 @@ rule inserts:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid create_bed --raw_reads {input.reads} --processed_alignments {input.processed} --bed {output.bed} --switch_coords {params.switch} --annotation {params.annotation} --switch_annotation {params.switch_anno} --outfile {output.tsv} 2> {log}
+    swibrid create_bed --raw_reads {input.reads} --processed_alignments {input.processed} --bed {output.bed} --switch_coords {params.switch} {params.annotation} --switch_annotation {params.switch_anno} --outfile {output.tsv} 2> {log}
     """
-
-def increase_mem (wildcards, attempt):
-  return 32000*attempt
-
-def get_partition (wildcards, attempt):
-  return 'medium' # if attempt <= 5 else 'highmem')
 
 
 rule msa:
@@ -279,7 +291,7 @@ rule linkage:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid construct_linkage --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --metric {params.metric} --method {params.method} --nmax {params.nmax} --n_threads {threads} --linkage {output.linkage}  --method {params.method} 2> {log}
+    swibrid construct_linkage --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --metric {params.metric} --method {params.method} --nmax {params.nmax} --n_threads {threads} --linkage {output.linkage}  2> {log}
     """
 
 
@@ -315,13 +327,14 @@ rule variants:
     pars='output/{sample}/{sample}_last_pars.npz' if config['ALIGNER']=='LAST' else 'output/{sample}/{sample}_minimap_pars.npz',
   output:
     txt='output/{sample}/{sample}_variants.txt',
+    txt_complete='output/{sample}/{sample}_variants_complete.txt',
     mat='output/{sample}/{sample}_variants.npz',
-    ht='output/{sample}/{sample}_haplotypes.csv'
+    ht='output/{sample}/{sample}_haplotypes.csv',
   params:
     switch=config['SWITCH'],
     switch_annotation=config['SWITCH_ANNOTATION'],
     reference=config['REFERENCE'],
-    variant_annotation="--variant_annotation config['VARIANT_ANNOTATION']" if 'VARIANT_ANNOTATION' in config else ""
+    variant_annotation="--variant_annotation " + config['VARIANT_ANNOTATION'] if 'VARIANT_ANNOTATION' in config else ""
   threads: 1
   resources:
     mem_mb=increase_mem,
@@ -333,7 +346,31 @@ rule variants:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht} {params.variant_annotation} 2> {log}
+    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --out_complete {output.txt_complete} --haplotypes {output.ht}  {params.variant_annotation} 2> {log}
+    """
+
+
+rule rearrangements:
+  input:
+    msa='output/{sample}/{sample}_msa.npz',
+  output:
+    bed='output/{sample}/{sample}_rearrangements.bed',
+    mat='output/{sample}/{sample}_rearrangements.npz'
+  params:
+    switch=config['SWITCH'],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='04:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  log: "logs/rearrangements/{sample}.log"
+  shell:
+    r"""
+    mkdir -p output/{wildcards.sample}
+    swibrid find_rearrangements --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} -o {output.bed} -m {output.mat} 2> {log}
     """
 
 
@@ -410,17 +447,45 @@ rule analyze_clustering:
     """
 
 
-rule gap_stats:
+rule downsample_clustering:
+  input:
+    msa='output/{sample}/{sample}_msa.npz',
+    gaps='output/{sample}/{sample}_gaps.npz',
+    cluster_stats='output/{sample}/{sample}_cluster_stats.csv',
+  output:
+    'output/{sample}/{sample}_cluster_downsampling.csv'
+  params:
+    max_gap=config['MAX_GAP'],
+    metric=config['CLUSTERING_METRIC'],
+    method=config['CLUSTERING_METHOD'],
+    nreads=config['CLUSTER_DOWNSAMPLING_NREADS'],
+    nreps=config['CLUSTER_DOWNSAMPLING_NREPS']
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='08:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  log: "logs/cluster/{sample}_downsampling.log"
+  shell:
+    r"""
+    swibrid downsample_clustering -s {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --cluster_stats {input.cluster_stats} --metric {params.metric} --method {params.method} --nreads {params.nreads} --nreps {params.nreps} 2> {log}
+    """
+
+
+rule breakpoint_stats:
   input:
     gaps='output/{sample}/{sample}_gaps.npz',
     clustering='output/{sample}/{sample}_clustering.csv',
     stats='output/{sample}/{sample}_cluster_stats.csv',
     analysis='output/{sample}/{sample}_cluster_analysis.csv',
+    rearrangements='output/{sample}/{sample}_rearrangements.npz',
     homology='output/all/homology.npz',
     motifs='output/all/motifs.npz'
   output:
-    stats='output/{sample}/{sample}_gap_stats.csv',
-    plot='output/{sample}/{sample}_gaps.png'
+    stats='output/{sample}/{sample}_breakpoint_stats.csv',
+    plot='output/{sample}/{sample}_breakpoints.png'
   params:
     switch=config['SWITCH'],
     switch_annotation=config['SWITCH_ANNOTATION'],
@@ -433,11 +498,11 @@ rule gap_stats:
     time='4:00:00',
   conda:
     config['ENV']
-  log: "logs/gaps/{sample}_stats.log"
+  log: "logs/breakpoints/{sample}_stats.log"
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid get_gap_stats -g {input.gaps} -c {input.clustering} -s {input.stats} -a {input.analysis} -b {params.binsize} --max_gap {params.max_gap} --homology {input.homology} --motifs {input.motifs} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} -o {output.stats} --weights {params.weights} --plot {output.plot} --sample {wildcards.sample} 2> {log}
+    swibrid get_breakpoint_stats -g {input.gaps} -c {input.clustering} -s {input.stats} -a {input.analysis} -r {input.rearrangements} -b {params.binsize} --max_gap {params.max_gap} --homology {input.homology} --motifs {input.motifs} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} -o {output.stats} --weights {params.weights} --plot {output.plot} --sample {wildcards.sample} 2> {log}
     """
 
 
@@ -455,10 +520,11 @@ rule plot_clustering:
     variants_matrix='output/{sample}/{sample}_variants.npz',
     haplotypes='output/{sample}/{sample}_haplotypes.csv'
   output:
-    reads='output/{sample}/{sample}_reads.png',
+    reads='output/{sample}/{sample}_reads_by_cluster.png',
+    coverage='output/{sample}/{sample}_reads_by_coverage.png',
   params:
     switch=config['SWITCH'],
-    annotation=config['ANNOTATION'],
+    annotation="--annotation " + config['ANNOTATION'] if 'ANNOTATION' in config else "",
     switch_annotation=config['SWITCH_ANNOTATION'],
   threads: 1
   resources:
@@ -471,21 +537,22 @@ rule plot_clustering:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --coords {input.process} --show_inserts --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} 2> {log}
+    swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} {params.annotation} --color_by cluster --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by true_haplotype,haplotype,true_cluster 2> {log}
+    swibrid plot_clustering --msa {input.msa} --figure {output.coverage} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} {params.annotation} --color_by coverage --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by true_haplotype,haplotype,true_cluster 2> {log}
     """
 
 
 rule summary:
   input:
     info='input/{sample}_info.csv',
-    filter='output/{sample}/{sample}_filter_stats.csv',
     process='output/{sample}/{sample}_process_stats.csv',
     clustering='output/{sample}/{sample}_clustering.csv',
     scanning='output/{sample}/{sample}_cutoff_scanning.csv',
     cluster_stats='output/{sample}/{sample}_cluster_stats.csv',
     cluster_analysis='output/{sample}/{sample}_cluster_analysis.csv',
+    cluster_downsampling='output/{sample}/{sample}_cluster_downsampling.csv',
     gaps='output/{sample}/{sample}_gaps.npz',
-    gap_stats='output/{sample}/{sample}_gap_stats.csv',
+    breakpoint_stats='output/{sample}/{sample}_breakpoint_stats.csv',
     variants='output/{sample}/{sample}_variants.txt'
   output:
     plot='output/{sample}/{sample}_summary.png',
@@ -506,7 +573,7 @@ rule summary:
   shell:
     r"""
     mkdir -p output/{wildcards.sample}
-    swibrid get_summary --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --filter {input.filter} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --scanning {input.scanning} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch} --gap_stats {input.gap_stats} --max_gap {params.max_gap} --cluster_analysis {input.cluster_analysis} --variants {input.variants} --weights {params.weights} 2> {log}
+    swibrid get_summary --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --scanning {input.scanning} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch} --breakpoint_stats {input.breakpoint_stats} --max_gap {params.max_gap} --cluster_analysis {input.cluster_analysis} --cluster_downsampling {input.cluster_downsampling} --variants {input.variants} --weights {params.weights} 2> {log}
     """
 
 
@@ -517,8 +584,8 @@ rule collect:
      expand("output/{sample}/{sample}_cluster_analysis.csv", sample=config['SAMPLES']),
   output:
     sample_stats='output/summary/{0}_stats.csv'.format(config['STUDY']),
-    inserts='output/summary/{0}_inserts.xlsx'.format(config['STUDY']),
-    cluster_stats='output/summary/{0}_clusters.xlsx'.format(config['STUDY'])
+    #inserts='output/summary/{0}_inserts.xlsx'.format(config['STUDY']),
+    #cluster_stats='output/summary/{0}_clusters.xlsx'.format(config['STUDY'])
   params:
     samples=','.join(config['SAMPLES']),
   threads: 1
@@ -531,5 +598,6 @@ rule collect:
   shell:
     r"""
     mkdir -p output/summary
-    swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} --inserts {output.inserts} --cluster_stats {output.cluster_stats} 2> {log}
+    swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} 2> {log}
     """
+    #swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} --inserts {output.inserts} --cluster_stats {output.cluster_stats} 2> {log}

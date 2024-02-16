@@ -1,25 +1,51 @@
-"""analyze clustering"""
+"""analyze clustering\
+given the clustering from `find_clusters` as input, various aggregate statistics are generated per cluster.
+output table contains the following columns:
+- cluster size (# of reads)
+- cluster isotype (most frequent)
+- average read fraction mapped per cluster
+- average read fraction mapped to same region
+- average read fraction ignored
+- consensus sequence
+- length of consensus
+- GC content of consensus
+- spread of breakpoints (number of bases with intermediate coverage)
+- size of inversions
+- size of duplications
+- frequency of inserts in cluster
+- fractional overlap of inserts in cluster
+- fractional overlap of insert-associated breakpoints
+- average insert length
+- average length of gaps around inserts
+- average isotype associated to inserts
+- number of homologous nucleotides around insert-associated breakpoints
+- number of homologous nucleotides around switch breakpoints
+- number of untemplated nucleotides around insert-associated breakpoints
+- number of untemplated nucleotides around switch breakpoints
+- length of different switch regions covered in cluster
+- cluster size adjusted for PCR length and GC bias
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("-o", "--output", dest="output", help="""output""")
+    parser.add_argument(
+        "--clustering",
+        dest="clustering",
+        help="""required: find_clusters.py output file""",
+    )
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("--gaps", dest="gaps", help="""gap distribution""")
+    parser.add_argument("-o", "--output", dest="output", help="""required: output table""")
+    parser.add_argument("--gaps", dest="gaps", help="""required: gap distribution""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
         default=75,
         type=int,
         help="""max gap size to ignore [75]""",
-    )
-    parser.add_argument(
-        "--clustering",
-        dest="clustering",
-        help="""find_clusters.py output file""",
     )
     parser.add_argument(
         "--switch_coords",

@@ -1,47 +1,48 @@
-"""plot clustering"""
+"""\
+given a MSA and clustering results, this will display individual reads mapping over the switch regions
+reads will be ordered as dictated by the linkage, or simply by isotype and cluster value
+reads can be colored by different variables (isotype, cluster, haplotype, coverage, strand, orientation or other columns present in the info file)
+an additional sidebar can display additional variables
+variant positions or breakpoint realignment statistics can also be indicated
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("--figure", dest="figure", help="""output figure""")
-    parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
-    parser.add_argument("--info", dest="info", help="""file with read info""")
-    parser.add_argument(
-        "--coords",
-        dest="coords",
-        help="""file with processed read coordinates""",
-    )
+    parser.add_argument("--figure", dest="figure", help="""required: output figure""")
     parser.add_argument(
         "--clustering_results",
         dest="clustering_results",
-        help="""file contains clustering results for extrapolated cutoff""",
+        help="""required: file contains clustering results""",
+    )
+    parser.add_argument(
+        "--switch_annotation",
+        dest="switch_annotation",
+        help="""required: bed file with switch annotation""",
+    )
+    parser.add_argument("--linkage", dest="linkage", help="""file containing flinkage""")
+    parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
+    parser.add_argument("--info", dest="info", help="""file with read info""")
+    parser.add_argument(
+        "--clustering_stats",
+        dest="clustering_stats",
+        help="""file contains clustering stats with cutoff value""",
     )
     parser.add_argument(
         "--cutoff",
         dest="cutoff",
         type=float,
-        help="""use fixed cutoff instead of data-derived""",
+        help="""show cutoff line""",
     )
-    parser.add_argument(
-        "--clustering_stats",
-        dest="clustering_stats",
-        help="""file contains clustering stats""",
-    )
-    parser.add_argument("--linkage", dest="linkage", help="""file containing flinkage""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
         help="""coordinates of switch region [chr14:106050000-106337000:-]""",
-    )
-    parser.add_argument(
-        "--switch_annotation",
-        dest="switch_annotation",
-        help="""bed file with switch annotation""",
     )
     parser.add_argument(
         "--annotation",
@@ -58,7 +59,7 @@ def setup_argparse(parser):
         "--sidebar_color_by",
         dest="sidebar_color_by",
         default="isotype",
-        help="""color sidebar reads by isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
+        help="""color sidebar reads by (comma-separated list of) isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
     )
     parser.add_argument(
         "--show_inserts",
@@ -66,6 +67,11 @@ def setup_argparse(parser):
         action="store_true",
         default=False,
         help="""show insert locations""",
+    )
+    parser.add_argument(
+        "--coords",
+        dest="coords",
+        help="""file with processed read coordinates (required if inserts are shown)""",
     )
     parser.add_argument(
         "--no_x_legend",
@@ -104,20 +110,20 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants_table",
         dest="variants_table",
-        help="""file with variant table (from find_variants.py)""",
+        help="""show variant positions from variant table (from find_variants)""",
     )
     parser.add_argument(
         "--variants_matrix",
         dest="variants_matrix",
-        help="""file with variant matrix (from find_variants.py)""",
+        help="""indicate variant occurrences from variant matrix (from find_variants)""",
     )
     parser.add_argument(
         "--haplotypes",
         dest="haplotypes",
-        help="""file with haplotype clustering (from find_variants.py)""",
+        help="""file with haplotype clustering (from find_variants)""",
     )
     parser.add_argument(
-        "--realignments", dest="realignments", help="""file with breakpoint realignments"""
+        "--realignments", dest="realignments", help="""indicate realignment scores with breakpoint realignments"""
     )
     parser.add_argument(
         "--dpi",
@@ -346,8 +352,8 @@ def run(args):
         )
         values = crank[clustering["cluster"].astype(int)].values % nclust
     elif args.color_by == "isotype":
-        cmap = plt.cm.tab20
-        values = clustering["isotype"].astype("category").cat.codes.values % 20
+        cmap = plt.cm.Set1
+        values = clustering["isotype"].astype("category").cat.codes.values % 9
     elif args.info and args.color_by in read_info.columns:
         info_col = read_info.loc[reads, args.color_by]
         if pd.api.types.is_numeric_dtype(read_info[args.color_by]):
@@ -365,8 +371,13 @@ def run(args):
                         )
                     )
                 )
-            values = info_col.astype("category").cat.codes % 20
-            cmap = plt.cm.tab20
+            ncats = len(info_col.astype("category").cat.categories)
+            if ncats < 9:
+                values = info_col.astype("category").cat.codes % 9
+                cmap = plt.cm.Set1
+            else:
+                values = info_col.astype("category").cat.codes % 20
+                cmap = plt.cm.tab20
     elif args.color_by == "orientation":
         cmap = plt.cm.PiYG
     elif args.color_by == "coverage":
@@ -394,7 +405,7 @@ def run(args):
 
     logger.info("creating figure")
 
-    figsize = (args.fig_width, args.fig_height + 0.5)
+    figsize = (args.fig_width, args.fig_height + 1)
     fig = plt.figure(figsize=figsize)
     fig.clf()
 
@@ -402,13 +413,18 @@ def run(args):
     height = args.fig_height / figsize[1]
     linkage_border = args.linkage_border if args.linkage else 0.01
     insert_border = 0.2 if args.show_inserts else 0.01
-    left = linkage_border
-    width = 1 - linkage_border - insert_border
+    if args.sidebar_color_by is not None:
+        num_sidebars = len(args.sidebar_color_by.split(','))
+    else:
+        num_sidebars = 0
+    sidebar_width = .005
+    left = .01 + linkage_border + num_sidebars * sidebar_width
+    width = .99 - linkage_border - insert_border - num_sidebars * sidebar_width
 
     if args.linkage:
         logger.info("reading linkage from {0} and creating dendrogram".format(args.linkage))
         Z = np.load(args.linkage)["Z"]
-        ax = fig.add_axes([0.01, bottom, left - 0.02, height])
+        ax = fig.add_axes([0.01, bottom, left - num_sidebars * sidebar_width - .015, height])
         lw = fig.bbox_inches.height * ax.get_position().height * 72 / nreads
         with plt.rc_context({"lines.linewidth": min(lw, 0.5)}):
             L = scipy.cluster.hierarchy.dendrogram(
@@ -442,63 +458,76 @@ def run(args):
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
     if args.sidebar_color_by is not None:
-        logger.info("adding sidebar")
-        ax = fig.add_axes([left - 0.005, bottom, 0.01, height])
-        if args.sidebar_color_by == "isotype":
-            sidebar_values = clustering["isotype"].astype("category").cat.codes.values % 20
-            sidebar_cmap = plt.cm.tab20
-        elif args.sidebar_color_by == "cluster":
-            csize = clustering["cluster"].value_counts()
-            nclust = len(csize)
-            crank = pd.Series(range(nclust), csize.index)
-            sidebar_cmap = rand_cmap(
-                max(2, nclust),
-                type="bright",
-                first_color_black=False,
-                last_color_black=False,
-                verbose=False,
-                seed=10,
-            )
-            sidebar_values = crank[clustering["cluster"].astype(int)].values % nclust
-        elif args.sidebar_color_by == "haplotype":
-            sidebar_values = haplotypes.loc[
-                clustering["cluster"].astype(int).values, "haplotype"
-            ].values
-            sidebar_cmap = plt.cm.coolwarm
-        elif args.info and args.sidebar_color_by in read_info.columns:
-            info_col = read_info.loc[reads, args.sidebar_color_by]
-            if pd.api.types.is_numeric_dtype(read_info[args.sidebar_color_by]):
-                sidebar_values = (
-                    (info_col - info_col.min()) / (info_col.max() - info_col.min())
-                ).values
-                sidebar_cmap = plt.cm.cool
-            else:
-                if args.sidebar_color_by in ["primers", "barcodes"]:
-                    info_col = info_col.apply(
-                        lambda x: "+".join(
-                            set(
-                                map(
-                                    lambda y: re.sub("primer_", "", y.split("@")[0]),
-                                    x.split(";"),
+        sidebar_colors = args.sidebar_color_by.split(',')
+        logger.info("adding {0} sidebars".format(len(sidebar_colors)))
+        for nsc, sidebar_color in enumerate(sidebar_colors):
+            ax = fig.add_axes([left - (num_sidebars - nsc) * sidebar_width, 
+                               bottom, .9 * sidebar_width, height])
+            if sidebar_color == "isotype":
+                sidebar_values = clustering["isotype"].astype("category").cat.codes.values % 9
+                sidebar_cmap = plt.cm.Set1
+            elif sidebar_color == "cluster":
+                csize = clustering["cluster"].value_counts()
+                nclust = len(csize)
+                crank = pd.Series(range(nclust), csize.index)
+                sidebar_cmap = rand_cmap(
+                    max(2, nclust),
+                    type="bright",
+                    first_color_black=False,
+                    last_color_black=False,
+                    verbose=False,
+                    seed=10,
+                )
+                sidebar_values = crank[clustering["cluster"].astype(int)].values % nclust
+            elif sidebar_color == "haplotype":
+                sidebar_values = haplotypes.loc[
+                    clustering["cluster"].astype(int).values, "haplotype"
+                ].values
+                sidebar_cmap = plt.cm.coolwarm
+            elif args.info and sidebar_color in read_info.columns:
+                info_col = read_info.loc[reads, sidebar_color]
+                if pd.api.types.is_numeric_dtype(read_info[sidebar_color]):
+                    sidebar_values = (
+                        (info_col - info_col.min()) / (info_col.max() - info_col.min())
+                    ).values
+                    sidebar_cmap = plt.cm.cool
+                else:
+                    if sidebar_color in ["primers", "barcodes"]:
+                        info_col = info_col.apply(
+                            lambda x: "+".join(
+                                set(
+                                    map(
+                                        lambda y: re.sub("primer_", "", y.split("@")[0]),
+                                        x.split(";"),
+                                    )
                                 )
                             )
                         )
-                    )
-                sidebar_values = info_col.astype("category").cat.codes.values % 20
-                sidebar_cmap = plt.cm.tab20
-        elif args.color_by == "strand" and args.info:
-            sidebar_values = (clustering["orientation"] == "+").astype(int) + 1
-            sidebar_cmap = plt.cm.PiYG
+                    ncats = len(info_col.astype("category").cat.categories)
+                    if ncats < 9:
+                        sidebar_values = info_col.astype("category").cat.codes.values % 9
+                        sidebar_cmap = plt.cm.Set1
+                    else:
+                        sidebar_values = info_col.astype("category").cat.codes.values % 20
+                        sidebar_cmap = plt.cm.tab20
+            elif sidebar_color == "strand":
+                sidebar_values = (clustering["orientation"].values == "+").astype(int) + 1
+                sidebar_cmap = plt.cm.PiYG
+            else:
+                logger.warn("no info on {0}!".format(sidebar_color))
+                sidebar_values = np.array([0.3] * nreads)
+                sidebar_cmap = plt.cm.Greys
 
-        ax.imshow(
-            sidebar_values[order, np.newaxis],
-            aspect="auto",
-            interpolation="none",
-            cmap=sidebar_cmap,
-            vmin=0,
-            vmax=max(1, sidebar_values.max()),
-        )
-        ax.set_axis_off()
+            ax.imshow(
+                sidebar_values[order, np.newaxis],
+                aspect="auto",
+                interpolation="none",
+                cmap=sidebar_cmap,
+                vmin=0,
+                vmax=max(1, sidebar_values.max()),
+            )
+            ax.set_axis_off()
+            ax.set_title(sidebar_color, rotation=45, size=4, ha='left')
 
     logger.info("plotting MSA")
     ax = fig.add_axes([left, bottom, width, height])
@@ -590,8 +619,8 @@ def run(args):
     minor_ticks = []
     minor_labels = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-        end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+        start = shift_coord(int(rec[3][1]), cov_int) 
+        end = shift_coord(int(rec[3][2]), cov_int) 
         major_ticks += [start, end]
         minor_ticks.append((start + end) / 2)
         minor_labels.append(rec[3][3])
@@ -685,14 +714,14 @@ def run(args):
                     switch_right, switch_left = switch_left, switch_right
                 insert = (insert_chrom, insert_start, insert_end)
                 ax.plot(
-                    shift_coord(switch_left, cov_int) - eff_start,
+                    shift_coord(switch_left, cov_int),
                     p + 0.5,
                     ">",
                     color="k",
                     markersize=0.5,
                 )
                 ax.plot(
-                    shift_coord(switch_right, cov_int) - eff_start,
+                    shift_coord(switch_right, cov_int),
                     p + 0.5,
                     "<",
                     color="k",
@@ -753,12 +782,12 @@ def run(args):
 
             pleft = (
                 realignments["pos_left"]
-                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int))
                 .values
             )
             pright = (
                 realignments["pos_right"]
-                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int))
                 .values
             )
             nh = realignments["n_homology"].values

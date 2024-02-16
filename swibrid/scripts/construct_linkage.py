@@ -1,14 +1,20 @@
-"""construct hiearchical agglomerative clustering from MSA"""
+"""\
+construct hiearchical agglomerative clustering from MSA
+from the input MSA, only coverage information will be used and gaps smaller than `max_gap` will be removed
+by default, `fastcluster` is used with cosine metric and average linkage
+output is a npz file containing the linkage matrix 
+EXPERIMENTAL: a sparse version building on pynndescent and gbbs agglomerative clustering, requires several libraries to be installed
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
+    parser.add_argument("--linkage", dest="linkage", help="""required: output file contains linkage""")
     parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
-    parser.add_argument("--distances", dest="distances", help="""distance matrix""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
@@ -19,8 +25,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--metric",
         dest="metric",
-        default="jaccard",
-        help="""clustering metric [jaccard]""",
+        default="cosine",
+        help="""clustering metric [cosine]""",
     )
     parser.add_argument(
         "--method",
@@ -28,7 +34,14 @@ def setup_argparse(parser):
         default="average",
         help="""clustering method for hierarchical clustering [average]""",
     )
-    parser.add_argument("--linkage", dest="linkage", help="""output file contains linkage""")
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
+    parser.add_argument(
+        "--ignore_unused_positions",
+        dest="ignore_unused_positions",
+        action="store_true",
+        default=False,
+        help="""ignore positions that have no coverage""",
+    )
     parser.add_argument(
         "--use_sparse",
         dest="use_sparse",
@@ -36,6 +49,7 @@ def setup_argparse(parser):
         default=False,
         help="""EXPERIMENTAL: use sparse nearest-neighbor clustering""",
     )
+    parser.add_argument("--distances", dest="distances", help="""pre-computed sparse distance matrix""")
     parser.add_argument(
         "--n_neighbors",
         dest="n_neighbors",
@@ -56,33 +70,6 @@ def setup_argparse(parser):
         type=int,
         default=0,
         help="""save full distances for these points in addition to the nearest neighbors [0]""",
-    )
-    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
-    parser.add_argument(
-        "--ignore_unused_positions",
-        dest="ignore_unused_positions",
-        action="store_true",
-        default=False,
-        help="""ignore positions that have no coverage""",
-    )
-    parser.add_argument(
-        "--downsample_nreads",
-        dest="downsample_nreads",
-        type=int,
-        default=0,
-        help="""construct additional linkage from downsampling to xx reads [0]""",
-    )
-    parser.add_argument(
-        "--downsample_nreps",
-        dest="downsample_nreps",
-        type=int,
-        default=0,
-        help="""construct additional linkage from downsampling xx times [0]""",
-    )
-    parser.add_argument(
-        "--downsampled_linkage",
-        dest="downsampled_linkage",
-        help="""output file for downsampled linkage(s)""",
     )
 
 
@@ -165,33 +152,3 @@ def run(args):
 
     logger.info("saving linkage to {0}".format(args.linkage))
     np.savez(args.linkage, Z=Z)
-
-    if (
-        args.downsample_nreads > 0
-        and args.downsample_nreps > 0
-        and args.downsample_nreads < msa_cleaned.shape[0]
-        and args.downsampled_linkage
-    ):
-        import fastcluster
-
-        logger.info(
-            "running {0} replicates of linkage construction for {1} downsampled reads".format(
-                args.downsample_nreps, args.downsample_nreads
-            )
-        )
-
-        Z = {}
-        for n in range(args.downsample_nreps):
-            ii = np.random.choice(msa_cleaned.shape[0], args.downsample_nreads, replace=False)
-            msa_here = msa_cleaned[ii]
-            logger.info(
-                "rep {3}: running fastcluster hierarchical clustering of {2} reads with {0} metric and {1} method".format(
-                    args.metric, args.method, msa_here.shape[0], n
-                )
-            )
-            Z["Z" + str(n)] = fastcluster.linkage(
-                msa_here.todense(), metric=args.metric, method=args.method
-            )
-
-        logger.info("saving downsampled linkages to {0}".format(args.downsampled_linkage))
-        np.savez(args.downsampled_linkage, **Z)

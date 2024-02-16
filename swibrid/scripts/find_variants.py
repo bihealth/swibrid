@@ -1,12 +1,52 @@
-"""find single-nucleotide variants and rearrangements (inversions/duplications) in MSA"""
+"""\
+EXPERIMENTAL: find single-nucleotide variants in MSA and determine haplotypes
+
+single-nucleotide variants: variable positions in the input MSA (excluding positions at or near gaps) where
+nucleotide distributions are different than what's expected given mutation frequencies (estimated at the initial alignment step)
+potential variants are removed if
+- there's less than min_cov non-gaps
+- fewer variants than expected
+- high strand bias
+- no cluster with at least min_cluster_cov reads and allele frequency > min_freq
+variants are aggregated over clusters, and the distribution across clusters is tested for evenness
+variants can be annotated by dbSNP id
+motif occurrences around variants are also scored
+
+haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant
+
+output is a vcf-style file with genomic (1-based) and relative (0-based) coordinates, and a matrix (sparse integer array, same shape as MSA) indicating which read contains a variant at which position 
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
+    parser.add_argument(
+        "--clustering",
+        dest="clustering",
+        help="""required: clustering (find_clusters output)""",
+    )
+    parser.add_argument(
+        "--stats",
+        dest="stats",
+        help="""required: clustering stats (find_clusters output)""",
+    )
+    parser.add_argument(
+        "--reference",
+        dest="reference",
+        help="""required: reference sequence (switch chromosome)""",
+    )
+    parser.add_argument(
+        "--pars",
+        dest="pars",
+        help="""required: alignment parameters to estimate mutation probability""",
+    )
+    parser.add_argument("-o", "--out", dest="out", help="""required: output file (text)""")
+    parser.add_argument("-m", "--mat", dest="mat", help="""required: output file (matrix)""")
+    parser.add_argument("--out_complete", dest="out_complete", help="""required: output file with all variants (text)""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -17,26 +57,6 @@ def setup_argparse(parser):
         "--switch_annotation",
         dest="switch_annotation",
         help="""bed file with switch annotation""",
-    )
-    parser.add_argument(
-        "--clustering",
-        dest="clustering",
-        help="""clustering""",
-    )
-    parser.add_argument(
-        "--stats",
-        dest="stats",
-        help="""clustering stats""",
-    )
-    parser.add_argument(
-        "--reference",
-        dest="reference",
-        help="""reference sequence (switch chromosome)""",
-    )
-    parser.add_argument(
-        "--pars",
-        dest="pars",
-        help="""alignment parameters to estimate mutation probability""",
     )
     parser.add_argument("--fdr", dest="fdr", default=0.05, help="""FDR for variant calling""")
     parser.add_argument(
@@ -61,13 +81,6 @@ def setup_argparse(parser):
         help="""max. local gap frequency in window [.7]""",
     )
     parser.add_argument(
-        "--max_rearrangement_gap",
-        dest="max_rearrangement_gap",
-        default=25,
-        type=int,
-        help="""max gap within rearrangements to ignore [25]""",
-    )
-    parser.add_argument(
         "--min_cluster_cov",
         dest="min_cluster_cov",
         default=10,
@@ -80,14 +93,6 @@ def setup_argparse(parser):
         default=0.4,
         type=float,
         help="""minimum allele frequency at potentially variable positions (in total or per cluster) [.4]""",
-    )
-    parser.add_argument("-o", "--out", dest="out", help="""output file (text)""")
-    parser.add_argument("-m", "--mat", dest="mat", help="""output file (matrix)""")
-    parser.add_argument(
-        "-r",
-        "--rearrangements",
-        dest="rearrangements",
-        help="""output file for inversions / duplications""",
     )
     parser.add_argument(
         "--variant_annotation",
@@ -157,87 +162,6 @@ def run(args):
     if nreads < msa.shape[0]:
         logger.info("restricting msa to {0} reads in clustering".format(nreads))
         msa = msa[:nreads]
-
-    if args.rearrangements:
-        logger.info("finding rearrangements (inversions / duplications)")
-
-        # get indices of nonzero elements
-        ii, jj = msa.nonzero()
-        # get coverage of nonzero entries
-        cov = msa.data // 10
-
-        # find positions where coverage is larger or smaller than 1
-        # and within that, get intervals of consecutive positions containing only gaps smaller than max_rearrangement_gap
-        def get_intervals(pp):
-            if len(pp) == 0:
-                return [], [], []
-            rr = ii[pp]
-            pos = jj[pp] + 1
-            inds = np.concatenate(
-                [
-                    [0],
-                    np.where((np.diff(pos) > args.max_rearrangement_gap) | (np.diff(rr) != 0))[0]
-                    + 1,
-                    [len(pos)],
-                ]
-            )
-            return (
-                np.asarray(rr[inds[:-1]]),
-                np.asarray(pos[inds[:-1]]),
-                np.asarray(pos[(inds[1:] - 1)]),
-            )
-
-        inv_read, inv_left, inv_right = get_intervals(np.where(cov < 1)[0])
-        dup_read, dup_left, dup_right = get_intervals(np.where(cov > 1)[0])
-        inv_size = inv_right - inv_left if len(inv_read) > 0 else np.array([])
-        dup_size = dup_right - dup_left if len(dup_read) > 0 else np.array([])
-
-        assert np.all(inv_size >= 0) & np.all(dup_size >= 0), "negative inv/dup sizes!"
-
-        if len(inv_read) >= 0:
-            msa_inv = msa.tocsr()[inv_read]
-            inv_cov = np.array(
-                [
-                    (msa_inv[k, pl:pr].data // 10).mean()
-                    for k, (pl, pr) in enumerate(zip(inv_left, inv_right))
-                ]
-            )
-
-            if np.any(inv_cov > -0.5):
-                logger.warn(
-                    "{0} of {1} inversions have mean coverage > -0.5".format(
-                        np.sum(inv_cov > -0.5), len(inv_read)
-                    )
-                )
-
-        if len(dup_read) >= 0:
-            msa_dup = msa.tocsr()[dup_read]
-            dup_cov = np.array(
-                [
-                    (msa_dup[k, pl:pr].data // 10).mean()
-                    for k, (pl, pr) in enumerate(zip(dup_left, dup_right))
-                ]
-            )
-
-            if np.any(dup_cov < 1.5):
-                logger.warn(
-                    "{0} of {1} duplications have mean coverage < 1.5".format(
-                        np.sum(dup_cov < 1.5), len(dup_read)
-                    )
-                )
-
-        logger.info("saving results to {0}".format(args.rearrangements))
-        np.savez(
-            args.rearrangements,
-            inv_read=inv_read,
-            inv_left=inv_left,
-            inv_right=inv_right,
-            inv_size=inv_size,
-            dup_read=dup_read,
-            dup_left=dup_left,
-            dup_right=dup_right,
-            dup_size=dup_size,
-        )
 
     # remove coverage and orientation info from msa
     msa.data = msa.data % 10
@@ -343,6 +267,11 @@ def run(args):
         no_clust = np.ones_like(padj).astype(bool)
     freq = mat.sum(0).A1 / (msa != 0).sum(0).A1
     no_clust = no_clust & (freq <= args.min_freq)
+
+    padj_complete = padj.copy()
+    padj_complete[few_var] = 1
+    SNP_pos_complete = np.where(padj_complete < args.fdr)[0]
+
     padj[low_cov | few_var | stranded | no_clust] = 1
     SNP_pos = np.where(padj < args.fdr)[0]
     logger.info("{0} variants removed due to low coverage".format(sum(low_cov)))
@@ -511,5 +440,42 @@ def run(args):
         outf.writelines(lines)
 
     if args.mat is not None:
-        logger.info("saving variant matrix to {0}\n".format(args.mat))
+        logger.info("saving variant matrix to {0}".format(args.mat))
         scipy.sparse.save_npz(args.mat, mat)
+
+    if args.out_complete:
+        logger.info("saving complete variant table to {0}".format(args.out_complete))
+        with open(args.out_complete, "w") as outf:
+            outf.write(
+                "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tcov\tpp_adj\tpstrand\tfreq\tused\n"
+            )
+            lines = []
+            line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9}\t{10:.3g}\t{11:.3g}\t{12:.3g}\t{13}\n"
+            for n, pos in enumerate(SNP_pos_complete):
+                ref = ref_seq[pos]
+                real_pos = cov_map[pos] + 1
+                region = []
+                for _, _, _, hit in intersect_intervals(
+                    [("chr14", real_pos - 1, real_pos)], switch_anno, loj=True
+                ):
+                    region.append(hit[3])
+                region = ",".join(region)
+                vals = [
+                    switch_chrom,
+                    real_pos,
+                    region,
+                    pos,
+                    ref,
+                    "ACGT"[alt[pos] - 1],
+                    ",".join(map(str, nuc_dist[pos])),
+                    pvar[pos],
+                    padj_complete[pos],
+                    nr[pos],
+                    pp_adj[pos],
+                    pstrand[pos],
+                    freq[pos],
+                    pos in SNP_pos,
+                ]
+                lines.append(line.format(*vals))
+            outf.writelines(lines)
+

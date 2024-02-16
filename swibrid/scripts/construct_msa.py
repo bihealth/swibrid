@@ -1,23 +1,30 @@
-"""construct (pseudo) MSA from processed LAST output"""
-
+"""\
+   construct (pseudo) MSA from processed alignments
+   this script will take aligned segments and sequences from process_alignments and construct a MSA
+   the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file. 
+   matrix values m code for coverage and nucleotide identity:
+       m % 10 gives nucleotide identity with A=1, C=2, G=3, T=4, gaps are zeros
+       m // 10 gives coverage of genomic regions by one read (1x, 2x, ...)  and indicates tandem duplications
+   if `--use_orientation` is set, inversions are also considered and associated coverage values are negative
+"""
 
 def setup_argparse(parser):
     parser.add_argument(
         "--coords",
         dest="coords",
-        help="""process_alignments.py coordinate output""",
+        help="""required: process_alignments coordinate output""",
     )
     parser.add_argument(
         "--sequences",
         dest="sequences",
-        help="""process_alignments.py sequence output""",
+        help="""required: process_alignments sequence output""",
     )
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: output file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("--out", dest="out", help="""file with  read info""")
+    parser.add_argument("--out", dest="out", help="""required: output file with read info""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -27,7 +34,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--switch_annotation",
         dest="switch_annotation",
-        help="""bed file with switch annotation""",
+        help="""required: bed file with coordinates of individual switch regions""",
     )
     parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
     parser.add_argument(
@@ -98,8 +105,8 @@ def run(args):
             continue
         chrom, start, end, orientation = decode_coords(rec.id.rsplit("@", 1)[1])
         # find coordinates of this part of the read sequence
-        ns = shift_coord(start, cov_int, ignore=True) - eff_start
-        ne = shift_coord(end, cov_int, ignore=True) - eff_start
+        ns = shift_coord(start, cov_int, ignore=True)
+        ne = shift_coord(end, cov_int, ignore=True)
         if len(rec.seq) == ne - ns and ns >= 0 and ne <= Ltot:
             seq = str(rec.seq).upper()
             if args.use_orientation and orientation == "-":

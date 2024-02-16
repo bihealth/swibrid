@@ -1,13 +1,21 @@
-"""get gaps in (pseudo)MSA"""
+"""\
+find gaps in (pseudo)MSA
+takes the MSA matrix from construct_MSA and finds all gap positions
+output is a .npz file containing several integer arrays
+- read_idx: index of read
+- gap_left: left end (within the MSA; 0-based)
+- gap_right: right end 
+- gap_size: size of gap
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: .npz file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("-o", "--out", help="""output file (.npz)""")
+    parser.add_argument("-o", "--out", help="""required: output file (.npz)""")
 
 
 def run(args):

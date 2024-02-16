@@ -1,11 +1,42 @@
-"""downsample the clustering to get more robust diversity measures"""
+"""\
+downsample the clustering to get more robust diversity measures
+given the input MSA (and associated gaps), clustering is repeated `nreps` times on a subsample of `nreads` reads
+using `fastcluster`  with (by defalt) cosine metric and average linkage and a cutoff derived from cluster_stats input
+the following diversity measured are calculated:
+- mean_cluster_size (as fraction of reads)
+- std_cluster_size
+- nclusters_final (number of clusters after filtering)
+- nclusters_eff (from the entropy of the cluster size distribution pre-filtering)
+- cluster_gini: gini coefficient (post-filtering)
+- cluster_entropy: entropy (post-filtering)
+- cluster_inverse_simpson: inverse simpson coefficient (post-filtering)
+- top_clone_occupancy: relative fraction of reads in biggest cluster
+- big_clones_occupancy: fraction of reads in clusters > 1% occupancy
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
+    )
+    parser.add_argument(
+        "--cluster_stats",
+        dest="cluster_stats",
+        help="""required: file with statistics from original clustering""",
+    )
+    parser.add_argument(
+        "-s",
+        "--stats",
+        dest="stats",
+        help="""required: output file with clustering statistics after downsampling""",
+    )
+    parser.add_argument(
+        "--nreads", dest="nreads", type=int, default=1000, help="""number of reads used [1000]"""
+    )
+    parser.add_argument(
+        "--nreps", dest="nreps", type=int, default=10, help="""number of replicates [10]"""
     )
     parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
     parser.add_argument(
@@ -18,8 +49,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--metric",
         dest="metric",
-        default="jaccard",
-        help="""clustering metric [jaccard]""",
+        default="cosine",
+        help="""clustering metric [cosine]""",
     )
     parser.add_argument(
         "--method",
@@ -33,23 +64,6 @@ def setup_argparse(parser):
         action="store_true",
         default=False,
         help="""ignore positions that have no coverage""",
-    )
-    parser.add_argument(
-        "--nreads", dest="nreads", type=int, default=1000, help="""number of reads used [1000]"""
-    )
-    parser.add_argument(
-        "--nreps", dest="nreps", type=int, default=10, help="""number of replicates [10]"""
-    )
-    parser.add_argument(
-        "--cluster_stats",
-        dest="cluster_stats",
-        help="""file with statistics from original clustering""",
-    )
-    parser.add_argument(
-        "-s",
-        "--stats",
-        dest="stats",
-        help="""output file with clustering statistics after downsampling""",
     )
     parser.add_argument(
         "--big_clone_cutoff",

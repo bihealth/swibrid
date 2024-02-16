@@ -1,11 +1,28 @@
-"""get sample summary and plot"""
+"""\
+produce a summary of features derived from a sample and a plot
+collects statistics produced by process_alignments, find_clusters, and downsample_clustering
+produces cluster distribution statistics similar to downsample_clustering (the latter are averaged):
+- mean_cluster_size (as fraction of reads)
+- std_cluster_size
+- nclusters_final (number of clusters after filtering)
+- nclusters_eff (from the entropy of the cluster size distribution pre-filtering)
+- cluster_gini: gini coefficient (post-filtering)
+- cluster_entropy: entropy (post-filtering)
+- cluster_inverse_simpson: inverse simpson coefficient (post-filtering)
+- top_clone_occupancy: relative fraction of reads in biggest cluster
+- big_clones_occupancy: fraction of reads in clusters > 1% occupancy
+- PCR_length_bias: regression coefficient of log(cluster_size) ~ length
+- PCR_GC_bias: regression coefficient of log(cluster_size) ~ GC 
+averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters
+collects number of reads / clusters per isotype
+gets statistics on variants (germline vs. somatic, transitions vs. transversions, etc.)
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("--sample", dest="sample", help="""sample""")
+    parser.add_argument("--sample", dest="sample", help="""sample name""")
     parser.add_argument("--figure", dest="figure", help="""output figure""")
     parser.add_argument("--stats", dest="stats", help="""output stats""")
-    parser.add_argument("--filter", dest="filter", help="""stats file from filter_reads.py""")
     parser.add_argument(
         "--process",
         dest="process",
@@ -135,12 +152,10 @@ def run(args):
     )
 
     stats = {}
-    logger.info("reading filter stats")
-    stats["filter"] = pd.read_csv(args.filter, index_col=0, header=None).squeeze()
     logger.info("reading processing stats")
     stats["process"] = pd.read_csv(args.process, index_col=0, header=None).squeeze()
-    stats["filter"]["nreads_unmapped"] = (
-        stats["filter"]["nreads_pass"] - stats["process"]["nreads_mapped"]
+    stats["process"]["nreads_unmapped"] = (
+        stats["process"]["nreads_initial"] - stats["process"]["nreads_mapped"]
     )
 
     logger.info("reading clustering, clustering stats, clustering analysis")

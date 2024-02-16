@@ -1,4 +1,23 @@
-"""analyze breakpoint statistics"""
+"""\
+analyze breakpoint statistics
+this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters
+homology scores are calculated from binned breakpoint frequencies weighted by homology of bins
+motif scores are calculated from binned breakpoint frequencies weighted by motif occurrences
+output file contains following values:
+- breaks_normalized: number of breaks divided by number of reads / clusters
+- frac_breaks_duplications: fraction of breaks leading to duplication events
+- frac_breaks_inversions: fraction of breaks leading to inversion events
+- frac_breaks_single: fraction of breaks from SM to elsewhere
+- frac_breaks_multiple: fraction of breaks to different regions but not SM
+- frac_breaks_within: fraction of breaks within a region
+- frac_breaks_inversions/duplications_within: frac breaks with inversions/duplications within regions
+- frac_breaks_X_X: fraction of breaks connecting indicated regions
+- spread_XX: spread (standard deviation) of breakpoint positions in a region
+- homology_fw: homology in bins around breakpoint positions (same orientation)
+- homology_rv: homology in bins around breakpoint positions (opposite orientation)
+- homology_fw/rv_XX: homologies for breaks connecting indicated regions
+- donor/receiver_score_XX: motif scores for donor and receiver breakpoints for different motifs, subdivided by region
+"""
 
 
 def setup_argparse(parser):
@@ -6,13 +25,13 @@ def setup_argparse(parser):
         "-g",
         "--gaps",
         dest="gaps",
-        help="""file with gap positions (output of get_gaps.py)""",
+        help="""required: file with gap positions (output of get_gaps.py)""",
     )
     parser.add_argument(
         "-r",
         "--rearrangements",
         dest="rearrangements",
-        help="""file with inversion/duplication positions (output of find_variants.py)""",
+        help="""required: file with inversion/duplication positions (output of find_variants.py)""",
     )
     parser.add_argument(
         "-c",
@@ -26,6 +45,8 @@ def setup_argparse(parser):
         dest="clustering_analysis",
         help="""file with clustering analysis""",
     )
+    parser.add_argument("-o", "--out", help="""required: output file""")
+    parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument(
         "-b",
         "--binsize",
@@ -51,15 +72,13 @@ def setup_argparse(parser):
     parser.add_argument(
         "--homology",
         dest="homology",
-        help="""file with homology values (output of get_switch_homology.py)""",
+        help="""file with homology values (output of get_switch_homology)""",
     )
     parser.add_argument(
         "--motifs",
         dest="motifs",
-        help="""file with motif counts (output of get_switch_motifs.py)""",
+        help="""file with motif counts (output of get_switch_motifs)""",
     )
-    parser.add_argument("-o", "--out", help="""output file""")
-    parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
     parser.add_argument(
         "--switch_coords",
@@ -73,20 +92,22 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument(
+        "--use_clones",
+        dest="use_clones",
+        help="""comma-separated list of clones to use or 'all' (default: filtered clusters, excluding singletons)""",
+    )
+    parser.add_argument(
+        "--weights",
+        dest="weights",
+        default="cluster",
+        help="""use different weights ("cluster" | "reads" | "adjusted") [cluster]""",
+    )
+    parser.add_argument(
         "--range",
         dest="range",
         default="5",
         help="""range of kmer sizes, e.g., 3,5-7 [5]""",
     )
-    parser.add_argument(
-        "-n",
-        "--ntop",
-        dest="ntop",
-        type=int,
-        default=10,
-        help="""number of top bins to select""",
-    )
-    parser.add_argument("--reference", dest="reference", help="""genome fasta file""")
     parser.add_argument(
         "--top_donor",
         dest="top_donor",
@@ -98,16 +119,14 @@ def setup_argparse(parser):
         help="""output file with top receiver sequences""",
     )
     parser.add_argument(
-        "--use_clones",
-        dest="use_clones",
-        help="""comma-separated list of clones to use or 'all' (default: filtered clusters, excluding singletons)""",
+        "-n",
+        "--ntop",
+        dest="ntop",
+        type=int,
+        default=10,
+        help="""number of top bins to select""",
     )
-    parser.add_argument(
-        "--weights",
-        dest="weights",
-        default="cluster",
-        help="""use different weights ("cluster" | "reads" | "adjusted") [cluster]""",
-    )
+    parser.add_argument("--reference", dest="reference", help="""genome fasta file""")
 
 
 def run(args):
@@ -359,8 +378,8 @@ def run(args):
         minor_ticks = []
         minor_labels = []
         for rec in anno_recs:
-            start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-            end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+            start = shift_coord(int(rec[3][1]), cov_int)
+            end = shift_coord(int(rec[3][2]), cov_int)
             major_ticks += [start, end]
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])

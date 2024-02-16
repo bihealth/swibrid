@@ -1,4 +1,11 @@
-"""find clusters by cutting linkage dendrogram"""
+"""\
+find clusters by cutting linkage dendrogram
+inputs are the linkage matrix (from construct_linkage) and read info (from construct_msa)
+output is a csv file that adds cluster identity to the read info file
+cutoff can be fixed or determined by scanning cutoffs between cmin and cmax 
+and finding an inflection point (either by distance, or from the intersection of two exponential trends)
+small and isolated clusters are flagged, filtered clusters contain at least 95% of reads
+"""
 
 
 def setup_argparse(parser):
@@ -6,14 +13,33 @@ def setup_argparse(parser):
         "-l",
         "--linkage",
         dest="linkage",
-        help="""output of construct_linkage.py""",
+        help="""required: output of construct_linkage.py""",
     )
+    parser.add_argument(
+        "-i",
+        "--input",
+        dest="input",
+        help="""required: read info (output of construct_msa.py)""",
+    )
+    parser.add_argument("-o", "--output", dest="output", help="""required: output file with clustering""")
+    parser.add_argument("-s", "--stats", dest="stats", help="""file with statistics""")
     parser.add_argument(
         "-f",
         "--fix_cutoff",
         dest="cutoff",
         type=float,
         help="""use fixed cutoff instead of data-derived""",
+    )
+    parser.add_argument(
+        "--scanning",
+        dest="scanning",
+        help="""file with scanning data""",
+    )
+    parser.add_argument(
+        "--fit-method",
+        dest="fit_method",
+        default="distance",
+        help="""cutoff determination method: "trend" or "distance" [distance]""",
     )
     parser.add_argument(
         "-c",
@@ -35,25 +61,6 @@ def setup_argparse(parser):
         default=100,
         type=int,
         help="""number of cutoff values between cmin and cmax [100]""",
-    )
-    parser.add_argument(
-        "-i",
-        "--input",
-        dest="input",
-        help="""read info (output of construct_msa.py)""",
-    )
-    parser.add_argument("-o", "--output", dest="output", help="""output file with clustering""")
-    parser.add_argument(
-        "--scanning",
-        dest="scanning",
-        help="""file with scanning data""",
-    )
-    parser.add_argument("-s", "--stats", dest="stats", help="""file with statistics""")
-    parser.add_argument(
-        "--fit-method",
-        dest="fit_method",
-        default="distance",
-        help="""cutoff determination method: "trend" or "distance" [distance]""",
     )
 
 

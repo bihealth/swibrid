@@ -1,4 +1,7 @@
-"""get LAST-like parameters from a SAM or MAF file"""
+"""\
+get LAST-like parameters from a SAM or MAF file
+this will go through the alignments and tally mutation and indel frequencies
+"""
 
 
 def setup_argparse(parser):

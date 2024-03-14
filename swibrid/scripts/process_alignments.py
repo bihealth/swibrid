@@ -159,6 +159,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--blacklist_regions",
         dest="blacklist_regions",
+        nargs='?',
         help="""ignore inserts from blacklist regions defined in this bed file""",
     )
     parser.add_argument(
@@ -457,6 +458,9 @@ def realign_breakpoints(matches, genome, read_seq, pad=20):
             gseq2 = genome.fetch(
                 matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
             ).upper()
+
+        if gseq1 == '' or gseq2 == '' or rseq == '':
+            continue
 
         # al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
         # al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
@@ -883,10 +887,6 @@ def run(args):
             stats["nreads_removed_switch_order"] += 1
             use = False
 
-        if args.interrupt_for_read and read in args.interrupt_for_read:
-            print([sm[:5] for sm in switch_matches])
-            break
-
         # isotype
         isotype = ""
         i = 0
@@ -912,6 +912,10 @@ def run(args):
 
         if orientations["1"] > 0 and orientations["-1"] > 0:
             stats["nreads_inversions"] += 1
+
+        if args.interrupt_for_read and read in args.interrupt_for_read:
+            print(read,[sm[:7] for sm in matches])
+            #raise Exception("stop")
 
         if not use:
             continue

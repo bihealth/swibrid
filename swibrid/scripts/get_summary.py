@@ -490,7 +490,7 @@ def run(args):
         isotype_fracs.T.plot(kind="barh", stacked=True, ax=ax)
         ax.set_xlabel("fraction")
         ax.legend(
-            ncol=3,
+            ncol=4,
             handlelength=1,
             columnspacing=0.5,
             loc=2,
@@ -531,8 +531,8 @@ def run(args):
         minor_ticks = []
         minor_labels = []
         for rec in anno_recs:
-            start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-            end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+            start = shift_coord(int(rec[3][1]), cov_int)
+            end = shift_coord(int(rec[3][2]), cov_int)
             major_ticks += [start, end]
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])
@@ -545,17 +545,10 @@ def run(args):
             label="all",
         )
         ax.hist(
-            clustering["filtered_cluster"].dropna().value_counts(),
+            clustering["filtered_cluster"][clustering['filtered_cluster'] >= 0].value_counts(),
             bins=np.geomspace(1, stats["nreads_final"], 50),
             histtype="stepfilled",
             label="filtered",
-            alpha=0.5,
-        )
-        ax.hist(
-            cluster_analysis["adj_size"].dropna(),
-            bins=np.geomspace(1, stats["nreads_final"], 50),
-            histtype="stepfilled",
-            label="adjusted",
             alpha=0.5,
         )
         ax.set_yscale("log")
@@ -568,11 +561,11 @@ def run(args):
         ax = axs[2, 1]
         ax.plot(
             cluster_analysis["size"],
-            cluster_analysis["break_spread"],
+            cluster_analysis["length"],
             ".",
         )
         ax.set_xscale("log")
-        ax.set_ylabel("break spread")
+        ax.set_ylabel("length")
         ax.set_xlabel("cluster size")
         sns.despine(ax=ax)
 

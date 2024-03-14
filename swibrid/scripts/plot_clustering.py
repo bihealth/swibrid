@@ -47,6 +47,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--annotation",
         dest="annotation",
+        nargs='?',
         help="""bed file with gene annotation""",
     )
     parser.add_argument(
@@ -58,8 +59,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--sidebar_color_by",
         dest="sidebar_color_by",
-        default="isotype",
-        help="""color sidebar reads by (comma-separated list of) isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
+        help="""color sidebar reads by (comma-separated list of) isotype, cluster, haplotype or by other columns present in the "info" file [none]""",
     )
     parser.add_argument(
         "--show_inserts",
@@ -414,10 +414,15 @@ def run(args):
     linkage_border = args.linkage_border if args.linkage else 0.01
     insert_border = 0.2 if args.show_inserts else 0.01
     if args.sidebar_color_by is not None:
-        num_sidebars = len(args.sidebar_color_by.split(','))
+        sidebar_colors = args.sidebar_color_by.split(',')
+        valid_cols = set(['strand','isotype','cluster','haplotype'])
+        if args.info:
+            valid_cols |= set(read_info.columns)
+        sidebar_colors = [s for s in sidebar_colors if s in valid_cols]
+        num_sidebars = len(sidebar_colors)
     else:
         num_sidebars = 0
-    sidebar_width = .005
+    sidebar_width = .01
     left = .01 + linkage_border + num_sidebars * sidebar_width
     width = .99 - linkage_border - insert_border - num_sidebars * sidebar_width
 
@@ -457,8 +462,7 @@ def run(args):
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
-    if args.sidebar_color_by is not None:
-        sidebar_colors = args.sidebar_color_by.split(',')
+    if num_sidebars > 0:
         logger.info("adding {0} sidebars".format(len(sidebar_colors)))
         for nsc, sidebar_color in enumerate(sidebar_colors):
             ax = fig.add_axes([left - (num_sidebars - nsc) * sidebar_width, 
@@ -521,7 +525,7 @@ def run(args):
             ax.imshow(
                 sidebar_values[order, np.newaxis],
                 aspect="auto",
-                interpolation="none",
+                interpolation="nearest",
                 cmap=sidebar_cmap,
                 vmin=0,
                 vmax=max(1, sidebar_values.max()),
@@ -531,6 +535,7 @@ def run(args):
 
     logger.info("plotting MSA")
     ax = fig.add_axes([left, bottom, width, height])
+    ax.set_facecolor('w')
 
     # plot the image in chunks
     nchunks = np.ceil(nreads / args.chunksize).astype(int)
@@ -574,7 +579,7 @@ def run(args):
             use = np.isin(y, variants["rel_pos"])
             ax.scatter(
                 y[use],
-                nreads - (x[use] + n * args.chunksize),
+                nreads - (x[use] + n * args.chunksize) - .5,
                 marker=".",
                 lw=0,
                 s=0.1,
@@ -586,7 +591,7 @@ def run(args):
             ax.imshow(
                 im,
                 aspect="auto",
-                interpolation="none",
+                interpolation="nearest",
                 cmap=cmap,
                 extent=extent,
                 vmin=0,

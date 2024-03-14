@@ -44,6 +44,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants",
         dest="variants",
+        nargs='?',
         help="""variant file (like output of find_variants) to add variants""",
     )
     parser.add_argument(
@@ -273,7 +274,7 @@ def run(args):
 
         if args.distribution in ['poisson','P']:
             ncopies = np.random.poisson(args.k)
-        elif args.distribution == ['nbinom','NB']:
+        elif args.distribution in ['nbinom','NB']:
             ncopies = scipy.stats.nbinom.rvs(1./args.nbinom_alpha, 
                                              1./(1.+args.nbinom_alpha * args.k), 
                                              size=1)[0]

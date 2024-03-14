@@ -20,7 +20,7 @@ IUPAC = {
     "N": "[ACGT]",
 }
 
-RC = {"A": "T", "C": "G", "G": "C", "T": "A"}
+RC = {"A": "T", "C": "G", "G": "C", "T": "A", "N": "N"}
 
 
 def parse_switch_coords(switch_coords):

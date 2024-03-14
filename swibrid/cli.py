@@ -33,6 +33,7 @@ from .scripts import (
     analyze_clustering,
     downsample_clustering,
     collect_results,
+    get_annotation,
 )
 
 from swibrid import __version__
@@ -102,15 +103,15 @@ def test_pipeline(args, snake_options):
         os.system("cp {0} .".format(configfile))
     
     Path("index").mkdir(exist_ok=True)
-    if not os.path.isfile("index/hs1_chr14_99-110MB.fa") or args.overwrite:
-        logger.info("setting up index for switch region of hs1")
-        reference = Path(__file__).parent.parent.joinpath("test_data/hs1_chr14_99-110MB.fa")
+    if not os.path.isfile("index/hg38_chr14_105-106MB.fa") or args.overwrite:
+        logger.info("setting up index for switch region of hg38")
+        reference = Path(__file__).parent.parent.joinpath("test_data/hg38_chr14_105-106MB.fa")
         os.system("cp {0} index".format(reference))
-        os.system("samtools faidx index/hs1_chr14_99-110MB.fa")
-        os.system("lastdb index/hs1_chr14_99-110MBdb index/hs1_chr14_99-110MB.fa")
+        os.system("samtools faidx index/hg38_chr14_105-106MB.fa")
+        os.system("lastdb index/hg38_chr14_105-106MBdb index/hg38_chr14_105-106MB.fa")
 
-    switch_regions = Path(__file__).parent.parent.joinpath("test_data/hs1_chr14_99-110MB_switch_regions.bed")
-    if not os.path.isfile("index/hs1_chr14_99-110MB_switch_regions.bed") or args.overwrite:
+    switch_regions = Path(__file__).parent.parent.joinpath("test_data/hg38_chr14_105-106MB_switch_regions.bed")
+    if not os.path.isfile("index/hg38_chr14_105-106MB_switch_regions.bed") or args.overwrite:
         os.system("cp {0} index".format(switch_regions))
 
     Path("input").mkdir(exist_ok=True)
@@ -183,10 +184,11 @@ def main(argv=None):
 
     additional subcommands:
 
+    swibrid get_annotation         prepare gene annotation
     swibrid get_unique_clones_bed  get bed file with unique clones
     swibrid get_synthetic_reads    create synthetic reads from bed file
     swibrid plot_demux_report      make a graphical summary of demultiplexing output
-    swibrid combine_replicate      combine (aligned & processed) reads from replicates
+    swibrid combine_replicates     combine (aligned & processed) reads from replicates
     swibrid downsample             downsample (aligned & processed) reads from a sample
     """
 
@@ -268,7 +270,7 @@ def main(argv=None):
     test_parser = subparsers.add_parser("test", formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent("""\
         test the pipline
         this will create synthetic reads in `input` and run the pipeline on this data,
-        using a reduced hs1 genome in `index` with only the switch region (chr14:99000000-110000000)
+        using a reduced hg38 genome in `index` with only the switch region (chr14:105000000-106000000)
         this will probably take about 30-60 minutes and will call snakemake, passing on additional options
         e.g., for a dry run use `swibrid test -n`, and do `swibrid test --unlock` after a failed run
         """))
@@ -383,6 +385,9 @@ def main(argv=None):
     collect_results.setup_argparse(
         subparsers.add_parser("collect_results", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(collect_results.__doc__))
     )
+    get_annotation.setup_argparse(
+        subparsers.add_parser("get_annotation", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_annotation.__doc__))
+    )
 
     args, extra = parser.parse_known_args(argv)
 
@@ -418,6 +423,7 @@ def main(argv=None):
         "combine_replicates": combine_replicates.run,
         "downsample": downsample.run,
         "collect_results": collect_results.run,
+        "get_annotation": get_annotation.run
     }
 
     if args.cmd == "run":

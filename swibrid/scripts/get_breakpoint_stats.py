@@ -415,20 +415,22 @@ def run(args):
         )
         bph_d.eliminate_zeros()
 
+        #raise Exception('stop')
+
         ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
         ax.scatter(
-            bph_p.nonzero()[1],
-            bph_p.nonzero()[0],
+            bph_p.nonzero()[1] + .5,
+            bph_p.nonzero()[0] + .5,
             c=np.log(bph_p.data),
             cmap=plt.cm.Greens,
             marker="s",
-            s=12,
+            s=15,
             linewidths=0.2,
             edgecolors="k",
         )
         ax.scatter(
-            bph_i.nonzero()[1],
-            bph_i.nonzero()[0],
+            bph_i.nonzero()[1] + .5,
+            bph_i.nonzero()[0] + .5,
             c=np.log(bph_i.data),
             cmap=plt.cm.Reds,
             marker=MarkerStyle("o", fillstyle="right"),
@@ -437,8 +439,8 @@ def run(args):
             edgecolors="k",
         )
         ax.scatter(
-            bph_d.nonzero()[1],
-            bph_d.nonzero()[0],
+            bph_d.nonzero()[1] + .5,
+            bph_d.nonzero()[0] + .5,
             c=np.log(bph_d.data),
             cmap=plt.cm.Blues,
             marker=MarkerStyle("o", fillstyle="left"),

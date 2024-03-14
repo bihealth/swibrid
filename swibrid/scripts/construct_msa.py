@@ -145,6 +145,8 @@ def run(args):
 
     cov = np.sign(x[ind])
     cons = np.abs(x[ind])
+    #cov2 = np.sign(x[ind])
+    #cons2 = np.abs(x[ind])
 
     if len(ind) < len(i):
         xx = scipy.sparse.csr_matrix((x, (np.arange(len(inv)), inv)))
@@ -156,9 +158,12 @@ def run(args):
         logger.warn(
             "{0} positions in MSA are covered multiple times; getting consensus".format(len(p1))
         )
-        for k, p in enumerate(p1):
-            cov[p] = np.sum(np.sign(xx[:, k].data))
-            cons[p] = np.bincount(np.abs(xx[:, k].data)).argmax()
+        #for k, p in enumerate(p1):
+        #    cov2[p] = np.sum(np.sign(xx[:, k].data))
+        #    cons2[p] = np.bincount(np.abs(xx[:, k].data)).argmax()
+        cov[p1] = (np.sum(xx > 0,axis=0) - np.sum(xx < 0,axis=0)).A1
+        cons[p1] = np.vstack([np.bincount(xx.nonzero()[1][np.abs(xx.data) == k + 1],
+                                          minlength=xx.shape[1]) for k in range(4)]).argmax(0) + 1
 
     msa = scipy.sparse.csr_matrix(
         (10 * cov + cons, (i[ind], j[ind])), shape=(nreads, Ltot), dtype=np.int8

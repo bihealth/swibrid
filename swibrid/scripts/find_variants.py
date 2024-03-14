@@ -97,7 +97,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variant_annotation",
         dest="variant_annotation",
-        default="",
+        nargs='?',
         help="""variant annotation file (vcf.gz; e.g., from 1000Genomes project)""",
     )
     parser.add_argument(

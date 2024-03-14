@@ -1,14 +1,20 @@
-"""construct hiearchical agglomerative clustering from MSA"""
+"""\
+construct hiearchical agglomerative clustering from MSA
+from the input MSA, only coverage information will be used and gaps smaller than `max_gap` will be removed
+by default, `fastcluster` is used with cosine metric and average linkage
+output is a npz file containing the linkage matrix 
+EXPERIMENTAL: a sparse version building on pynndescent and gbbs agglomerative clustering, requires several libraries to be installed
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
+    parser.add_argument("--linkage", dest="linkage", help="""required: output file contains linkage""")
     parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
-    parser.add_argument("--distances", dest="distances", help="""distance matrix""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
@@ -19,23 +25,31 @@ def setup_argparse(parser):
     parser.add_argument(
         "--metric",
         dest="metric",
-        default="jaccard",
-        help="""clustering metric [jaccard]""",
+        default="cosine",
+        help="""clustering metric [cosine]""",
     )
     parser.add_argument(
         "--method",
         dest="method",
-        default="complete",
-        help="""clustering method for hierarchical clustering [complete]""",
+        default="average",
+        help="""clustering method for hierarchical clustering [average]""",
     )
-    parser.add_argument("--linkage", dest="linkage", help="""output file contains linkage""")
+    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
+    parser.add_argument(
+        "--ignore_unused_positions",
+        dest="ignore_unused_positions",
+        action="store_true",
+        default=False,
+        help="""ignore positions that have no coverage""",
+    )
     parser.add_argument(
         "--use_sparse",
         dest="use_sparse",
         action="store_true",
         default=False,
-        help="""use sparse nearest-neighbor clustering""",
+        help="""EXPERIMENTAL: use sparse nearest-neighbor clustering""",
     )
+    parser.add_argument("--distances", dest="distances", help="""pre-computed sparse distance matrix""")
     parser.add_argument(
         "--n_neighbors",
         dest="n_neighbors",
@@ -56,14 +70,6 @@ def setup_argparse(parser):
         type=int,
         default=0,
         help="""save full distances for these points in addition to the nearest neighbors [0]""",
-    )
-    parser.add_argument("--nmax", dest="nmax", type=int, help="""use only nmax reads""")
-    parser.add_argument(
-        "--ignore_unused_positions",
-        dest="ignore_unused_positions",
-        action="store_true",
-        default=False,
-        help="""ignore positions that have no coverage""",
     )
 
 
@@ -144,5 +150,5 @@ def run(args):
         else:
             Z = fastcluster.linkage(msa_cleaned.todense(), metric=args.metric, method=args.method)
 
-    logger.info("saving linkage to {0}\n".format(args.linkage))
+    logger.info("saving linkage to {0}".format(args.linkage))
     np.savez(args.linkage, Z=Z)

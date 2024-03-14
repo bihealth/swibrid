@@ -1,4 +1,23 @@
-"""analyze gap statistics"""
+"""\
+analyze breakpoint statistics
+this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters
+homology scores are calculated from binned breakpoint frequencies weighted by homology of bins
+motif scores are calculated from binned breakpoint frequencies weighted by motif occurrences
+output file contains following values:
+- breaks_normalized: number of breaks divided by number of reads / clusters
+- frac_breaks_duplications: fraction of breaks leading to duplication events
+- frac_breaks_inversions: fraction of breaks leading to inversion events
+- frac_breaks_single: fraction of breaks from SM to elsewhere
+- frac_breaks_multiple: fraction of breaks to different regions but not SM
+- frac_breaks_within: fraction of breaks within a region
+- frac_breaks_inversions/duplications_within: frac breaks with inversions/duplications within regions
+- frac_breaks_X_X: fraction of breaks connecting indicated regions
+- spread_XX: spread (standard deviation) of breakpoint positions in a region
+- homology_fw: homology in bins around breakpoint positions (same orientation)
+- homology_rv: homology in bins around breakpoint positions (opposite orientation)
+- homology_fw/rv_XX: homologies for breaks connecting indicated regions
+- donor/receiver_score_XX: motif scores for donor and receiver breakpoints for different motifs, subdivided by region
+"""
 
 
 def setup_argparse(parser):
@@ -6,7 +25,13 @@ def setup_argparse(parser):
         "-g",
         "--gaps",
         dest="gaps",
-        help="""file with gap positions (output of get_gaps.py)""",
+        help="""required: file with gap positions (output of get_gaps.py)""",
+    )
+    parser.add_argument(
+        "-r",
+        "--rearrangements",
+        dest="rearrangements",
+        help="""required: file with inversion/duplication positions (output of find_variants.py)""",
     )
     parser.add_argument(
         "-c",
@@ -15,17 +40,13 @@ def setup_argparse(parser):
         help="""file with clustering results""",
     )
     parser.add_argument(
-        "-s",
-        "--clustering_stats",
-        dest="clustering_stats",
-        help="""file with clustering stats""",
-    )
-    parser.add_argument(
         "-a",
         "--clustering_analysis",
         dest="clustering_analysis",
         help="""file with clustering analysis""",
     )
+    parser.add_argument("-o", "--out", help="""required: output file""")
+    parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument(
         "-b",
         "--binsize",
@@ -51,15 +72,13 @@ def setup_argparse(parser):
     parser.add_argument(
         "--homology",
         dest="homology",
-        help="""file with homology values (output of get_switch_homology.py)""",
+        help="""file with homology values (output of get_switch_homology)""",
     )
     parser.add_argument(
         "--motifs",
         dest="motifs",
-        help="""file with motif counts (output of get_switch_motifs.py)""",
+        help="""file with motif counts (output of get_switch_motifs)""",
     )
-    parser.add_argument("-o", "--out", help="""output file""")
-    parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
     parser.add_argument(
         "--switch_coords",
@@ -73,20 +92,22 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument(
+        "--use_clones",
+        dest="use_clones",
+        help="""comma-separated list of clones to use or 'all' (default: filtered clusters, excluding singletons)""",
+    )
+    parser.add_argument(
+        "--weights",
+        dest="weights",
+        default="cluster",
+        help="""use different weights ("cluster" | "reads" | "adjusted") [cluster]""",
+    )
+    parser.add_argument(
         "--range",
         dest="range",
         default="5",
         help="""range of kmer sizes, e.g., 3,5-7 [5]""",
     )
-    parser.add_argument(
-        "-n",
-        "--ntop",
-        dest="ntop",
-        type=int,
-        default=10,
-        help="""number of top bins to select""",
-    )
-    parser.add_argument("--reference", dest="reference", help="""genome fasta file""")
     parser.add_argument(
         "--top_donor",
         dest="top_donor",
@@ -98,16 +119,14 @@ def setup_argparse(parser):
         help="""output file with top receiver sequences""",
     )
     parser.add_argument(
-        "--use_clones",
-        dest="use_clones",
-        help="""comma-separated list of clones to use or 'all' (default: filtered clusters, excluding singletons)""",
+        "-n",
+        "--ntop",
+        dest="ntop",
+        type=int,
+        default=10,
+        help="""number of top bins to select""",
     )
-    parser.add_argument(
-        "--weights",
-        dest="weights",
-        default="cluster",
-        help="""use different weights ("cluster" | "reads" | "adjusted") [cluster]""",
-    )
+    parser.add_argument("--reference", dest="reference", help="""genome fasta file""")
 
 
 def run(args):
@@ -140,6 +159,7 @@ def run(args):
     binsize = args.binsize
     switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, binsize)
 
+    logger.info("reading gaps from " + args.gaps)
     gaps = np.load(args.gaps)
     nreads = gaps["read_idx"].max() + 1
 
@@ -148,8 +168,6 @@ def run(args):
         clustering = pd.read_csv(args.clustering, header=0, index_col=0)
         clustering = clustering[~clustering["cluster"].isna()]
         nreads = clustering.shape[0]
-        logger.info("reading clustering stats from " + args.clustering_stats)
-        stats = pd.read_csv(args.clustering_stats, header=0, index_col=0).squeeze()
         logger.info("reading clustering analysis from " + args.clustering_analysis)
         analysis = pd.read_csv(args.clustering_analysis, header=0, index_col=0)
         if args.use_clones:
@@ -182,23 +200,17 @@ def run(args):
     else:
         weights = pd.Series(np.ones(nreads) / nreads, index=np.arange(nreads))
 
-    gap_reads = gaps["read_idx"]
-    gap_left = gaps["pos_left"]
-    gap_right = gaps["pos_right"]
+    gap_read = gaps["read_idx"]
+    gap_left = gaps["gap_left"]
+    gap_right = gaps["gap_right"]
     gap_size = gaps["gap_size"]
-    inversion = gaps["inversion"]
-    Leff = Ltot // binsize
 
     # breaks in consistent orientation
-    take = (
-        (gap_size >= args.max_gap)
-        & (gap_left // binsize < Leff)
-        & (gap_right // binsize < Leff)
-        & ~inversion
-    )
+    Leff = Ltot // binsize
+    take = (gap_size >= args.max_gap) & (gap_left // binsize < Leff) & (gap_right // binsize < Leff)
     bp_hist = scipy.sparse.csr_matrix(
         (
-            weights[gap_reads[take]],
+            weights[gap_read[take]],
             (
                 np.minimum(gap_left[take], gap_right[take]) // binsize,
                 np.maximum(gap_left[take], gap_right[take]) // binsize,
@@ -206,34 +218,71 @@ def run(args):
         ),
         shape=(Leff, Leff),
     ).todense()
+    np.nan_to_num(bp_hist, copy=False)
 
-    # breaks with inversions
-    take = (
-        (gap_size >= args.max_gap)
-        & (gap_left // binsize < Leff)
-        & (gap_right // binsize < Leff)
-        & inversion
-    )
-    bp_hist_neg = scipy.sparse.csr_matrix(
-        (
-            weights[gap_reads[take]],
+    if args.rearrangements:
+        logger.info("reading rearrangements from " + args.rearrangements)
+        rearrangements = np.load(args.rearrangements)
+        inv_read = rearrangements["inv_read"]
+        inv_left = rearrangements["inv_left"]
+        inv_right = rearrangements["inv_right"]
+        inv_size = rearrangements["inv_size"]
+
+        # inversions
+        take = (
+            (inv_size >= args.max_gap)
+            & (inv_left // binsize < Leff)
+            & (inv_right // binsize < Leff)
+        )
+        bp_hist_inv = scipy.sparse.csr_matrix(
             (
-                np.maximum(gap_left[take], gap_right[take]) // binsize,
-                np.minimum(gap_left[take], gap_right[take]) // binsize,
+                weights[inv_read[take]],
+                (
+                    np.maximum(inv_left[take], inv_right[take]) // binsize,
+                    np.minimum(inv_left[take], inv_right[take]) // binsize,
+                ),
             ),
-        ),
-        shape=(Leff, Leff),
-    ).todense()
+            shape=(Leff, Leff),
+        ).todense()
+        np.nan_to_num(bp_hist_inv, copy=False)
+
+        dup_read = rearrangements["dup_read"]
+        dup_left = rearrangements["dup_left"]
+        dup_right = rearrangements["dup_right"]
+        dup_size = rearrangements["dup_size"]
+
+        # duplications
+        take = (
+            (dup_size >= args.max_gap)
+            & (dup_left // binsize < Leff)
+            & (dup_right // binsize < Leff)
+        )
+        bp_hist_dup = scipy.sparse.csr_matrix(
+            (
+                weights[dup_read[take]],
+                (
+                    np.maximum(dup_left[take], dup_right[take]) // binsize,
+                    np.minimum(dup_left[take], dup_right[take]) // binsize,
+                ),
+            ),
+            shape=(Leff, Leff),
+        ).todense()
+        np.nan_to_num(bp_hist_dup, copy=False)
+
+    else:
+        bp_hist_inv = np.matrix(np.zeros((Leff, Leff)))
+        bp_hist_dup = np.matrix(np.zeros((Leff, Leff)))
 
     stats = {}
 
     xx, yy = np.meshgrid(np.arange(Leff), np.arange(Leff), indexing="ij")
-    iu = np.triu_indices(Leff)
 
     nbreaks = bp_hist.sum()
-    ninversions = bp_hist_neg.sum()
+    ninversions = bp_hist_inv.sum()
+    nduplications = bp_hist_dup.sum()
     stats["breaks_normalized"] = nbreaks
-    stats["frac_inversions"] = ninversions / (nbreaks + ninversions)
+    stats["frac_breaks_inversions"] = ninversions / (nbreaks + ninversions + nduplications)
+    stats["frac_breaks_duplications"] = nduplications / (nbreaks + ninversions + nduplications)
 
     single_event = ((switch_iis[xx] == "SM") | (switch_iis[yy] == "SM")) & (
         switch_iis[xx] != switch_iis[yy]
@@ -246,11 +295,15 @@ def run(args):
     stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
     stats["frac_breaks_multiple"] = bp_hist[multiple_event].sum() / nbreaks
     stats["frac_breaks_within"] = bp_hist[within_event].sum() / nbreaks
-    stats["frac_inversions_within"] = bp_hist_neg[within_event].sum() / ninversions
+    stats["frac_breaks_inversions_within"] = bp_hist_inv[within_event].sum() / ninversions
+    stats["frac_breaks_duplications_within"] = bp_hist_dup[within_event].sum() / nduplications
 
+    # collapse different gamma and alpha isotypes for frac_breaks, spread and homology scores
+    switch_iis = np.array([si[:2] for si in switch_iis])
     regions = np.unique(switch_iis)
-    if args.switch_coords.split(":")[-1] == "-":
+    if switch_orientation == "-":
         regions = regions[::-1]
+
     for i in range(len(regions)):
         r1 = regions[i]
         for j in range(i + 1):
@@ -258,26 +311,7 @@ def run(args):
             take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
                 switch_iis[xx] == r2
             )
-            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (
-                nbreaks + ninversions
-            )
-            # stats["frac_inversions_{1}_{0}".format(r1, r2)] = bp_hist_neg[take].sum() / ninversions
-
-    # check if certain regions in SM break to different isotypes with different frequencies
-    df = {}
-    for isotype in np.unique(switch_iis):
-        for k, b in enumerate(np.where(switch_iis == "SM")[0]):
-            df[(isotype, k)] = bp_hist[switch_iis == isotype][:, b].sum()
-    m = pd.Series(df).unstack(level=0)
-    stats["SM_downstream_bias"] = (
-        np.nansum(
-            [
-                m.loc[i].sum() * scipy.stats.entropy(m.loc[i], m.sum(0)) / np.log(m.shape[1])
-                for i in m.index
-            ]
-        )
-        / m.sum().sum()
-    )
+            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (nbreaks)
 
     bps = (bp_hist + bp_hist.T).sum(1).A1
     for sr in np.unique(switch_iis):
@@ -289,38 +323,48 @@ def run(args):
 
     if args.homology:
         homology = np.load(args.homology)
-
-        # collapse different gamma and alpha isotypes for homology scores
-        switch_iis = np.array([si[:2] for si in switch_iis])
-        regions = np.unique(switch_iis)
-        if args.switch_coords.split(":")[-1] == "-":
-            regions = regions[::-1]
-
-        for i in range(len(regions)):
-            r1 = regions[i]
-            for j in range(i + 1):
-                r2 = regions[j]
-                take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
-                    switch_iis[xx] == r2
-                )
-                for n in parse_range(args.range):
-                    stats["homology_fw_{1}_{0}".format(r1, r2)] = np.sum(
-                        bp_hist[take].A1 * homology["fw_{0}".format(n)][take]
-                    ) / np.sum(bp_hist[take])
-                    stats["homology_rv_{1}_{0}".format(r1, r2)] = np.sum(
-                        bp_hist[take].A1 * homology["rv_{0}".format(n)][take]
-                    ) / np.sum(bp_hist[take])
+        for n in parse_range(args.range):
+            stats["homology_fw"] = (
+                np.asarray(bp_hist) * homology["fw_{0}".format(n)]
+            ).sum() / np.sum(bp_hist)
+            stats["homology_rv"] = (
+                np.asarray(bp_hist) * homology["rv_{0}".format(n)]
+            ).sum() / np.sum(bp_hist)
+        r1 = regions[0]
+        for r2 in regions[1:]:
+            take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
+                switch_iis[xx] == r2
+            )
+            for n in parse_range(args.range):
+                stats["homology_fw_{0}_{1}".format(r1, r2)] = np.sum(
+                    bp_hist[take].A1 * homology["fw_{0}".format(n)][take]
+                ) / np.sum(bp_hist[take])
+                stats["homology_rv_{0}_{1}".format(r1, r2)] = np.sum(
+                    bp_hist[take].A1 * homology["rv_{0}".format(n)][take]
+                ) / np.sum(bp_hist[take])
 
     if args.motifs:
         motif_counts = np.load(args.motifs)
         for motif in motif_counts.files:
             counts = motif_counts[motif]
-            stats["donor_score_" + motif] = np.sum(bp_hist.sum(0).A1 * counts) / (
+            stats["donor_score_{0}".format(motif)] = np.sum(bp_hist.sum(0).A1 * counts) / (
                 bp_hist.sum(0).A1.sum() * counts.sum()
             )
-            stats["receiver_score_" + motif] = np.sum(bp_hist.sum(1).A1 * counts) / (
+            stats["receiver_score_{0}".format(motif)] = np.sum(bp_hist.sum(1).A1 * counts) / (
                 bp_hist.sum(1).A1.sum() * counts.sum()
             )
+        r1 = regions[0]
+        take1 = switch_iis == r1
+        for r2 in regions[1:]:
+            take2 = switch_iis == r2
+            for motif in motif_counts.files:
+                counts = motif_counts[motif]
+                stats["donor_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                    bp_hist.sum(0).A1[take1] * counts[take1]
+                ) / (bp_hist.sum(0).A1[take1].sum() * counts[take1].sum())
+                stats["donor_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                    bp_hist.sum(1).A1[take2] * counts[take2]
+                ) / (bp_hist.sum(1).A1[take2].sum() * counts[take2].sum())
 
     logger.info("saving results to {0}\n".format(args.out))
     pd.Series(stats).to_csv(args.out, header=False)
@@ -328,13 +372,14 @@ def run(args):
     if args.plot:
         logger.info("creating figure and saving to {0}\n".format(args.plot))
         from matplotlib import pyplot as plt
+        from matplotlib.markers import MarkerStyle
 
         major_ticks = []
         minor_ticks = []
         minor_labels = []
         for rec in anno_recs:
-            start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-            end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+            start = shift_coord(int(rec[3][1]), cov_int)
+            end = shift_coord(int(rec[3][2]), cov_int)
             major_ticks += [start, end]
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])
@@ -345,24 +390,64 @@ def run(args):
 
         scale_factor = args.scale_factor
         assert Leff % scale_factor == 0, "Leff is not a multiple of scale_factor"
-        bph_p = (
+        bph_p = scipy.sparse.csr_matrix(
             np.asarray(bp_hist.T)
             .reshape((Leff, Leff // scale_factor, scale_factor))
             .sum(-1)
             .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
             .sum(1)
         )
-        bph_n = (
-            np.asarray(bp_hist_neg.T)
+        bph_p.eliminate_zeros()
+        bph_i = scipy.sparse.csr_matrix(
+            np.asarray(bp_hist_inv.T)
             .reshape((Leff, Leff // scale_factor, scale_factor))
             .sum(-1)
             .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
             .sum(1)
         )
+        bph_i.eliminate_zeros()
+        bph_d = scipy.sparse.csr_matrix(
+            np.asarray(bp_hist_dup.T)
+            .reshape((Leff, Leff // scale_factor, scale_factor))
+            .sum(-1)
+            .reshape((Leff // scale_factor, scale_factor, Leff // scale_factor))
+            .sum(1)
+        )
+        bph_d.eliminate_zeros()
+
+        #raise Exception('stop')
 
         ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
-        ax.imshow(np.log(bph_p), cmap=plt.cm.Greens, origin="lower", interpolation="none")
-        ax.imshow(np.log(bph_n), cmap=plt.cm.Reds, origin="lower", interpolation="none")
+        ax.scatter(
+            bph_p.nonzero()[1] + .5,
+            bph_p.nonzero()[0] + .5,
+            c=np.log(bph_p.data),
+            cmap=plt.cm.Greens,
+            marker="s",
+            s=15,
+            linewidths=0.2,
+            edgecolors="k",
+        )
+        ax.scatter(
+            bph_i.nonzero()[1] + .5,
+            bph_i.nonzero()[0] + .5,
+            c=np.log(bph_i.data),
+            cmap=plt.cm.Reds,
+            marker=MarkerStyle("o", fillstyle="right"),
+            s=12,
+            linewidths=0.2,
+            edgecolors="k",
+        )
+        ax.scatter(
+            bph_d.nonzero()[1] + .5,
+            bph_d.nonzero()[0] + .5,
+            c=np.log(bph_d.data),
+            cmap=plt.cm.Blues,
+            marker=MarkerStyle("o", fillstyle="left"),
+            s=12,
+            linewidths=0.2,
+            edgecolors="k",
+        )
         ax.set_xlim([Leff // scale_factor, 0])
         ax.set_ylim([Leff // scale_factor, 0])
         ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)
@@ -379,7 +464,8 @@ def run(args):
 
         ax = fig.add_axes([0.12, 0.07, 0.83, 0.15])
         ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "g-", lw=0.5)
-        ax.plot(np.arange(Leff), -(bp_hist_neg + bp_hist_neg.T).mean(0).A1, "r-", lw=0.5)
+        ax.plot(np.arange(Leff), -(bp_hist_inv + bp_hist_inv.T).mean(0).A1, "r-", lw=0.5)
+        ax.plot(np.arange(Leff), (bp_hist_dup + bp_hist_dup.T).mean(0).A1, "b-", lw=0.5)
         ax.set_xlim([Leff, 0])
         ax.set_xticks(np.array(major_ticks) // binsize)
         ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)
@@ -393,7 +479,7 @@ def run(args):
         ax.spines["right"].set_visible(False)
         ax.set_title("1D breakpoint histogram", size="medium")
 
-        fig.savefig(args.plot)
+        fig.savefig(args.plot, dpi=300)
 
     if args.reference and args.top_donor and args.top_receiver:
         genome = pysam.FastaFile(args.reference)

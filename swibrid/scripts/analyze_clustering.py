@@ -1,25 +1,51 @@
-"""analyze clustering"""
+"""analyze clustering\
+given the clustering from `find_clusters` as input, various aggregate statistics are generated per cluster.
+output table contains the following columns:
+- cluster size (# of reads)
+- cluster isotype (most frequent)
+- average read fraction mapped per cluster
+- average read fraction mapped to same region
+- average read fraction ignored
+- consensus sequence
+- length of consensus
+- GC content of consensus
+- spread of breakpoints (number of bases with intermediate coverage)
+- size of inversions
+- size of duplications
+- frequency of inserts in cluster
+- fractional overlap of inserts in cluster
+- fractional overlap of insert-associated breakpoints
+- average insert length
+- average length of gaps around inserts
+- average isotype associated to inserts
+- number of homologous nucleotides around insert-associated breakpoints
+- number of homologous nucleotides around switch breakpoints
+- number of untemplated nucleotides around insert-associated breakpoints
+- number of untemplated nucleotides around switch breakpoints
+- length of different switch regions covered in cluster
+- cluster size adjusted for PCR length and GC bias
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("-o", "--output", dest="output", help="""output""")
+    parser.add_argument(
+        "--clustering",
+        dest="clustering",
+        help="""required: find_clusters.py output file""",
+    )
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("--gaps", dest="gaps", help="""gap distribution""")
+    parser.add_argument("-o", "--output", dest="output", help="""required: output table""")
+    parser.add_argument("--gaps", dest="gaps", help="""required: gap distribution""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
         default=75,
         type=int,
         help="""max gap size to ignore [75]""",
-    )
-    parser.add_argument(
-        "--clustering",
-        dest="clustering",
-        help="""find_clusters.py output file""",
     )
     parser.add_argument(
         "--switch_coords",
@@ -41,6 +67,13 @@ def setup_argparse(parser):
         dest="adjust_size",
         action="store_true",
         help="""calculate cluster size adjusted for fragment length and QC content""",
+    )
+    parser.add_argument(
+        "--isotype_extra",
+        dest="isotype_extra",
+        default=500,
+        type=int,
+        help="""extra space added to define isotypes [500]""",
     )
 
 
@@ -88,8 +121,9 @@ def run(args):
         shape=(len(clusters), len(cinv)),
     )
 
-    avg_coverage = clustering.groupby("cluster")["coverage"].mean()
-    avg_outside_range = clustering.groupby("cluster")["outside_range"].mean()
+    avg_frac_mapped = clustering.groupby("cluster")["frac_mapped"].mean()
+    avg_frac_mapped_multi = clustering.groupby("cluster")["frac_mapped_multi"].mean()
+    avg_frac_ignored = clustering.groupby("cluster")["frac_ignored"].mean()
 
     avg_isotype = (
         clustering.groupby("cluster")["isotype"].agg(lambda x: pd.Series.mode(x)[0]).loc[clusters]
@@ -101,8 +135,15 @@ def run(args):
     logger.info("loading MSA from " + args.msa)
     msa = scipy.sparse.load_npz(args.msa)
 
-    logger.info("getting cluster consensus sequences")
+    logger.info("averaging MSA coverage after removing gaps > {0}".format(args.max_gap))
+    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
+    avg_msa = np.asarray(mm.dot(msa_cleaned).todense())
+    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
+    inversion_size = np.sum(avg_msa < 0, 1)
+    duplication_size = np.sum(avg_msa > 1, 1)
 
+    logger.info("getting cluster consensus sequences")
+    msa.data = msa.data % 10
     nogap = mm.dot(msa != 0)
     means = dict((n, mm.dot(msa == c)) for n, c in ncodes.items())
 
@@ -117,17 +158,13 @@ def run(args):
         cluster_length.append(len(seq))
         cluster_GC.append(
             (seq.count("G") + seq.count("C") + seq.count("g") + seq.count("c")) / len(seq)
+            if len(seq) > 0
+            else 0.5
         )
-
-    logger.info("removing gaps < {0} from MSA".format(args.max_gap))
-    msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
-    logger.info("averaging cleaned MSA")
-    avg_msa = np.asarray(mm.dot(np.abs(msa_cleaned)).todense())
-    break_spread = np.sum((avg_msa > 0) & (avg_msa < 0.95), 1) / avg_msa.sum(1)
 
     try:
         inserts = pd.read_csv(args.inserts, index_col=0, header=0, sep="\t")
-    except pd.errors.EmptyDataError:
+    except (ValueError, pd.errors.EmptyDataError):
         inserts = None
 
     insert_stats = pd.DataFrame(
@@ -147,13 +184,13 @@ def run(args):
 
         def get_insert_isotype(x):
             left_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3]).upper()
                 for rec in intersect_intervals(
                     [
                         (
                             switch_chrom,
-                            x["insert_pos_left"],
-                            x["insert_pos_left"] + 1,
+                            x["insert_pos_left"] - args.isotype_extra,
+                            x["insert_pos_left"] + args.isotype_extra,
                         )
                     ],
                     switch_anno,
@@ -161,13 +198,13 @@ def run(args):
                 )
             )
             right_isotype = ",".join(
-                re.sub("[0-9][A-Za-z]*$", "", rec[3][3])
+                re.sub("[0-9][A-Za-z]*$", "", rec[3][3]).upper()
                 for rec in intersect_intervals(
                     [
                         (
                             switch_chrom,
-                            x["insert_pos_right"],
-                            x["insert_pos_right"] + 1,
+                            x["insert_pos_right"] - args.isotype_extra,
+                            x["insert_pos_right"] + args.isotype_extra,
                         )
                     ],
                     switch_anno,
@@ -253,15 +290,20 @@ def run(args):
         ) - 1, insert_pos.max(axis=1)
 
         inserts = pd.concat([inserts, insert_coords, insert_pos], axis=1)
-        inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
+        if inserts.shape[0] > 0:
+            inserts["insert_isotype"] = inserts.apply(get_insert_isotype, axis=1)
+        else:
+            inserts["insert_isotype"] = pd.Series()
 
         tmp = pd.concat([clustering, inserts], axis=1)
+
         insert_frequency = (
-            tmp.groupby("cluster")["insert"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
+            tmp.groupby("cluster")["inserts"].agg(lambda x: np.mean(~pd.isnull(x))).loc[clusters]
         )
         if tmp.dropna().shape[0] > 0:
             insert_stats = tmp.dropna().groupby("cluster").apply(aggregate_inserts)
 
+    realignment_stats = pd.DataFrame([], columns=["n_homology_switch", "n_untemplated_switch"])
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("reading breakpoint realignments from " + args.realignments)
 
@@ -276,21 +318,20 @@ def run(args):
                 .unstack(level=0)
             )
             realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
-        else:
-            realignment_stats = pd.DataFrame(
-                [], columns=["n_homology_switch", "n_untemplated_switch"]
-            )
 
     df = pd.DataFrame(
         {
             "size": csize,
             "isotype": avg_isotype,
-            "coverage": avg_coverage,
-            "outside_range": avg_outside_range,
+            "frac_mapped": avg_frac_mapped,
+            "frac_mapped_multi": avg_frac_mapped_multi,
+            "frac_ignored": avg_frac_ignored,
             "sequence": cluster_seq,
             "length": cluster_length,
             "GC": cluster_GC,
             "break_spread": break_spread,
+            "inversion_size": inversion_size,
+            "duplication_size": duplication_size,
             "insert_frequency": insert_frequency,
         },
         index=clusters,

@@ -1,9 +1,16 @@
-"""demultiplex reads using output of BLAST against primers and barcodes"""
+"""\
+   demultiplex reads using output of BLAST against primers and barcodes
+
+   BLAST output is created with `blastn -db {barcodes_primers} -query {query} -task blastn-short -max_target_seqs 50 -outfmt "6 saccver qaccver slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -num_threads 1 -perc_identity 50` where {barcodes_primers} is a database containing barcode and primer sequences and {query} is the input fasta file
+
+   optional (but recommended) input is a sample sheet (tab delimited, no header or row names, 1st column barcode, 2nd column sample name)
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("-i", "--input", dest="input", help="""input fastq(.gz)""")
-    parser.add_argument("-b", "--blast", dest="blast", help="""BLAST output file (or stdin)""")
+    parser.add_argument("-i", "--input", dest="input", help="""required: input fastq(.gz)""", required=True)
+    parser.add_argument("-b", "--blast", dest="blast", help="""required: BLAST output file (or stdin)""", required=True)
+    parser.add_argument("-o", "--outdir", dest="outdir", help="""required: output directory""", required=True)
     parser.add_argument(
         "-c",
         "--cutoff",
@@ -26,9 +33,8 @@ def setup_argparse(parser):
         dest="min_reads",
         default=1000,
         type=float,
-        help="""min # of reads required to create separate file [1000]""",
+        help="""min # of reads required to create separate file if no sample sheet is given [1000]""",
     )
-    parser.add_argument("-o", "--outdir", dest="outdir", help="""output directory""")
     parser.add_argument("-f", "--figure", dest="figure", help="""summary figure""")
     parser.add_argument("-r", "--report", dest="report", help="""summary report""")
     parser.add_argument(
@@ -77,7 +83,9 @@ def run(args):
         sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
         whitelist = sample_sheet.index
 
-    assert len(whitelist) == len(whitelist.unique()), "sample sheet contains repeated barcodes. exiting ..."
+    assert len(whitelist) == len(
+        whitelist.unique()
+    ), "sample sheet contains repeated barcodes. exiting ..."
 
     if args.blast is not None:
         logger.info("reading and filtering BLAST output from " + args.blast)
@@ -223,8 +231,7 @@ def run(args):
                     if "primer" in rh[0] and (rh[1] <= args.dist or rh[2] >= len(rec) - args.dist)
                 ]
                 internal = [
-                    rh
-                    for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
+                    rh for rh in read_hits if (rh[1] > args.dist and rh[2] < len(rec) - args.dist)
                 ]
                 ignored = [
                     rh
@@ -365,6 +372,6 @@ def run(args):
         nreads.to_csv(args.report)
 
     if args.figure is not None:
-
         from .plot_demux_report import run as plot_demux_report
+
         plot_demux_report(args)

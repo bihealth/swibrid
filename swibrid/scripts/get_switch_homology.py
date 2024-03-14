@@ -1,18 +1,24 @@
-""" analyze sequence homology within switch region bins by jaccard similarity of k-mers  """
+"""\
+analyze sequence homology within switch region bins by jaccard similarity of k-mers
+from switch region coordinates and a genome file, this script assesses homology of
+pairs of bins by jaccard similarity of k-mer occurrences in forward or reverse orientation
+output is a .npz file with pairwise forward and reverse homology arrays for each value of k
+"""
 
 
 def setup_argparse(parser):
-    parser.add_argument("-g", "--genome", dest="genome", help="""genome fasta file""")
+    parser.add_argument("-g", "--genome", dest="genome", help="""required: genome fasta file""")
+    parser.add_argument("-o", "--output", dest="output", help="""required: output file (npz)""")
+    parser.add_argument(
+        "--switch_annotation",
+        dest="switch_annotation",
+        help="""required: bed file with switch annotation""",
+    )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
         help="""coordinates of switch region [chr14:106050000-106337000:-]""",
-    )
-    parser.add_argument(
-        "--switch_annotation",
-        dest="switch_annotation",
-        help="""bed file with switch annotation""",
     )
     parser.add_argument(
         "-b",
@@ -22,7 +28,6 @@ def setup_argparse(parser):
         default=100,
         help="""binsize [100]""",
     )
-    parser.add_argument("-o", "--output", dest="output", help="""output file (npz)""")
     parser.add_argument(
         "--range",
         dest="range",
@@ -118,8 +123,8 @@ def run(args):
         minor_ticks = []
         minor_labels = []
         for rec in anno_recs:
-            start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-            end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+            start = shift_coord(int(rec[3][1]), cov_int)
+            end = shift_coord(int(rec[3][2]), cov_int)
             major_ticks += [start, end]
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])

@@ -1,37 +1,43 @@
-"""plot clustering"""
+"""\
+given a MSA and clustering results, this will display individual reads mapping over the switch regions
+reads will be ordered as dictated by the linkage, or simply by isotype and cluster value
+reads can be colored by different variables (isotype, cluster, haplotype, coverage, strand, orientation or other columns present in the info file)
+an additional sidebar can display additional variables
+variant positions or breakpoint realignment statistics can also be indicated
+"""
 
 
 def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
-        help="""file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
+        help="""required: file(s) with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("--figure", dest="figure", help="""output figure""")
-    parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
-    parser.add_argument("--info", dest="info", help="""file with read info""")
-    parser.add_argument(
-        "--coords",
-        dest="coords",
-        help="""file with processed read coordinates""",
-    )
+    parser.add_argument("--figure", dest="figure", help="""required: output figure""")
     parser.add_argument(
         "--clustering_results",
         dest="clustering_results",
-        help="""file contains clustering results for extrapolated cutoff""",
+        help="""required: file contains clustering results""",
+    )
+    parser.add_argument(
+        "--switch_annotation",
+        dest="switch_annotation",
+        help="""required: bed file with switch annotation""",
+    )
+    parser.add_argument("--linkage", dest="linkage", help="""file containing flinkage""")
+    parser.add_argument("--sample", dest="sample", help="""sample name (for figure title)""")
+    parser.add_argument("--info", dest="info", help="""file with read info""")
+    parser.add_argument(
+        "--clustering_stats",
+        dest="clustering_stats",
+        help="""file contains clustering stats with cutoff value""",
     )
     parser.add_argument(
         "--cutoff",
         dest="cutoff",
         type=float,
-        help="""use fixed cutoff instead of data-derived""",
+        help="""show cutoff line""",
     )
-    parser.add_argument(
-        "--clustering_stats",
-        dest="clustering_stats",
-        help="""file contains clustering stats""",
-    )
-    parser.add_argument("--linkage", dest="linkage", help="""file contains linkage""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -39,13 +45,9 @@ def setup_argparse(parser):
         help="""coordinates of switch region [chr14:106050000-106337000:-]""",
     )
     parser.add_argument(
-        "--switch_annotation",
-        dest="switch_annotation",
-        help="""bed file with switch annotation""",
-    )
-    parser.add_argument(
         "--annotation",
         dest="annotation",
+        nargs='?',
         help="""bed file with gene annotation""",
     )
     parser.add_argument(
@@ -55,11 +57,21 @@ def setup_argparse(parser):
         help="""color reads by isotype, cluster, haplotype or by other columns present in the "info" file [isotype]""",
     )
     parser.add_argument(
+        "--sidebar_color_by",
+        dest="sidebar_color_by",
+        help="""color sidebar reads by (comma-separated list of) isotype, cluster, haplotype or by other columns present in the "info" file [none]""",
+    )
+    parser.add_argument(
         "--show_inserts",
         dest="show_inserts",
         action="store_true",
         default=False,
         help="""show insert locations""",
+    )
+    parser.add_argument(
+        "--coords",
+        dest="coords",
+        help="""file with processed read coordinates (required if inserts are shown)""",
     )
     parser.add_argument(
         "--no_x_legend",
@@ -98,20 +110,20 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants_table",
         dest="variants_table",
-        help="""file with variant table (from find_variants.py)""",
+        help="""show variant positions from variant table (from find_variants)""",
     )
     parser.add_argument(
         "--variants_matrix",
         dest="variants_matrix",
-        help="""file with variant matrix (from find_variants.py)""",
+        help="""indicate variant occurrences from variant matrix (from find_variants)""",
     )
     parser.add_argument(
         "--haplotypes",
         dest="haplotypes",
-        help="""file with haplotype clustering (from find_variants.py)""",
+        help="""file with haplotype clustering (from find_variants)""",
     )
     parser.add_argument(
-        "--realignments", dest="realignments", help="""file with breakpoint realignments"""
+        "--realignments", dest="realignments", help="""indicate realignment scores with breakpoint realignments"""
     )
     parser.add_argument(
         "--dpi",
@@ -126,11 +138,6 @@ def setup_argparse(parser):
         default=5000,
         type=int,
         help="""plot image in chunks of reads of this size [5000]""",
-    )
-    parser.add_argument(
-        "--plot_circles",
-        dest="plot_circles",
-        help="""plot another graph displaying circular packing of clusters""",
     )
     parser.add_argument(
         "--cmax",
@@ -289,14 +296,15 @@ def run(args):
         switch_anno, switch_chrom, switch_start, switch_end
     )
 
-    logger.info("using annotation from " + args.annotation)
-    annotation = defaultdict(list)
-    for line in open(args.annotation):
-        ls = line.strip("\n").split("\t")
-        chrom = ls[0]
-        start = int(ls[1])
-        end = int(ls[2])
-        annotation[chrom].append((chrom, start, end) + tuple(ls[3:]))
+    if args.annotation:
+        logger.info("using annotation from " + args.annotation)
+        annotation = defaultdict(list)
+        for line in open(args.annotation):
+            ls = line.strip("\n").split("\t")
+            chrom = ls[0]
+            start = int(ls[1])
+            end = int(ls[2])
+            annotation[chrom].append((chrom, start, end) + tuple(ls[3:]))
 
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa).tocsr()
@@ -344,8 +352,8 @@ def run(args):
         )
         values = crank[clustering["cluster"].astype(int)].values % nclust
     elif args.color_by == "isotype":
-        cmap = plt.cm.tab20
-        values = clustering["isotype"].astype("category").cat.codes.values % 20
+        cmap = plt.cm.Set1
+        values = clustering["isotype"].astype("category").cat.codes.values % 9
     elif args.info and args.color_by in read_info.columns:
         info_col = read_info.loc[reads, args.color_by]
         if pd.api.types.is_numeric_dtype(read_info[args.color_by]):
@@ -363,11 +371,18 @@ def run(args):
                         )
                     )
                 )
-            values = info_col.astype("category").cat.codes % 20
-            cmap = plt.cm.tab20
+            ncats = len(info_col.astype("category").cat.categories)
+            if ncats < 9:
+                values = info_col.astype("category").cat.codes % 9
+                cmap = plt.cm.Set1
+            else:
+                values = info_col.astype("category").cat.codes % 20
+                cmap = plt.cm.tab20
     elif args.color_by == "orientation":
         cmap = plt.cm.PiYG
-    elif args.color_by == "strand" and args.info and "primers" in read_info.columns:
+    elif args.color_by == "coverage":
+        cmap = plt.cm.rainbow_r
+    elif args.color_by == "strand" and args.info:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
     elif args.color_by == "haplotype" and args.haplotypes is not None:
@@ -390,7 +405,7 @@ def run(args):
 
     logger.info("creating figure")
 
-    figsize = (args.fig_width, args.fig_height + 0.5)
+    figsize = (args.fig_width, args.fig_height + 1)
     fig = plt.figure(figsize=figsize)
     fig.clf()
 
@@ -398,13 +413,23 @@ def run(args):
     height = args.fig_height / figsize[1]
     linkage_border = args.linkage_border if args.linkage else 0.01
     insert_border = 0.2 if args.show_inserts else 0.01
-    left = linkage_border
-    width = 1 - linkage_border - insert_border
+    if args.sidebar_color_by is not None:
+        sidebar_colors = args.sidebar_color_by.split(',')
+        valid_cols = set(['strand','isotype','cluster','haplotype'])
+        if args.info:
+            valid_cols |= set(read_info.columns)
+        sidebar_colors = [s for s in sidebar_colors if s in valid_cols]
+        num_sidebars = len(sidebar_colors)
+    else:
+        num_sidebars = 0
+    sidebar_width = .01
+    left = .01 + linkage_border + num_sidebars * sidebar_width
+    width = .99 - linkage_border - insert_border - num_sidebars * sidebar_width
 
     if args.linkage:
         logger.info("reading linkage from {0} and creating dendrogram".format(args.linkage))
         Z = np.load(args.linkage)["Z"]
-        ax = fig.add_axes([0.01, bottom, left - 0.02, height])
+        ax = fig.add_axes([0.01, bottom, left - num_sidebars * sidebar_width - .015, height])
         lw = fig.bbox_inches.height * ax.get_position().height * 72 / nreads
         with plt.rc_context({"lines.linewidth": min(lw, 0.5)}):
             L = scipy.cluster.hierarchy.dendrogram(
@@ -437,17 +462,80 @@ def run(args):
     else:
         order = np.lexsort((clustering["cluster"], clustering["isotype"]))[::-1]
 
-    if args.haplotypes:  # and not args.color_by=='haplotype':
-        logger.info("adding haplotype information")
-        ax = fig.add_axes([left - 0.005, bottom, 0.01, height])
-        ht = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values[order][
-            :, np.newaxis
-        ]
-        ax.imshow(ht, aspect="auto", interpolation="none", cmap=plt.cm.coolwarm, vmin=0, vmax=1)
-        ax.set_axis_off()
+    if num_sidebars > 0:
+        logger.info("adding {0} sidebars".format(len(sidebar_colors)))
+        for nsc, sidebar_color in enumerate(sidebar_colors):
+            ax = fig.add_axes([left - (num_sidebars - nsc) * sidebar_width, 
+                               bottom, .9 * sidebar_width, height])
+            if sidebar_color == "isotype":
+                sidebar_values = clustering["isotype"].astype("category").cat.codes.values % 9
+                sidebar_cmap = plt.cm.Set1
+            elif sidebar_color == "cluster":
+                csize = clustering["cluster"].value_counts()
+                nclust = len(csize)
+                crank = pd.Series(range(nclust), csize.index)
+                sidebar_cmap = rand_cmap(
+                    max(2, nclust),
+                    type="bright",
+                    first_color_black=False,
+                    last_color_black=False,
+                    verbose=False,
+                    seed=10,
+                )
+                sidebar_values = crank[clustering["cluster"].astype(int)].values % nclust
+            elif sidebar_color == "haplotype":
+                sidebar_values = haplotypes.loc[
+                    clustering["cluster"].astype(int).values, "haplotype"
+                ].values
+                sidebar_cmap = plt.cm.coolwarm
+            elif args.info and sidebar_color in read_info.columns:
+                info_col = read_info.loc[reads, sidebar_color]
+                if pd.api.types.is_numeric_dtype(read_info[sidebar_color]):
+                    sidebar_values = (
+                        (info_col - info_col.min()) / (info_col.max() - info_col.min())
+                    ).values
+                    sidebar_cmap = plt.cm.cool
+                else:
+                    if sidebar_color in ["primers", "barcodes"]:
+                        info_col = info_col.apply(
+                            lambda x: "+".join(
+                                set(
+                                    map(
+                                        lambda y: re.sub("primer_", "", y.split("@")[0]),
+                                        x.split(";"),
+                                    )
+                                )
+                            )
+                        )
+                    ncats = len(info_col.astype("category").cat.categories)
+                    if ncats < 9:
+                        sidebar_values = info_col.astype("category").cat.codes.values % 9
+                        sidebar_cmap = plt.cm.Set1
+                    else:
+                        sidebar_values = info_col.astype("category").cat.codes.values % 20
+                        sidebar_cmap = plt.cm.tab20
+            elif sidebar_color == "strand":
+                sidebar_values = (clustering["orientation"].values == "+").astype(int) + 1
+                sidebar_cmap = plt.cm.PiYG
+            else:
+                logger.warn("no info on {0}!".format(sidebar_color))
+                sidebar_values = np.array([0.3] * nreads)
+                sidebar_cmap = plt.cm.Greys
+
+            ax.imshow(
+                sidebar_values[order, np.newaxis],
+                aspect="auto",
+                interpolation="nearest",
+                cmap=sidebar_cmap,
+                vmin=0,
+                vmax=max(1, sidebar_values.max()),
+            )
+            ax.set_axis_off()
+            ax.set_title(sidebar_color, rotation=45, size=4, ha='left')
 
     logger.info("plotting MSA")
     ax = fig.add_axes([left, bottom, width, height])
+    ax.set_facecolor('w')
 
     # plot the image in chunks
     nchunks = np.ceil(nreads / args.chunksize).astype(int)
@@ -469,6 +557,9 @@ def run(args):
             im[(i[pos], j[pos])] = 0.8
             im[(i[neg], j[neg])] = 0.1
             values = np.array([0, 1])
+        elif args.color_by == "coverage":
+            im[np.nonzero(msa_chunk)] = (msa_chunk.data // 10 + 2) / 4
+            values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
             im[np.nonzero(msa_chunk)] = tmp[np.nonzero(msa_chunk)]
@@ -488,7 +579,7 @@ def run(args):
             use = np.isin(y, variants["rel_pos"])
             ax.scatter(
                 y[use],
-                nreads - (x[use] + n * args.chunksize),
+                nreads - (x[use] + n * args.chunksize) - .5,
                 marker=".",
                 lw=0,
                 s=0.1,
@@ -500,7 +591,7 @@ def run(args):
             ax.imshow(
                 im,
                 aspect="auto",
-                interpolation="none",
+                interpolation="nearest",
                 cmap=cmap,
                 extent=extent,
                 vmin=0,
@@ -533,8 +624,8 @@ def run(args):
     minor_ticks = []
     minor_labels = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-        end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+        start = shift_coord(int(rec[3][1]), cov_int) 
+        end = shift_coord(int(rec[3][2]), cov_int) 
         major_ticks += [start, end]
         minor_ticks.append((start + end) / 2)
         minor_labels.append(rec[3][3])
@@ -570,20 +661,14 @@ def run(args):
     ax.set_ylim(ylim)
 
     if args.show_inserts:
-        if not args.coords:
-            logger.warn("need processed read coordinates to show inserts!")
-            exit(1)
-        read_inserts = {}
+        assert args.coords is not None, "need processed read coordinates to show inserts!"
+
         logger.info("reading processed read coordinates from {0}".format(args.coords))
-        for line in open(args.coords):
-            ls = line.strip("\n").split("\t")
-            read = ls[0]
-            inserts = []
-            for ll in ls[4:]:
-                if "insert" in ll:
-                    inserts.append(decode_insert(ll))
-            if len(inserts) > 0 and read in reads:
-                read_inserts[read] = inserts
+        process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0)
+        read_inserts = dict(
+            (read, [decode_insert(insert) for insert in inserts.split(";")])
+            for read, inserts in process["inserts"].dropna().items()
+        )
 
         stat_string = (
             "{0}: {1} reads "
@@ -620,7 +705,7 @@ def run(args):
         n = nreads + 0.5 * dn
 
         arrows = []
-        for read in clustering.iloc[order].dropna(subset=["insert"]).index:
+        for read in clustering.iloc[order].dropna(subset=["inserts"]).index:
             p = nreads - reads[order].get_loc(read) - 1
             for m in read_inserts[read]:
                 insert_chrom = m.group("insert_chrom")
@@ -634,14 +719,14 @@ def run(args):
                     switch_right, switch_left = switch_left, switch_right
                 insert = (insert_chrom, insert_start, insert_end)
                 ax.plot(
-                    shift_coord(switch_left, cov_int) - eff_start,
+                    shift_coord(switch_left, cov_int),
                     p + 0.5,
                     ">",
                     color="k",
                     markersize=0.5,
                 )
                 ax.plot(
-                    shift_coord(switch_right, cov_int) - eff_start,
+                    shift_coord(switch_right, cov_int),
                     p + 0.5,
                     "<",
                     color="k",
@@ -660,8 +745,9 @@ def run(args):
                 arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
                 insert_pos[uinsert] = n + 0.5
                 insert_anno = set()
-                for rec in intersect_intervals([uinsert], annotation[uinsert[0]], loj=True):
-                    insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
+                if args.annotation:
+                    for rec in intersect_intervals([uinsert], annotation[uinsert[0]], loj=True):
+                        insert_anno.add(re.sub(".exon[0-9]*", "", rec[3][3]))
                 if len(insert_anno) == 0 or insert_anno == set("."):
                     insert_anno = "{0}:{1}-{2}".format(*uinsert)
                 else:
@@ -701,12 +787,12 @@ def run(args):
 
             pleft = (
                 realignments["pos_left"]
-                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int))
                 .values
             )
             pright = (
                 realignments["pos_right"]
-                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int) - eff_start)
+                .apply(lambda x: shift_coord(int(x.split(":")[1]), cov_int))
                 .values
             )
             nh = realignments["n_homology"].values
@@ -731,49 +817,3 @@ def run(args):
     if args.figure is not None:
         logger.info("saving figure to {0}".format(args.figure))
         fig.savefig(args.figure, dpi=args.dpi)
-
-    if args.plot_circles is not None:
-        if not args.color_by == "cluster":
-            logger.error("can't create bubble chart when not coloring by cluster!")
-        logger.info("creating bubble chart")
-
-        if nclust < 500:
-            import circlify
-
-            circles = circlify.circlify(
-                clustering["cluster"].value_counts().tolist(),
-                show_enclosure=False,
-                target_enclosure=circlify.Circle(x=0, y=0, r=1),
-            )
-        else:
-            import packcircles
-
-            circles = packcircles.pack(np.sqrt(clustering["cluster"].value_counts())[::-1].tolist())
-
-        figsize = (args.fig_height + 0.5, args.fig_height + 0.5)
-        fig = plt.figure(figsize=figsize)
-        fig.clf()
-
-        ax = fig.add_axes([bottom, bottom, width, width])
-        ax.axis("off")
-
-        lim = 0
-        for n, (x, y, r) in enumerate(circles):
-            ax.add_patch(
-                plt.Circle(
-                    (x, y),
-                    r,
-                    facecolor=cmap(nclust - n - 1),
-                    edgecolor="k",
-                    linewidth=0.25,
-                    clip_on=False,
-                )
-            )
-            m = max(abs(x) + r, abs(y) + r)
-            if m > lim:
-                lim = m
-        ax.set_xlim(-lim, lim)
-        ax.set_ylim(-lim, lim)
-
-        logger.info("saving bubble chart to " + args.plot_circles)
-        fig.savefig(args.plot_circles, dpi=args.dpi)

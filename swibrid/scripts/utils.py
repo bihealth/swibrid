@@ -20,7 +20,7 @@ IUPAC = {
     "N": "[ACGT]",
 }
 
-RC = {"A": "T", "C": "G", "G": "C", "T": "A"}
+RC = {"A": "T", "C": "G", "G": "C", "T": "A", "N": "N"}
 
 
 def parse_switch_coords(switch_coords):
@@ -61,7 +61,7 @@ def get_switch_coverage(switch_anno, switch_chrom, switch_start, switch_end):
     return cov_int, Ltot, eff_start, eff_end, anno_recs
 
 
-def merge_intervals(intervals):
+def merge_intervals(intervals, add_count=False):
     """interval merging function from here: http://codereview.stackexchange.com/questions/69242/merging-overlapping-intervals but extended to include chromosome as first entry of tuple"""
 
     sorted_by_lower_bound = sorted(intervals, key=lambda tup: (tup[0], tup[1]))
@@ -69,7 +69,7 @@ def merge_intervals(intervals):
 
     for higher in sorted_by_lower_bound:
         if not merged:
-            merged.append(higher)
+            merged.append(higher + ((1,) if add_count else ()))
         else:
             lower = merged[-1]
             # test for intersection between lower and higher:
@@ -80,9 +80,10 @@ def merge_intervals(intervals):
                     lower[0],
                     lower[1],
                     upper_bound,
-                )  # replace by merged interval
+                )  + ((merged[-1][3] + 1,) if add_count else ()) # replace by merged interval
+                
             else:
-                merged.append(higher)
+                merged.append(higher + ((1,) if add_count else ()))
 
     return merged
 
@@ -293,7 +294,7 @@ def nonzero_intervals(vec, start):
 
 
 def shift_coord(coord, cov_int, ignore=False):
-    shift = 0
+    shift = cov_int[0][0]
     for k in range(1, len(cov_int)):
         if coord >= cov_int[k][0]:
             shift += cov_int[k][0] - cov_int[k - 1][1]
@@ -342,16 +343,19 @@ def res2(p, x, y):
     return np.log(f2(p, x)) - np.log(y)
 
 
-def get_gap_positions(msa):
+def get_gap_positions(msa, max_gap=25):
+    # get indices of nonzero elements
     ii, jj = msa.nonzero()
-    cps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
-    pos_left = jj[cps] + 1
-    pos_right = pos_left + np.diff(jj)[cps] - 1
-    read_idx = ii[cps]
-    gap_sizes = pos_right - pos_left
-    inversions = np.sign(msa.data[cps]) != np.sign(msa.data[cps + 1])
+    # find all "normal" breakpoint positions (between empty and nonzero)
+    bps = np.where((np.diff(jj) > 1) & (np.diff(ii) == 0))[0]
+    gap_left = jj[bps] + 1
+    gap_right = jj[bps] + np.diff(jj)[bps]
+    gap_read = ii[bps]
+    gap_size = gap_right - gap_left
 
-    return read_idx, pos_left, pos_right, gap_sizes, inversions
+    assert np.all(gap_size >= 0), "negative gap sizes!"
+
+    return gap_read, gap_left, gap_right, gap_size
 
 
 def vrange(starts, stops):
@@ -384,27 +388,28 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     import scipy.sparse
 
     if gaps is None:
-        read_idx, pos_left, pos_right, gap_sizes, inversions = get_gap_positions(msa)
+        read_idx, pos_left, pos_right, gap_size = get_gap_positions(msa)
     else:
         read_idx = gaps["read_idx"]
-        pos_left = gaps["pos_left"]
-        pos_right = gaps["pos_right"]
-        gap_sizes = gaps["gap_size"]
-    remove = gap_sizes <= max_gap
-    gaps_to_remove = gap_sizes[remove]
+        gap_left = gaps["gap_left"]
+        gap_right = gaps["gap_right"]
+        gap_size = gaps["gap_size"]
+
+    remove = gap_size <= max_gap
+    gaps_to_remove = gap_size[remove]
     read_idx_to_remove = np.repeat(read_idx[remove], gaps_to_remove)
-    pos_idx_to_remove = vrange(pos_left[remove], pos_right[remove])
+    pos_idx_to_remove = vrange(gap_left[remove], gap_right[remove])
 
     if return_sparse:
         msa_cleaned = scipy.sparse.csr_matrix(
-            (np.sign(msa.data), (msa.row, msa.col)), shape=msa.shape, dtype=np.int8
+            (msa.data // 10, (msa.row, msa.col)), shape=msa.shape, dtype=np.int8
         ).tolil()
         vals_replace = np.repeat(
             np.max(
                 np.array(
                     [
-                        msa_cleaned[(read_idx, pos_left - 1)].todense().A1,
-                        msa_cleaned[(read_idx, pos_right)].todense().A1,
+                        msa_cleaned[(read_idx, gap_left - 1)].todense().A1,
+                        msa_cleaned[(read_idx, gap_right)].todense().A1,
                     ]
                 ),
                 0,
@@ -415,11 +420,11 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
         return msa_cleaned.tocsr()
     else:
         msa_cleaned = np.zeros(msa.shape, dtype=np.int8)
-        msa_cleaned[(msa.row, msa.col)] = np.sign(msa.data)
+        msa_cleaned[(msa.row, msa.col)] = msa.data // 10
         vals_replace = np.repeat(
             np.max(
                 np.array(
-                    [msa_cleaned[(read_idx, pos_left - 1)], msa_cleaned[(read_idx, pos_right)]]
+                    [msa_cleaned[(read_idx, gap_left - 1)], msa_cleaned[(read_idx, gap_right)]]
                 ),
                 0,
             )[remove],
@@ -494,8 +499,8 @@ def nmf_consistency(U_max, U_all):
 def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
     switch_iis = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) - eff_start
-        end = shift_coord(int(rec[3][2]), cov_int) - eff_start
+        start = shift_coord(int(rec[3][1]), cov_int) 
+        end = shift_coord(int(rec[3][2]), cov_int) 
         switch_iis.append([rec[3][3].upper()] * (end // binsize - start // binsize))
     return np.concatenate(switch_iis)
 

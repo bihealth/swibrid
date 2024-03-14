@@ -1,23 +1,46 @@
-"""process alignments"""
-
+"""\
+process alignments: 
+for an input file with aligned reads (MAF if LAST output, SAM if minimap2 output), 
+get alignments to switch regions and elsewhere (potential inserts)
+output table contains 
+- isotype
+- read orientation
+- read coverage
+- fraction of read sequence mapping to the same genomic regions
+- mapped switch region segments 
+- inserts 
+aligned sequences can be saved separately (necessary to then construct a pseudo MSA)
+reads are removed if 
+- they are too short
+- they don't contain a forward and reverse primer
+- they contain internal primers
+- they contain no switch region
+- if mapped regions on the genome are much shorter than mapped parts of the read
+- there's too much overlap between different alignments on the read, or on the genome
+- too little of the read maps
+- alignments to the switch region are in the wrong order
+- the isotype cannot be determined
+if `--realign_breakpoints` is set, 20nt on each side of a breakpoint are re-aligned, and statistics like number of homologous or untemplated bases are extracted
+"""
 
 def setup_argparse(parser):
     parser.add_argument(
         "--alignments",
         dest="alignments",
-        help="""MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)""",
-    )
-    parser.add_argument(
-        "--telo",
-        dest="telo",
-        help="""output of blasting reads against telomer repeats""",
+        help="""required: MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)""",
     )
     parser.add_argument(
         "--outfile",
         dest="outfile",
-        help="""output table with processed reads""",
+        help="""required: output table with processed reads""",
     )
-    parser.add_argument("--stats", dest="stats", help="""output stats""")
+    parser.add_argument("--info", dest="info", help="""required: csv file with read info""")
+    parser.add_argument(
+        "--sequences",
+        dest="sequences",
+        help="""save sequence alignment to reference for pseudo-multiple alignment""",
+    )
+    parser.add_argument("--stats", dest="stats", help="""output stats on removed reads""")
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -30,11 +53,38 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument(
+        "--min-length",
+        dest="min_length",
+        default=500,
+        type=int,
+        help="""minimum read length""",
+    )
+    parser.add_argument(
+        "--only-complete",
+        dest="only_complete",
+        action="store_true",
+        default=False,
+        help="""use only complete reads with two primers""",
+    )
+    parser.add_argument(
+        "--keep-internal",
+        dest="keep_internal",
+        action="store_true",
+        default=False,
+        help="""keep reads with internal primers""",
+    )
+    parser.add_argument(
+        "--telo",
+        dest="telo",
+        default="",
+        help="""output of blasting reads against telomer repeats""",
+    )
+    parser.add_argument(
         "--min_switch_match",
         dest="min_switch_match",
         default=100,
         type=int,
-        help="""min match length to switch region on both sides [100]""",
+        help="""min match length to switch region on both sides of an insert[100]""",
     )
     parser.add_argument(
         "--max_switch_overlap",
@@ -55,7 +105,7 @@ def setup_argparse(parser):
         dest="max_overlap",
         default=50,
         type=int,
-        help="""max overlap between switch and insert parts [50]""",
+        help="""max overlap between switch and insert parts (on the read) [50]""",
     )
     parser.add_argument(
         "--min_insert_match",
@@ -90,7 +140,7 @@ def setup_argparse(parser):
         dest="isotype_extra",
         default=200,
         type=int,
-        help="""extra space added to define isotypes""",
+        help="""extra space added to define isotypes [200]""",
     )
     parser.add_argument(
         "--telo_cutoff",
@@ -107,18 +157,9 @@ def setup_argparse(parser):
         help="""minimum matchlen for telomeric repeat matches [25]""",
     )
     parser.add_argument(
-        "--sequences",
-        dest="sequences",
-        help="""save sequence alignment to reference for pseudo-multiple alignment""",
-    )
-    parser.add_argument(
-        "--interrupt_for_read",
-        dest="interrupt_for_read",
-        help="""interrupt for specified read(s)""",
-    )
-    parser.add_argument(
         "--blacklist_regions",
         dest="blacklist_regions",
+        nargs='?',
         help="""ignore inserts from blacklist regions defined in this bed file""",
     )
     parser.add_argument(
@@ -128,6 +169,11 @@ def setup_argparse(parser):
     )
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with unaligned reads""")
     parser.add_argument("--genome", dest="genome", help="""reference genome file""")
+    parser.add_argument(
+        "--interrupt_for_read",
+        dest="interrupt_for_read",
+        help="""(for debugging) interrupt for specified read(s)""",
+    )
 
 
 def parse_sam(sam_input, min_gap=75):
@@ -224,12 +270,17 @@ def parse_sam(sam_input, min_gap=75):
 
 def parse_maf(alignments, min_gap=75):
     import re
+    import gzip
     from Bio import AlignIO
 
     read_matches = []
     read_id = ""
 
-    for ref, read in AlignIO.parse(alignments, "maf", seq_count=2):
+    for ref, read in AlignIO.parse(
+        gzip.open(alignments, "rt") if alignments.endswith(".gz") else open(alignments),
+        "maf",
+        seq_count=2,
+    ):
         read_name = read.id
         read_start = read.annotations["start"]
         read_len = read.annotations["srcSize"]
@@ -408,6 +459,9 @@ def realign_breakpoints(matches, genome, read_seq, pad=20):
                 matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
             ).upper()
 
+        if gseq1 == '' or gseq2 == '' or rseq == '':
+            continue
+
         # al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
         # al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
 
@@ -465,6 +519,7 @@ def run(args):
     import pandas as pd
     from Bio import SeqIO, Seq, SeqRecord
     import gzip
+    import re
     from logzero import logger
     from .utils import (
         parse_switch_coords,
@@ -474,16 +529,10 @@ def run(args):
         merge_intervals,
     )
 
-    if args.realign_breakpoints is not None:
-        import pysam
-
-        logger.info("getting raw reads from " + args.raw_reads)
-        raw_reads = SeqIO.index(args.raw_reads, "fasta")
-        logger.info("loading genomes from " + args.genome)
-        genome = pysam.FastaFile(args.genome)
-
-    if args.telo:
+    if os.path.isfile(args.telo):
         telo = pd.read_csv(args.telo, index_col=0, sep="\t")
+    else:
+        telo = None
 
     if args.blacklist_regions is not None and os.path.isfile(args.blacklist_regions):
         blacklist_regions = sorted(
@@ -505,24 +554,38 @@ def run(args):
     switch_anno = read_switch_anno(args.switch_annotation)
 
     stats = {
-        "nreads": 0,
-        "no_switch": 0,
-        "length_mismatch": 0,
-        "overlap_mismatch": 0,
-        "inversions": 0,
-        "low_cov": 0,
-        "switch_order": 0,
-        "small_gap": 0,
-        "no_isotype": 0,
+        "nreads_initial": 0,
+        "nreads_mapped": 0,
+        "nreads_removed_short": 0,
+        "nreads_removed_incomplete": 0,
+        "nreads_removed_internal_primer": 0,
+        "nreads_removed_no_switch": 0,
+        "nreads_removed_length_mismatch": 0,
+        "nreads_removed_overlap_mismatch": 0,
+        "nreads_inversions": 0,
+        "nreads_removed_low_cov": 0,
+        "nreads_removed_switch_order": 0,
+        "nreads_removed_no_isotype": 0,
     }
 
+    if args.realign_breakpoints is not None:
+        processed_matches = {}
+
+    logger.info("reading read info from " + args.info)
+    read_info = pd.read_csv(args.info, header=0, index_col=0)
+    stats["nreads_initial"] = read_info.shape[0]
+
     logger.info("processing reads from " + args.alignments)
-    if args.alignments.endswith(".sam"):
+    if args.alignments.endswith(".bam") or args.alignments.endswith(".bam"):
         alignments = parse_sam(args.alignments, min_gap=args.min_gap)
     else:
         alignments = parse_maf(args.alignments, min_gap=args.min_gap)
 
     outf = open(args.outfile, "w")
+    outf.write(
+        "read\tisotype\torientation\tfrac_mapped\tfrac_mapped_multi\tswitch_mappings\tinserts\n"
+    )
+
     if args.sequences is not None:
         seq_out = (
             gzip.open(args.sequences, "wt")
@@ -534,7 +597,37 @@ def run(args):
 
     for read, matches in alignments:
         use = True
-        stats["nreads"] += 1
+        stats["nreads_mapped"] += 1
+
+        # filter reads based on length
+        if read_info.loc[read, "length"] < args.min_length:
+            stats["nreads_removed_short"] += 1
+            use = False
+
+        # check for primers
+        if pd.isna(read_info.loc[read, "primers"]):
+            primers = set()
+        else:
+            primers = set(
+                map(
+                    lambda x: re.sub("primer_|_[1-9]", "", x.split("@")[0]),
+                    read_info.loc[read, "primers"].split(";"),
+                )
+            )
+
+        if args.only_complete and not (
+            any("rv" in p for p in primers) and any("fw" in p for p in primers)
+        ):
+            stats["nreads_removed_incomplete"] += 1
+            use = False
+
+        internal = read_info.loc[read, "internal"]
+        if not args.keep_internal and not pd.isna(internal) and "primer" in internal:
+            stats["nreads_removed_internal_primer"] += 1
+            use = False
+
+        if not use:
+            continue
 
         # collect parts matching to switch region
         switch_matches = []
@@ -553,6 +646,7 @@ def run(args):
             orientation,
             aligned_seq,
         ) in matches:
+
             assert (
                 read_len > 0 and ref_len > 0 and tot_read_len > 0
             ), "negative lengths in parsed alignments!"
@@ -596,7 +690,7 @@ def run(args):
                 )
 
         # check for telomer matches from demultiplexing
-        if args.telo and read in telo.index:
+        if telo is not None and read in telo.index:
             telo_matches = []
             for _, df in telo.loc[[read]].iterrows():
                 if df["pident"] > args.telo_cutoff and df["length"] > args.min_telo_matchlen:
@@ -635,7 +729,7 @@ def run(args):
         )
 
         if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap:
-            stats["overlap_mismatch"] += 1
+            stats["nreads_removed_overlap_mismatch"] += 1
             logger.warn(
                 "overlap mismatch (read: {0}, ref {1}) for read {2}".format(
                     read_overlap, ref_overlap, read
@@ -740,7 +834,7 @@ def run(args):
 
         # take only reads matching to switch region (only once enough?)
         if len(switch_matches) == 0:
-            stats["no_switch"] += 1
+            stats["nreads_removed_no_switch"] += 1
             use = False
 
         # merge the switch mappings and sort them by genomic coordinate
@@ -763,21 +857,8 @@ def run(args):
         if sum(sm[4] - sm[3] for sm in switch_matches) < 0.7 * sum(
             sm[1] - sm[0] for sm in switch_matches
         ):
-            stats["length_mismatch"] += 1
+            stats["nreads_removed_length_mismatch"] += 1
             use = False
-
-        # check that there are no small gaps < args.min_gap
-        # switch_maps = defaultdict(list)
-        # for rec in intersect_intervals(read_mappings, switch_anno, loj=False):
-        #    if rec[3][3].startswith("S"):
-        #        switch_maps[rec[3][3]].append((rec[1], rec[2]))
-
-        # gaps = [
-        #    val[i][1] - val[i - 1][0] for val in switch_maps.values() for i in range(1, len(val))
-        # ]
-        # if len(gaps) > 0 and min(gaps) < args.min_gap:
-        #    stats["small_gap"] += 1
-        #    use = False
 
         # check that more than args.min_cov of the read maps to the genome
         if any(fi[8] < fi[7] for fi in filtered_inserts):
@@ -786,12 +867,16 @@ def run(args):
             fi[8] - fi[7] for fi in filtered_inserts
         )
         if tot_cov / tot_read_len < args.min_cov:
-            stats["low_cov"] += 1
+            stats["nreads_removed_low_cov"] += 1
             use = False
 
         # check how much genomic sequence is covered multiple times
-        unmerged_switch_coverage = sum(sm[4] - sm[3] for sm in switch_matches)
-        merged_switch_coverage = sum(rm[2] - rm[1] for rm in read_mappings)
+        unmerged_switch_coverage = sum(sm[4] - sm[3] for sm in switch_matches) + sum(
+            fi[8] + fi[7] for fi in filtered_inserts
+        )
+        merged_switch_coverage = sum(rm[2] - rm[1] for rm in read_mappings) + sum(
+            fi[8] + fi[7] for fi in filtered_inserts
+        )
 
         # check that switch matches are in consistent order along the read and the genome (but ignore inverted segments)
         read_order = np.argsort([sm[0] for sm in switch_matches if sm[5] == main_orientation])
@@ -799,12 +884,8 @@ def run(args):
         if main_orientation == -1:
             genomic_order = genomic_order[::-1]
         if not (read_order == genomic_order).all():
-            stats["switch_order"] += 1
+            stats["nreads_removed_switch_order"] += 1
             use = False
-
-        if args.interrupt_for_read and read in args.interrupt_for_read:
-            print([sm[:5] for sm in switch_matches])
-            break
 
         # isotype
         isotype = ""
@@ -827,39 +908,37 @@ def run(args):
 
         if isotype == "":
             use = False
-            stats["no_isotype"] += 1
+            stats["nreads_removed_no_isotype"] += 1
 
         if orientations["1"] > 0 and orientations["-1"] > 0:
-            stats["inversions"] += 1
+            stats["nreads_inversions"] += 1
+
+        if args.interrupt_for_read and read in args.interrupt_for_read:
+            print(read,[sm[:7] for sm in matches])
+            #raise Exception("stop")
 
         if not use:
             continue
 
         outf.write(
-            "{0}\t{1}\t{2}\t{3:.4f}".format(
+            "{0}\t{1}\t{2}\t{3:.4f}\t{4:.4f}\t".format(
                 read,
                 isotype,
                 "+" if main_orientation == 1 else "-",
                 tot_cov / tot_read_len,
+                1 - merged_switch_coverage / unmerged_switch_coverage,
             )
         )
-        # outf.write("\t{0:.4f}".format(unmerged_switch_coverage / merged_switch_coverage)
-        for chrom, start, end, orientation in read_mappings:
-            outf.write("\t{0}:{1}-{2}:{3}".format(chrom, start, end, orientation))
-        for (
-            chrom,
-            start,
-            end,
-            left,
-            gapl,
-            right,
-            gapr,
-            istart,
-            iend,
-            orientation,
-        ) in filtered_inserts:
-            outf.write(
-                ("\tinsert_{0}:{1}_{2}_{3}-{4}_{5}_" "{6}:{7}-{8}_{9}_{10}:{11}").format(
+        outf.write(
+            ";".join(
+                "{0}:{1}-{2}:{3}".format(chrom, start, end, orientation)
+                for chrom, start, end, orientation in read_mappings
+            )
+        )
+        outf.write("\t")
+        outf.write(
+            ";".join(
+                "insert_{0}:{1}_{2}_{3}-{4}_{5}_{6}:{7}-{8}_{9}_{10}:{11}".format(
                     switch_chrom,
                     left,
                     gapl,
@@ -873,42 +952,51 @@ def run(args):
                     switch_chrom,
                     right,
                 )
+                for (
+                    chrom,
+                    start,
+                    end,
+                    left,
+                    gapl,
+                    right,
+                    gapr,
+                    istart,
+                    iend,
+                    orientation,
+                ) in filtered_inserts
             )
+        )
 
         outf.write("\n")
 
         # write genomic alignments to fasta file for MSA construction
         if args.sequences is not None:
-            seq = ["-" * (rm[2] - rm[1]) for rm in read_mappings]
-            for (
-                read_start,
-                read_end,
-                ref_chrom,
-                ref_start,
-                ref_end,
-                orientation,
-                aligned_seq,
-            ) in switch_matches:
-                for k, rm in enumerate(read_mappings):
-                    if ref_start >= rm[1] and ref_end <= rm[2]:
-                        seq[k] = (
-                            seq[k][: (ref_start - rm[1])]
-                            + aligned_seq
-                            + seq[k][(ref_end - rm[1]) :]
-                        )
-            sequences = []
-            for k, rm in enumerate(read_mappings):
-                sequences.append(
-                    SeqRecord.SeqRecord(
-                        Seq.Seq(seq[k]),
-                        id="{0}@{1}:{2}-{3}:{4}".format(read, *rm),
-                    )
+            sequences = (
+                SeqRecord.SeqRecord(
+                    Seq.Seq(aligned_seq),
+                    id="{0}@{1}:{2}-{3}:{4}".format(
+                        read,
+                        ref_chrom,
+                        ref_start,
+                        ref_end,
+                        "+" if orientation == main_orientation else "-",
+                    ),
                 )
+                for (
+                    read_start,
+                    read_end,
+                    ref_chrom,
+                    ref_start,
+                    ref_end,
+                    orientation,
+                    aligned_seq,
+                ) in switch_matches
+            )
             SeqIO.write(sequences, seq_out, "fasta")
 
         # re-align breakpoints
         if args.realign_breakpoints is not None:
-            processed_matches = sorted(
+            processed_matches[read] = sorted(
                 [sm[:6] + ("switch",) for sm in switch_matches]
                 + [
                     (f[7], f[8], f[0], f[1], f[2], f[9], "insert")
@@ -917,9 +1005,6 @@ def run(args):
                 ],
                 key=operator.itemgetter(0),
             )
-            realignments[read] = realign_breakpoints(
-                processed_matches, genome, str(raw_reads[read].seq)
-            )
 
     outf.close()
     if args.sequences is not None:
@@ -927,9 +1012,28 @@ def run(args):
 
     logger.info("done. saving stats to " + args.stats)
     if args.stats:
-        pd.Series(stats).to_csv(args.stats)
+        pd.Series(stats).to_csv(args.stats, header=False)
 
     if args.realign_breakpoints is not None:
+        import pysam
+
+        logger.info("loading genomes from " + args.genome)
+        genome = pysam.FastaFile(args.genome)
+
+        logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
+        for rec in SeqIO.parse(
+            gzip.open(args.raw_reads, "rt")
+            if args.raw_reads.endswith(".gz")
+            else open(args.raw_reads),
+            "fastq",
+        ):
+            if rec.id not in processed_matches:
+                continue
+
+            realignments[rec.id] = realign_breakpoints(
+                processed_matches[rec.id], genome, str(rec.seq)
+            )
+
         logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)
         df = pd.DataFrame(
             [pd.Series(al, name=read) for read, als in realignments.items() for al in als]

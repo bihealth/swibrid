@@ -1,0 +1,39 @@
+ENV: "swibrid"
+SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p" 
+STUDY: "test"
+INPUT: ""
+SAMPLE_SHEET: ""
+SAMPLES: ["test1", "test2"] 
+MINLENGTH: 500
+BARCODES_PRIMERS: ''
+GENOME: 'hs1'
+REFERENCE: 'index/hg38_chr14_105-106MB.fa'
+SWITCH: 'chr14_switch:583000-872000:-'
+SWITCH_ANNOTATION: 'index/hg38_chr14_105-106MB_switch_regions.bed'
+LAST_INDEX: 'index/hg38_chr14_105-106MBdb'
+MINIMAP_INDEX: ''
+ALIGNER: 'LAST'
+TELO_REPEAT: ''
+NMAX: 50000
+MAX_GAP: 75
+BINSIZE: 50
+BLACKLIST_REGIONS: ''
+WEIGHTS: 'cluster'
+CLUSTERING_METRIC: 'cosine'
+CLUSTERING_METHOD: 'average'
+CLUSTERING_CUTOFF: 0.01
+CLUSTER_DOWNSAMPLING_NREADS: 1000
+CLUSTER_DOWNSAMPLING_NREPS: 10
+SIMULATION_PARAMS:
+  input_clones: 'input/input_clones.bed'
+  input_variants: 'input/input_variants.txt'
+  input_pars: 'input/input_pars.par'
+  model: "nbinom"
+  seed: "1"
+  test1:
+    nclones: 100
+    nreads: 25
+  test2:
+    nclones: 50
+    nreads: 50
+    seed: 2

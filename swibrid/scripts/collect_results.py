@@ -13,18 +13,18 @@ def setup_argparse(parser):
         dest="sample_stats",
         help="""required: output file with sample_stats""",
     )
-    parser.add_argument("--summary_path", dest="summary_path", default="output/{sample}/{sample}_summary.csv",
-                        help="""path pattern for summary files ["output/{sample}/{sample}_summary.csv"]""")
+    parser.add_argument("--summary_path", dest="summary_path", default="pipeline/{sample}/{sample}_summary.csv",
+                        help="""path pattern for summary files ["pipeline/{sample}/{sample}_summary.csv"]""")
     parser.add_argument("--inserts", dest="inserts", help="""output file with inserts""")
-    parser.add_argument("--inserts_path", dest="inserts_path", default="output/{sample}/{sample}_inserts.tsv",
-                        help="""path pattern for insert tables ["output/{sample}/{sample}_inserts.tsv"]""")
+    parser.add_argument("--inserts_path", dest="inserts_path", default="pipeline/{sample}/{sample}_inserts.tsv",
+                        help="""path pattern for insert tables ["pipeline/{sample}/{sample}_inserts.tsv"]""")
     parser.add_argument(
         "--cluster_stats",
         dest="cluster_stats",
         help="""output file with cluster stats""",
     )
-    parser.add_argument("--cluster_analysis_path", dest="cluster_analysis_path", default="output/{sample}/{sample}_cluster_analysis.csv",
-                        help="""path pattern for cluster_analysis files ["output/{sample}/{sample}_cluster_analysis.csv"]""")
+    parser.add_argument("--cluster_analysis_path", dest="cluster_analysis_path", default="pipeline/{sample}/{sample}_cluster_analysis.csv",
+                        help="""path pattern for cluster_analysis files ["pipeline/{sample}/{sample}_cluster_analysis.csv"]""")
 
 
 def run(args):

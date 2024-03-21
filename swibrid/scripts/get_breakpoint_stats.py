@@ -384,9 +384,9 @@ def run(args):
             minor_ticks.append((start + end) / 2)
             minor_labels.append(rec[3][3])
 
-        fig = plt.figure(figsize=(4, 5.5))
+        fig = plt.figure(figsize=(3.6, 4.3))
 
-        fig.text(0.535, 0.99, args.sample, size="large", ha="center", va="top")
+        fig.text(0.535, 0.98, args.sample, size="medium", ha="center", va="top")
 
         scale_factor = args.scale_factor
         assert Leff % scale_factor == 0, "Leff is not a multiple of scale_factor"
@@ -417,67 +417,98 @@ def run(args):
 
         #raise Exception('stop')
 
-        ax = fig.add_axes([0.12, 0.32, 0.83, 0.6])
+        ax = fig.add_axes([0.12, 0.03, 0.85, 0.7])
         ax.scatter(
-            bph_p.nonzero()[1] + .5,
             bph_p.nonzero()[0] + .5,
+            bph_p.nonzero()[1] + .5,
             c=np.log(bph_p.data),
-            cmap=plt.cm.Greens,
+            cmap=plt.cm.Greys,
             marker="s",
             s=15,
             linewidths=0.2,
             edgecolors="k",
         )
-        ax.scatter(
-            bph_i.nonzero()[1] + .5,
-            bph_i.nonzero()[0] + .5,
-            c=np.log(bph_i.data),
-            cmap=plt.cm.Reds,
-            marker=MarkerStyle("o", fillstyle="right"),
-            s=12,
-            linewidths=0.2,
-            edgecolors="k",
-        )
-        ax.scatter(
-            bph_d.nonzero()[1] + .5,
-            bph_d.nonzero()[0] + .5,
-            c=np.log(bph_d.data),
-            cmap=plt.cm.Blues,
-            marker=MarkerStyle("o", fillstyle="left"),
-            s=12,
-            linewidths=0.2,
-            edgecolors="k",
-        )
+        if args.rearrangements:
+            ax.scatter(
+                bph_i.nonzero()[0] + .5,
+                bph_i.nonzero()[1] + .5,
+                c=np.log(bph_i.data),
+                cmap=plt.cm.Reds,
+                marker=MarkerStyle("o", fillstyle="right"),
+                s=12,
+                linewidths=0.2,
+                edgecolors="r",
+            )
+            ax.scatter(
+                bph_d.nonzero()[0] + .5,
+                bph_d.nonzero()[1] + .5,
+                c=np.log(bph_d.data),
+                cmap=plt.cm.Blues,
+                marker=MarkerStyle("o", fillstyle="left"),
+                s=12,
+                linewidths=0.2,
+                edgecolors="b",
+            )
         ax.set_xlim([Leff // scale_factor, 0])
         ax.set_ylim([Leff // scale_factor, 0])
         ax.plot([0, 1], [0, 1], transform=ax.transAxes, color="gray", lw=0.5)
-        ax.set_yticks(np.array(major_ticks) // (binsize * scale_factor))
-        ax.set_xticks(np.array(major_ticks) // (binsize * scale_factor))
-        ax.set_yticks(np.array(minor_ticks) // (binsize * scale_factor), minor=True)
-        ax.set_xticks(np.array(minor_ticks) // (binsize * scale_factor), minor=True)
+        ax.set_xticks(np.array(major_ticks)[::-1] // (binsize * scale_factor))
+        ax.set_xticks(np.array(minor_ticks)[::-1] // (binsize * scale_factor), minor=True)
         ax.set_xticklabels([])
+        ax.set_xticklabels(minor_labels[::-1], minor=True, rotation=90, size='medium')
+        ax.xaxis.tick_top()
+        ax.set_yticks(np.array(major_ticks)[::-1] // (binsize * scale_factor))
+        ax.set_yticks(np.array(minor_ticks)[::-1] // (binsize * scale_factor), minor=True)
         ax.set_yticklabels([])
-        ax.set_yticklabels(minor_labels, minor=True)
+        ax.set_yticklabels(minor_labels[::-1], minor=True, size='medium')
         ax.tick_params(which="minor", length=0)
-        ax.grid(alpha=0.5, color="lightgrey", which="major")
-        ax.set_title("2D breakpoint histogram", size="medium")
+        if args.rearrangements:
+            ax.grid(color="lightgrey", which="major", lw=.5)
+        else:
+            ax.hlines(np.array(major_ticks) // (binsize * scale_factor),
+                      #xmin=0,
+                      xmin=np.array(major_ticks) // (binsize * scale_factor),
+                      xmax=Leff // scale_factor,
+                      color='lightgrey',
+                      lw=.5,
+                      zorder=1)
+            ax.vlines(np.array(major_ticks) // (binsize * scale_factor), 
+                      ymin=0,
+                      ymax=np.array(major_ticks) // (binsize * scale_factor),
+                      #ymax=Leff // scale_factor,
+                      color='lightgrey',
+                      lw=.5,
+                      zorder=1)
+            ax.spines["bottom"].set_visible(False)
+            ax.spines["right"].set_visible(False)
 
-        ax = fig.add_axes([0.12, 0.07, 0.83, 0.15])
-        ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "g-", lw=0.5)
-        ax.plot(np.arange(Leff), -(bp_hist_inv + bp_hist_inv.T).mean(0).A1, "r-", lw=0.5)
-        ax.plot(np.arange(Leff), (bp_hist_dup + bp_hist_dup.T).mean(0).A1, "b-", lw=0.5)
+        ax = fig.add_axes([0.12, 0.81, 0.85, 0.15])
+        ax.plot(np.arange(Leff), (bp_hist + bp_hist.T).mean(0).A1, "k-", lw=0.5)
+        if args.rearrangements:
+            ax.plot(np.arange(Leff), (bp_hist_inv + bp_hist_inv.T).mean(0).A1, "r-", lw=0.5)
+            ax.plot(np.arange(Leff), (bp_hist_dup + bp_hist_dup.T).mean(0).A1, "b-", lw=0.5)
+        ax.vlines(np.array(major_ticks) // binsize,
+                  ymin=0,
+                  ymax=ax.get_ylim()[1],
+                  #ymax=Leff // scale_factor,
+                  color='lightgrey',
+                  lw=.5,
+                  zorder=1)
         ax.set_xlim([Leff, 0])
-        ax.set_xticks(np.array(major_ticks) // binsize)
-        ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)
+        #ax.set_xticks(np.array(major_ticks) // binsize)
+        ax.set_xticks([])
         ax.set_xticklabels([])
-        ax.set_xticklabels(minor_labels, rotation=90, minor=True)
         ax.set_yticks([])
-        ax.set_ylabel("frequency")
         ax.tick_params(which="minor", length=0)
-        ax.grid(alpha=0.5, color="lightgrey", which="major")
+        #ax.grid(alpha=0.5, color="lightgrey", which="major")
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
-        ax.set_title("1D breakpoint histogram", size="medium")
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        if args.rearrangements:
+            ax.text(-.12, 0, 'regular breaks', color='k', rotation=90, size='small', transform=ax.transAxes)
+            ax.text(-.08, 0, 'duplications', color='b', rotation=90, size='small', transform=ax.transAxes)
+            ax.text(-.04, 0, 'inversions', color='r', rotation=90, size='small', transform=ax.transAxes)
 
         fig.savefig(args.plot, dpi=300)
 

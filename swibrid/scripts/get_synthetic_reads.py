@@ -37,9 +37,9 @@ def setup_argparse(parser):
     parser.add_argument(
         "--nbinom_alpha",
         dest="nbinom_alpha",
-        default=5,
+        default=4,
         type=float,
-        help="""dispersion alpha of negative binomial [5]""",
+        help="""dispersion alpha of negative binomial [4]""",
     )
     parser.add_argument(
         "--variants",
@@ -50,9 +50,10 @@ def setup_argparse(parser):
     parser.add_argument(
         "--rearrangements",
         dest="rearrangements",
+        nargs='?',
         help="""rearrangement file (bed-like output of find_rearrangements) to add rearrangements""",
     )
-    parser.add_argument("--seed", dest="seed", type=int, default=1)
+    parser.add_argument("-s", "--seed", dest="seed", type=int, default=1)
     parser.add_argument(
         "--no-mutations",
         dest="no_mutations",

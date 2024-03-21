@@ -74,11 +74,18 @@ def setup_argparse(parser):
         help="""file with processed read coordinates (required if inserts are shown)""",
     )
     parser.add_argument(
-        "--no_x_legend",
-        dest="no_x_legend",
+        "--no_x_ticks",
+        dest="no_x_ticks",
         action="store_true",
         default=False,
-        help="""omit the x axis legend""",
+        help="""omit the x axis ticks""",
+    )
+    parser.add_argument(
+        "--omit_scale_bar",
+        dest="omit_scale_bar",
+        action="store_true",
+        default=False,
+        help="""omit scale bar"""
     )
     parser.add_argument(
         "--fig_width",
@@ -632,31 +639,33 @@ def run(args):
     ax.set_xticks(np.unique(major_ticks))
     ax.set_xticklabels([])
     ax.set_xticks(minor_ticks, minor=True)
-    ax.set_xticklabels(minor_labels, minor=True, size="small")
+    if not args.no_x_ticks:
+        ax.set_xticklabels(minor_labels, minor=True, size="small")
     ax.tick_params(which="minor", length=0)
 
-    # add genomic scale bar
+    if not args.omit_scale_bar:
+        # add genomic scale bar
+        ax.hlines(
+            nreads + 0.01 * nreads,
+            0,
+            scale_bar_x_length,
+            color="k",
+            lw=2,
+            clip_on=False,
+        )
+        ax.text(
+            0.5 * scale_bar_x_length,
+            nreads + 0.015 * nreads,
+            scale_bar_x_legend,
+            color="k",
+            clip_on=False,
+            size="xx-small",
+            ha="center",
+            va="bottom",
+        )
+
     xlim = [0, Ltot]
     ylim = [0, nreads]
-    ax.hlines(
-        nreads + 0.01 * nreads,
-        0,
-        scale_bar_x_length,
-        color="k",
-        lw=2,
-        clip_on=False,
-    )
-    ax.text(
-        0.5 * scale_bar_x_length,
-        nreads + 0.015 * nreads,
-        scale_bar_x_legend,
-        color="k",
-        clip_on=False,
-        size="xx-small",
-        ha="center",
-        va="bottom",
-    )
-
     ax.set_xlim(xlim if switch_orientation == "+" else xlim[::-1])
     ax.set_ylim(ylim)
 

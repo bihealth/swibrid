@@ -362,7 +362,7 @@ def run(args):
                 stats["donor_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(0).A1[take1] * counts[take1]
                 ) / (bp_hist.sum(0).A1[take1].sum() * counts[take1].sum())
-                stats["donor_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                stats["receiver_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(1).A1[take2] * counts[take2]
                 ) / (bp_hist.sum(1).A1[take2].sum() * counts[take2].sum())
 

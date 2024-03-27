@@ -487,7 +487,10 @@ def run(args):
         sns.despine(ax=ax)
 
         ax = axs[1, 0]
-        isotype_fracs.T.plot(kind="barh", stacked=True, ax=ax)
+        isotype_colors = {"SM":"#000000", "SG3":"#FF96BC", "SG1":"#FF629B","SA1":"#13C203", 
+                          "SG2":"#C81E5C", "SG4":"#76002B", "SE":"#E3D913", "SA2":"#006709"}
+        isotype_fracs.T.plot(kind="barh", stacked=True, ax=ax,
+                             color=[isotype_colors[it] for it in isotype_fracs.index])
         ax.set_xlabel("fraction")
         ax.legend(
             ncol=4,

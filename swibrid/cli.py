@@ -70,7 +70,7 @@ def run_pipeline(args, snake_options):
         logger.info("run script content:\n" + s_command)
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
-        command = "sbatch -t 48:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
+        command = "sbatch -t 96:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
             queue=args.queue
         )
     elif args.sge:

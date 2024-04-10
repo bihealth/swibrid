@@ -1,5 +1,5 @@
 """\
-find rearrangements (inversions/duplications) in MSA: 
+find rearrangements (inversions/duplications) in MSA:
 regions with coverage larger or smaller than 1 and without gaps bigger than 25 nt
 output files
 - a .npz file with read indices, left/right positions and sizes for inversions and duplications per read
@@ -36,13 +36,11 @@ def setup_argparse(parser):
 
 
 def run(args):
-    import os
     import numpy as np
     import pandas as pd
     import scipy.cluster.hierarchy
     import scipy.optimize
     import scipy.stats
-    import pysam
     from logzero import logger
     from .utils import (
         parse_switch_coords,
@@ -71,7 +69,6 @@ def run(args):
 
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa).tocsr()
-    nreads = msa.shape[0]
 
     logger.info("finding rearrangements (inversions / duplications)")
 
@@ -90,8 +87,7 @@ def run(args):
         inds = np.concatenate(
             [
                 [0],
-                np.where((np.diff(pos) > args.max_rearrangement_gap) | (np.diff(rr) != 0))[0]
-                + 1,
+                np.where((np.diff(pos) > args.max_rearrangement_gap) | (np.diff(rr) != 0))[0] + 1,
                 [len(pos)],
             ]
         )
@@ -155,16 +151,25 @@ def run(args):
 
     logger.info("getting consensus events and saving to {0}".format(args.out))
 
-    merged_inversions = merge_intervals((('inversion',l,r) for l,r in zip(inv_left,inv_right)), add_count=True)
-    merged_duplications = merge_intervals((('duplication',l,r) for l,r in zip(dup_left,dup_right)), add_count=True)
-        
-    consensus = pd.DataFrame(merged_inversions + merged_duplications,
-                             columns=['name', 'left', 'right', 'nreads'])
-    consensus['chrom'] = switch_chrom
-    consensus['left'] = np.maximum(0, np.minimum(consensus['left'], Ltot - 1))
-    consensus['right'] = np.maximum(0, np.minimum(consensus['right'], Ltot - 1))
-    consensus_nreads = [(msa[:,l:r]!=0).sum(0).mean() for _,(l,r) in consensus[['left','right']].iterrows()]
-    consensus['score'] = consensus['nreads'] / consensus_nreads
-    consensus['start'] = cov_map[consensus['left']]
-    consensus['end'] = cov_map[consensus['right']]
-    consensus[['chrom','start','end','name','score']].sort_values(['chrom','start','end']).to_csv(args.out, header=False, index=False, sep='\t')
+    merged_inversions = merge_intervals(
+        (("inversion", l, r) for l, r in zip(inv_left, inv_right)), add_count=True
+    )
+    merged_duplications = merge_intervals(
+        (("duplication", l, r) for l, r in zip(dup_left, dup_right)), add_count=True
+    )
+
+    consensus = pd.DataFrame(
+        merged_inversions + merged_duplications, columns=["name", "left", "right", "nreads"]
+    )
+    consensus["chrom"] = switch_chrom
+    consensus["left"] = np.maximum(0, np.minimum(consensus["left"], Ltot - 1))
+    consensus["right"] = np.maximum(0, np.minimum(consensus["right"], Ltot - 1))
+    consensus_nreads = [
+        (msa[:, l:r] != 0).sum(0).mean() for _, (l, r) in consensus[["left", "right"]].iterrows()
+    ]
+    consensus["score"] = consensus["nreads"] / consensus_nreads
+    consensus["start"] = cov_map[consensus["left"]]
+    consensus["end"] = cov_map[consensus["right"]]
+    consensus[["chrom", "start", "end", "name", "score"]].sort_values(
+        ["chrom", "start", "end"]
+    ).to_csv(args.out, header=False, index=False, sep="\t")

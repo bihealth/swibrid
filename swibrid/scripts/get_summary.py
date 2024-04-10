@@ -12,7 +12,7 @@ produces cluster distribution statistics similar to downsample_clustering (the l
 - top_clone_occupancy: relative fraction of reads in biggest cluster
 - big_clones_occupancy: fraction of reads in clusters > 1% occupancy
 - PCR_length_bias: regression coefficient of log(cluster_size) ~ length
-- PCR_GC_bias: regression coefficient of log(cluster_size) ~ GC 
+- PCR_GC_bias: regression coefficient of log(cluster_size) ~ GC
 averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters
 collects number of reads / clusters per isotype
 gets statistics on variants (germline vs. somatic, transitions vs. transversions, etc.)
@@ -133,6 +133,7 @@ def run(args):
         weighted_avg_and_std,
         ncodes,
         f2,
+        isotype_colors,
     )
 
     matplotlib.rcParams.update({"font.size": 8})
@@ -196,10 +197,11 @@ def run(args):
     stats["nreads_final"] = sum(~clustering["cluster"].isna())
 
     if len(clones) > 0:
-
         rel_size = cluster_analysis.loc[clones, "size"] / cluster_analysis.loc[clones, "size"].sum()
 
-        assert (rel_size.sum() > .999) & (rel_size.sum() < 1.001), "relative sizes don't sum up to 1"
+        assert (rel_size.sum() > 0.999) & (
+            rel_size.sum() < 1.001
+        ), "relative sizes don't sum up to 1"
 
         stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
             cluster_analysis.loc[clones, "length"], w
@@ -251,22 +253,16 @@ def run(args):
         downsampling = pd.read_csv(args.cluster_downsampling, header=0, index_col=0).mean(0)
         stats = pd.concat([stats, downsampling], axis=0)
 
-    read_isotype_count = clustering["isotype"].dropna().value_counts()
-    cluster_isotype_count = cluster_analysis.loc[clones, "isotype"].dropna().value_counts()
-    insert_isotype_count = cluster_analysis["insert_pos_isotype"].dropna().value_counts()
+    isotype_read_count = clustering["isotype"].dropna().value_counts()
+    isotype_cluster_count = cluster_analysis.loc[clones, "isotype"].dropna().value_counts()
+    isotype_insert_count = cluster_analysis["insert_pos_isotype"].dropna().value_counts()
 
-    nreads = read_isotype_count.sum()
-    nclusters = cluster_isotype_count.sum()
-    isotype_fracs = pd.DataFrame(
-        {
-            "reads\n(n={0})".format(nreads): read_isotype_count / nreads,
-            "clusters\n(n={0})".format(nclusters): cluster_isotype_count / nclusters,
-        }
-    )
+    isotype_read_fraction = isotype_read_count / isotype_read_count.sum()
+    isotype_cluster_fraction = isotype_cluster_count / isotype_cluster_count.sum()
 
-    read_isotype_count.index = "nreads_" + read_isotype_count.index
-    cluster_isotype_count.index = "nclusters_" + cluster_isotype_count.index
-    insert_isotype_count.index = "ninserts_" + insert_isotype_count.index.astype(str)
+    isotype_read_fraction.index = "frac_reads_" + isotype_read_fraction.index
+    isotype_cluster_fraction.index = "frac_clusters_" + isotype_cluster_fraction.index
+    isotype_insert_count.index = "ninserts_" + isotype_insert_count.index.astype(str)
     take = ~clustering["cluster"].isna()
     inserts = [
         decode_coords(m)
@@ -277,6 +273,7 @@ def run(args):
         "n_inserts": len(inserts),
         "n_unique_inserts": len(merge_intervals(inserts)),
         "n_clusters_inserts": len(cluster_analysis["insert_pos_isotype"].dropna()),
+        "insert_frequency": len(merge_intervals(inserts)) / len(clones) if len(clones) > 0 else 0,
     }
     insert_stats = cluster_analysis.agg(
         {
@@ -296,8 +293,6 @@ def run(args):
         {
             "alpha_ratio_reads": cluster_analysis.loc[clones][alpha_clusters]["size"].sum()
             / cluster_analysis.loc[clones]["size"].sum(),
-            "alpha_ratio_adjusted": cluster_analysis.loc[clones][alpha_clusters]["adj_size"].sum()
-            / cluster_analysis.loc[clones]["adj_size"].sum(),
             "alpha_ratio_clusters": alpha_clusters.mean(),
         }
     )
@@ -341,12 +336,12 @@ def run(args):
     stats = pd.concat(
         [
             stats,
-            read_isotype_count,
-            cluster_isotype_count,
+            isotype_read_fraction,
+            isotype_cluster_fraction,
             alpha_ratio,
             pd.Series(cluster_stats),
             insert_stats,
-            insert_isotype_count,
+            isotype_insert_count,
             realignment_stats,
         ],
         axis=0,
@@ -487,10 +482,18 @@ def run(args):
         sns.despine(ax=ax)
 
         ax = axs[1, 0]
-        isotype_colors = {"SM":"#000000", "SG3":"#FF96BC", "SG1":"#FF629B","SA1":"#13C203", 
-                          "SG2":"#C81E5C", "SG4":"#76002B", "SE":"#E3D913", "SA2":"#006709"}
-        isotype_fracs.T.plot(kind="barh", stacked=True, ax=ax,
-                             color=[isotype_colors[it] for it in isotype_fracs.index])
+        isotype_fracs = pd.DataFrame(
+            {
+                "reads\n(n={0})".format(isotype_read_count.sum()): isotype_read_fraction,
+                "clusters\n(n={0})".format(isotype_cluster_count.sum()): isotype_cluster_fraction,
+            }
+        )
+        isotype_fracs.T.plot(
+            kind="barh",
+            stacked=True,
+            ax=ax,
+            color=[isotype_colors[it.split("_")[-1]] for it in isotype_fracs.index],
+        )
         ax.set_xlabel("fraction")
         ax.legend(
             ncol=4,
@@ -548,7 +551,7 @@ def run(args):
             label="all",
         )
         ax.hist(
-            clustering["filtered_cluster"][clustering['filtered_cluster'] >= 0].value_counts(),
+            clustering["filtered_cluster"][clustering["filtered_cluster"] >= 0].value_counts(),
             bins=np.geomspace(1, stats["nreads_final"], 50),
             histtype="stepfilled",
             label="filtered",

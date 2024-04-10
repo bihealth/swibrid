@@ -66,6 +66,13 @@ def setup_argparse(parser):
         help="""ignore positions that have no coverage""",
     )
     parser.add_argument(
+        "--filtering_cutoff",
+        dest="filtering_cutoff",
+        default=0.95,
+        type=float,
+        help="""filter out smallest clusters, keeping at least this fraction of reads [.95]""",
+    )
+    parser.add_argument(
         "--big_clone_cutoff",
         dest="big_clone_cutoff",
         default=0.01,
@@ -128,11 +135,13 @@ def run(args):
         msa_here = msa_cleaned[ii]
         Z = fastcluster.linkage(msa_here.todense(), metric=args.metric, method=args.method)
         cc = scipy.cluster.hierarchy.cut_tree(Z, height=[cutoff])
-        clustering = filter_clustering(Z, cc[:, 0].flatten())
+        clustering = filter_clustering(Z, cc[:, 0].flatten(), p=args.filtering_cutoff)
         clusters, cinv, csize = np.unique(clustering, return_inverse=True, return_counts=True)
         use = clusters >= 0
         rel_size = csize[use] / csize[use].sum()
-        assert (rel_size.sum() > .999) & (rel_size.sum() < 1.001), "relative sizes don't sum up to 1"
+        assert (rel_size.sum() > 0.999) & (
+            rel_size.sum() < 1.001
+        ), "relative sizes don't sum up to 1"
 
         stats["mean_cluster_size_downsampled"].append(rel_size.mean())
         stats["std_cluster_size_downsampled"].append(rel_size.std())

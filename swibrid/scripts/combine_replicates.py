@@ -21,26 +21,66 @@ def setup_argparse(parser):
     parser.add_argument(
         "--aligner", dest="aligner", default="last", help="""alignment algorithm used [last]"""
     )
-    parser.add_argument("--msa_path", dest="msa_path", default="pipeline/{sample}/{sample}_msa.npz",
-                        help="""path pattern for msa files ["pipeline/{sample}/{sample}_msa.npz"]""")
-    parser.add_argument("--msa_csv_path", dest="msa_csv_path", default="pipeline/{sample}/{sample}_msa.csv",
-                        help="""path pattern for msa csv files ["pipeline/{sample}/{sample}_msa.csv"]""")
-    parser.add_argument("--info_path", dest="info_path", default="input/{sample}_info.csv",
-                        help="""path pattern for info csv files ["input/{sample}_info.csv"]""")
-    parser.add_argument("--process_path", dest="process_path", default="pipeline/{sample}/{sample}_processed.out",
-                        help="""path pattern for processing output ["pipeline/{sample}/{sample}_processed.out"]""")
-    parser.add_argument("--process_stats_path", dest="process_stats_path", default="pipeline/{sample}/{sample}_process_stats.csv",
-                        help="""path pattern for process stats csv ["pipeline/{sample}/{sample}_process_stats.csv"]""")
-    parser.add_argument("--alignment_pars_path", dest="alignment_pars_path", default="pipeline/{sample}/{sample}_{aligner}_pars.npz",
-                        help="""path pattern for alignment pars ["pipeline/{sample}/{sample}_{aligner}_pars.npz"]""")
-    parser.add_argument("--aligned_seqs_path", dest="aligned_seqs_path", default="pipeline/{sample}/{sample}_aligned.fasta.gz",
-                        help="""path pattern for aligned sequences ["pipeline/{sample}/{sample}_aligned.fasta.gz""")
-    parser.add_argument("--breakpoint_alignments_path", dest="breakpoint_alignments_path", default="pipeline/{sample}/{sample}_breakpoint_alignments.csv",
-                        help="""path pattern for breakpoint alignments ["pipeline/{sample}/{sample}_breakpoint_alignments.csv"]""")
-    parser.add_argument("--inserts_tsv_path", dest="inserts_tsv_path", default="pipeline/{sample}/{sample}_inserts.tsv",
-                        help="""path pattern for inserts tsv ["pipeline/{sample}/{sample}_inserts.tsv"]""")
-    parser.add_argument("--bed_path", dest="bed_path", default="pipeline/{sample}/{sample}.bed",
-                        help="""path pattern for bed ["pipeline/{sample}/{sample}.bed"]""")
+    parser.add_argument(
+        "--msa_path",
+        dest="msa_path",
+        default="pipeline/{sample}/{sample}_msa.npz",
+        help="""path pattern for msa files ["pipeline/{sample}/{sample}_msa.npz"]""",
+    )
+    parser.add_argument(
+        "--msa_csv_path",
+        dest="msa_csv_path",
+        default="pipeline/{sample}/{sample}_msa.csv",
+        help="""path pattern for msa csv files ["pipeline/{sample}/{sample}_msa.csv"]""",
+    )
+    parser.add_argument(
+        "--info_path",
+        dest="info_path",
+        default="input/{sample}_info.csv",
+        help="""path pattern for info csv files ["input/{sample}_info.csv"]""",
+    )
+    parser.add_argument(
+        "--process_path",
+        dest="process_path",
+        default="pipeline/{sample}/{sample}_processed.out",
+        help="""path pattern for processing output ["pipeline/{sample}/{sample}_processed.out"]""",
+    )
+    parser.add_argument(
+        "--process_stats_path",
+        dest="process_stats_path",
+        default="pipeline/{sample}/{sample}_process_stats.csv",
+        help="""path pattern for process stats csv ["pipeline/{sample}/{sample}_process_stats.csv"]""",
+    )
+    parser.add_argument(
+        "--alignment_pars_path",
+        dest="alignment_pars_path",
+        default="pipeline/{sample}/{sample}_{aligner}_pars.npz",
+        help="""path pattern for alignment pars ["pipeline/{sample}/{sample}_{aligner}_pars.npz"]""",
+    )
+    parser.add_argument(
+        "--aligned_seqs_path",
+        dest="aligned_seqs_path",
+        default="pipeline/{sample}/{sample}_aligned.fasta.gz",
+        help="""path pattern for aligned sequences ["pipeline/{sample}/{sample}_aligned.fasta.gz""",
+    )
+    parser.add_argument(
+        "--breakpoint_alignments_path",
+        dest="breakpoint_alignments_path",
+        default="pipeline/{sample}/{sample}_breakpoint_alignments.csv",
+        help="""path pattern for breakpoint alignments ["pipeline/{sample}/{sample}_breakpoint_alignments.csv"]""",
+    )
+    parser.add_argument(
+        "--inserts_tsv_path",
+        dest="inserts_tsv_path",
+        default="pipeline/{sample}/{sample}_inserts.tsv",
+        help="""path pattern for inserts tsv ["pipeline/{sample}/{sample}_inserts.tsv"]""",
+    )
+    parser.add_argument(
+        "--bed_path",
+        dest="bed_path",
+        default="pipeline/{sample}/{sample}.bed",
+        help="""path pattern for bed ["pipeline/{sample}/{sample}.bed"]""",
+    )
 
 
 def run(args):
@@ -88,9 +128,9 @@ def run(args):
         .loc[reads]
         .to_csv("input/{0}_info.csv".format(args.combined))
     )
-    with gzip.open("input/{0}.fastq.gz".format(args.combined),"wt") as outf:
+    with gzip.open("input/{0}.fastq.gz".format(args.combined), "wt") as outf:
         for sample in samples:
-            for rec in SeqIO.parse(gzip.open("input/{0}.fastq.gz".format(sample),"rt"),"fastq"):
+            for rec in SeqIO.parse(gzip.open("input/{0}.fastq.gz".format(sample), "rt"), "fastq"):
                 if rec.id in reads:
                     SeqIO.write(rec, outf, "fastq")
 
@@ -101,18 +141,23 @@ def run(args):
     combined_pars = {}
     for slot in set.intersection(*(set(p.files) for p in pars)):
         combined_pars[slot] = np.mean([p[slot] for p in pars], axis=0)
-    np.savez(args.alignment_pars_path.format(sample=args.combined,aligner=args.aligner), **combined_pars)
+    np.savez(
+        args.alignment_pars_path.format(sample=args.combined, aligner=args.aligner), **combined_pars
+    )
 
     logger.info("combining output from process_alignments")
     process = {}
     process_stats = {}
     breakpoint_alignments = {}
     for sample in samples:
-        process[sample] = pd.read_csv(args.process_path.format(sample=sample), header=0, index_col=0, sep="\t"
+        process[sample] = pd.read_csv(
+            args.process_path.format(sample=sample), header=0, index_col=0, sep="\t"
         )
-        process_stats[sample] = pd.read_csv(args.process_stats_path.format(sample=sample), header=None, index_col=0
+        process_stats[sample] = pd.read_csv(
+            args.process_stats_path.format(sample=sample), header=None, index_col=0
         ).squeeze()
-        breakpoint_alignments[sample] = pd.read_csv(args.breakpoint_alignments_path.format(sample=sample), header=0, index_col=0
+        breakpoint_alignments[sample] = pd.read_csv(
+            args.breakpoint_alignments_path.format(sample=sample), header=0, index_col=0
         )
 
     pd.concat(process.values(), axis=0, keys=process.keys()).reset_index(
@@ -124,12 +169,13 @@ def run(args):
     breakpoint_alignments = pd.concat(
         breakpoint_alignments.values(), axis=0, keys=breakpoint_alignments.keys()
     ).reset_index(level=0, names="sample")
-    breakpoint_alignments.loc[reads.intersection(breakpoint_alignments.index)].to_csv(args.breakpoint_alignments_path.format(sample=args.combined)
+    breakpoint_alignments.loc[reads.intersection(breakpoint_alignments.index)].to_csv(
+        args.breakpoint_alignments_path.format(sample=args.combined)
     )
 
     # update time stamp on (probably empty) file with aligned sequences
     aligned_seqs = args.aligned_seqs_path.format(sample=args.combined)
-    with open(aligned_seqs,'a'):
+    with open(aligned_seqs, "a"):
         os.utime(aligned_seqs, None)
 
     logger.info("combining inserts")
@@ -137,7 +183,8 @@ def run(args):
     bed = {}
     for sample in samples:
         try:
-            inserts[sample] = pd.read_csv(args.inserts_tsv_path.format(sample=sample), index_col=0, header=0, sep="\t"
+            inserts[sample] = pd.read_csv(
+                args.inserts_tsv_path.format(sample=sample), index_col=0, header=0, sep="\t"
             )
         except (ValueError, pd.errors.EmptyDataError):
             inserts[sample] = pd.DataFrame(
@@ -151,8 +198,7 @@ def run(args):
                     "sequence",
                 ],
             )
-        bed[sample] = pd.read_csv(args.bed_path.format(sample=sample), header=None, sep="\t"
-        )
+        bed[sample] = pd.read_csv(args.bed_path.format(sample=sample), header=None, sep="\t")
 
     inserts = pd.concat(inserts.values(), axis=0)
     insert_reads = reads.intersection(inserts.index)
@@ -164,11 +210,11 @@ def run(args):
         .loc[reads]
         .reset_index()[[0, 1, 2, "read", 4, 5, 6, 7, 8, 9, 10, 11]]
     )
-    bed.to_csv(args.bed_path.format(sample=args.combined), header=False, index=False, sep="\t"
-    )
+    bed.to_csv(args.bed_path.format(sample=args.combined), header=False, index=False, sep="\t")
 
     logger.info("writing combined MSA to " + args.msa_path.format(sample=args.combined))
     msa_df.loc[reads].to_csv(args.msa_csv_path.format(sample=args.combined))
-    scipy.sparse.save_npz(args.msa_path.format(sample=args.combined),
+    scipy.sparse.save_npz(
+        args.msa_path.format(sample=args.combined),
         scipy.sparse.vstack(msa.values()).tocsr()[inds].tocoo(),
     )

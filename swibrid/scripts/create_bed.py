@@ -29,7 +29,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--annotation",
         dest="annotation",
-        nargs='?',
+        nargs="?",
         help="""bed file with gene annotation""",
     )
     parser.add_argument(

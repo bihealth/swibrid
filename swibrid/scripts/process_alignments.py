@@ -1,16 +1,16 @@
 """\
-process alignments: 
-for an input file with aligned reads (MAF if LAST output, SAM if minimap2 output), 
+process alignments:
+for an input file with aligned reads (MAF if LAST output, SAM if minimap2 output),
 get alignments to switch regions and elsewhere (potential inserts)
-output table contains 
+output table contains
 - isotype
 - read orientation
 - read coverage
 - fraction of read sequence mapping to the same genomic regions
-- mapped switch region segments 
-- inserts 
+- mapped switch region segments
+- inserts
 aligned sequences can be saved separately (necessary to then construct a pseudo MSA)
-reads are removed if 
+reads are removed if
 - they are too short
 - they don't contain a forward and reverse primer
 - they contain internal primers
@@ -22,6 +22,7 @@ reads are removed if
 - the isotype cannot be determined
 if `--realign_breakpoints` is set, 20nt on each side of a breakpoint are re-aligned, and statistics like number of homologous or untemplated bases are extracted
 """
+
 
 def setup_argparse(parser):
     parser.add_argument(
@@ -159,7 +160,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--blacklist_regions",
         dest="blacklist_regions",
-        nargs='?',
+        nargs="?",
         help="""ignore inserts from blacklist regions defined in this bed file""",
     )
     parser.add_argument(
@@ -459,7 +460,7 @@ def realign_breakpoints(matches, genome, read_seq, pad=20):
                 matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
             ).upper()
 
-        if gseq1 == '' or gseq2 == '' or rseq == '':
+        if gseq1 == "" or gseq2 == "" or rseq == "":
             continue
 
         # al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
@@ -646,7 +647,6 @@ def run(args):
             orientation,
             aligned_seq,
         ) in matches:
-
             assert (
                 read_len > 0 and ref_len > 0 and tot_read_len > 0
             ), "negative lengths in parsed alignments!"
@@ -914,8 +914,8 @@ def run(args):
             stats["nreads_inversions"] += 1
 
         if args.interrupt_for_read and read in args.interrupt_for_read:
-            print(read,[sm[:7] for sm in matches])
-            #raise Exception("stop")
+            print(read, [sm[:7] for sm in matches])
+            # raise Exception("stop")
 
         if not use:
             continue

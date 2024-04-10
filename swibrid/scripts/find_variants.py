@@ -14,7 +14,7 @@ motif occurrences around variants are also scored
 
 haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant
 
-output is a vcf-style file with genomic (1-based) and relative (0-based) coordinates, and a matrix (sparse integer array, same shape as MSA) indicating which read contains a variant at which position 
+output is a vcf-style file with genomic (1-based) and relative (0-based) coordinates, and a matrix (sparse integer array, same shape as MSA) indicating which read contains a variant at which position
 """
 
 
@@ -46,7 +46,11 @@ def setup_argparse(parser):
     )
     parser.add_argument("-o", "--out", dest="out", help="""required: output file (text)""")
     parser.add_argument("-m", "--mat", dest="mat", help="""required: output file (matrix)""")
-    parser.add_argument("--out_complete", dest="out_complete", help="""required: output file with all variants (text)""")
+    parser.add_argument(
+        "--out_complete",
+        dest="out_complete",
+        help="""required: output file with all variants (text)""",
+    )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
@@ -97,7 +101,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variant_annotation",
         dest="variant_annotation",
-        nargs='?',
+        nargs="?",
         help="""variant annotation file (vcf.gz; e.g., from 1000Genomes project)""",
     )
     parser.add_argument(
@@ -478,4 +482,3 @@ def run(args):
                 ]
                 lines.append(line.format(*vals))
             outf.writelines(lines)
-

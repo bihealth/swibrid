@@ -5,7 +5,9 @@ produce a bed file with unique clones from the biggest clusters
 
 def setup_argparse(parser):
     parser.add_argument("-b", "--bed", dest="bed", help="""required: input bed file""")
-    parser.add_argument("-c", "--clustering", dest="clustering", help="""required: clustering results""")
+    parser.add_argument(
+        "-c", "--clustering", dest="clustering", help="""required: clustering results"""
+    )
     parser.add_argument("-o", "--output", dest="output", help="""output file [stdout]""")
     parser.add_argument(
         "--cut",
@@ -36,7 +38,7 @@ def run(args):
     )
 
     if args.output:
-        outf = open(args.output, 'w')
+        outf = open(args.output, "w")
     else:
         outf = sys.stdout
 

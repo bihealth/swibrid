@@ -8,9 +8,13 @@ additional homozygous / heterozygous / other variants can be added
 
 def setup_argparse(parser):
     parser.add_argument("-b", "--bed", dest="bed", help="""required: input bed file""")
-    parser.add_argument("-r", "--reference", dest="reference", help="""required: reference sequence""")
+    parser.add_argument(
+        "-r", "--reference", dest="reference", help="""required: reference sequence"""
+    )
     parser.add_argument("-p", "--par", dest="par", help="""required: file with LAST parameters""")
-    parser.add_argument("-o", "--out", dest="out", help="""required: output fasta / fastq (.gz) file""")
+    parser.add_argument(
+        "-o", "--out", dest="out", help="""required: output fasta / fastq (.gz) file"""
+    )
     parser.add_argument("-i", "--info", dest="info", help="""output info file""")
     parser.add_argument(
         "-n",
@@ -44,13 +48,13 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants",
         dest="variants",
-        nargs='?',
+        nargs="?",
         help="""variant file (like output of find_variants) to add variants""",
     )
     parser.add_argument(
         "--rearrangements",
         dest="rearrangements",
-        nargs='?',
+        nargs="?",
         help="""rearrangement file (bed-like output of find_rearrangements) to add rearrangements""",
     )
     parser.add_argument("-s", "--seed", dest="seed", type=int, default=1)
@@ -129,15 +133,14 @@ def mutate_seq(seq, pars):
 
 
 def mutate_rec(rec, pars, add_id=""):
-    import copy
     import numpy as np
     from Bio import SeqRecord, Seq
 
     if pars is not None:
-        seq=Seq.Seq(mutate_seq(str(rec.seq).upper(), pars))
+        seq = Seq.Seq(mutate_seq(str(rec.seq).upper(), pars))
     else:
-        seq=Seq.Seq(str(rec.seq).upper())
-    if np.random.rand() < .5:
+        seq = Seq.Seq(str(rec.seq).upper())
+    if np.random.rand() < 0.5:
         seq = seq.reverse_complement()
     return SeqRecord.SeqRecord(
         seq,
@@ -174,7 +177,11 @@ def run(args):
         pars = None
 
     logger.info("reading bed file from " + args.bed)
-    bed = pd.read_csv(args.bed, sep="\t", header=None, index_col=None).sample(n=args.n).reset_index(drop=True)
+    bed = (
+        pd.read_csv(args.bed, sep="\t", header=None, index_col=None)
+        .sample(n=args.n)
+        .reset_index(drop=True)
+    )
     logger.info("loading reference from " + args.reference)
     reference = pysam.FastaFile(args.reference)
 
@@ -182,13 +189,34 @@ def run(args):
         logger.info("loading variants information from " + args.variants)
         variants = pd.read_csv(args.variants, sep="\t", header=0)
     else:
-        variants = pd.DataFrame([], columns=['chrom','position','region','rel_pos','ref','alt','counts','pval','padj','pval_clust','padj_clust','pval_strand','type','anno','motif'])
-        
+        variants = pd.DataFrame(
+            [],
+            columns=[
+                "chrom",
+                "position",
+                "region",
+                "rel_pos",
+                "ref",
+                "alt",
+                "counts",
+                "pval",
+                "padj",
+                "pval_clust",
+                "padj_clust",
+                "pval_strand",
+                "type",
+                "anno",
+                "motif",
+            ],
+        )
+
     if args.rearrangements:
         logger.info("loading rearrangement information from " + args.rearrangements)
-        rearrangements = pd.read_csv(args.rearrangements, sep="\t", index_col=None, header=None).dropna()
+        rearrangements = pd.read_csv(
+            args.rearrangements, sep="\t", index_col=None, header=None
+        ).dropna()
     else:
-        rearrangements = pd.DataFrame([], columns=['chrom','start','end','type','score'])
+        rearrangements = pd.DataFrame([], columns=["chrom", "start", "end", "type", "score"])
 
     if args.out.endswith("fastq.gz"):
         logger.info("writing fastq.gz output to " + args.out)
@@ -219,11 +247,13 @@ def run(args):
         blocksizes,
         blockstarts,
     ) in bed.iterrows():
-
         blocksizes = list(map(int, blocksizes.strip(",").split(",")))
         blockstarts = list(map(int, blockstarts.strip(",").split(",")))
 
-        cov_int = [(start + bstart, start + bstart + bsize) for bsize, bstart in zip(blocksizes, blockstarts)]
+        cov_int = [
+            (start + bstart, start + bstart + bsize)
+            for bsize, bstart in zip(blocksizes, blockstarts)
+        ]
 
         seq = list("".join(reference.fetch(chrom, s, e) for s, e in cov_int).upper())
 
@@ -232,22 +262,38 @@ def run(args):
         dups_added = []
 
         # loop over variants and add them to clone sequence
-        for _, (_, pos, _, _, REF, ALT, counts, _, _, _, _, _, var_type, _, _) in variants.iterrows():
-            rel_pos = shift_coord(pos - 1, cov_int) 
-            counts = np.array(list(map(int, counts.split(','))))
+        for _, (
+            _,
+            pos,
+            _,
+            _,
+            REF,
+            ALT,
+            counts,
+            _,
+            _,
+            _,
+            _,
+            _,
+            var_type,
+            _,
+            _,
+        ) in variants.iterrows():
+            rel_pos = shift_coord(pos - 1, cov_int)
+            counts = np.array(list(map(int, counts.split(","))))
             # ignore variants outside the current region
             if pos < start or pos >= end or not np.isfinite(rel_pos) or seq[rel_pos] != REF:
                 continue
             # ignore heterozygous variants for every other clone
-            if (var_type == 'het0' and n%2==1) or (var_type == 'het1' and n%2==0):
-               continue
+            if (var_type == "het0" and n % 2 == 1) or (var_type == "het1" and n % 2 == 0):
+                continue
             # ignore other variants depending on their frequency
-            var_freq = counts['ACGT'.index(ALT)] / np.sum(counts)
-            if var_type == 'n.d.' and np.random.rand() > var_freq:
-               continue
+            var_freq = counts["ACGT".index(ALT)] / np.sum(counts)
+            if var_type == "n.d." and np.random.rand() > var_freq:
+                continue
 
             nvars_added += 1
-            vars_added.append('{0}:{1}{2}>{3}'.format(chrom, pos, REF, ALT))
+            vars_added.append("{0}:{1}{2}>{3}".format(chrom, pos, REF, ALT))
             seq[rel_pos] = ALT
 
         # loop over rearrangements ad add them to clone sequence
@@ -256,29 +302,41 @@ def run(args):
             rel_end = shift_coord(rend, cov_int)
 
             # ignore events outside the current regions
-            if rstart < start or rend >= end or not np.isfinite(rel_start) or not np.isfinite(rel_end):
+            if (
+                rstart < start
+                or rend >= end
+                or not np.isfinite(rel_start)
+                or not np.isfinite(rel_end)
+            ):
                 continue
             # ignore events depending on allele frequency
             if np.random.rand() > rfreq:
                 continue
 
-            if rtype == 'inversion':
+            if rtype == "inversion":
                 ninvs_added += 1
-                invs_added.append('{0}:{1}-{2}'.format(chrom, rstart, rend))
-                seq = seq[:rel_start] + [RC[s] for s in seq[rel_start:rel_end][::-1]] + seq[rel_end:]
-            if rtype == 'duplication':
+                invs_added.append("{0}:{1}-{2}".format(chrom, rstart, rend))
+                seq = (
+                    seq[:rel_start] + [RC[s] for s in seq[rel_start:rel_end][::-1]] + seq[rel_end:]
+                )
+            if rtype == "duplication":
                 ndups_added += 1
-                dups_added.append('{0}:{1}-{2}'.format(chrom, rstart, rend))
-                seq = seq[:rel_start] + seq[rel_start:rel_end] + seq[rel_start:rel_end] + seq[rel_end:]
+                dups_added.append("{0}:{1}-{2}".format(chrom, rstart, rend))
+                seq = (
+                    seq[:rel_start]
+                    + seq[rel_start:rel_end]
+                    + seq[rel_start:rel_end]
+                    + seq[rel_end:]
+                )
 
-        rec = SeqRecord.SeqRecord(seq=Seq.Seq(''.join(seq)), id=name, name=name, description=name)
+        rec = SeqRecord.SeqRecord(seq=Seq.Seq("".join(seq)), id=name, name=name, description=name)
 
-        if args.distribution in ['poisson','P']:
+        if args.distribution in ["poisson", "P"]:
             ncopies = np.random.poisson(args.k)
-        elif args.distribution in ['nbinom','NB']:
-            ncopies = scipy.stats.nbinom.rvs(1./args.nbinom_alpha, 
-                                             1./(1.+args.nbinom_alpha * args.k), 
-                                             size=1)[0]
+        elif args.distribution in ["nbinom", "NB"]:
+            ncopies = scipy.stats.nbinom.rvs(
+                1.0 / args.nbinom_alpha, 1.0 / (1.0 + args.nbinom_alpha * args.k), size=1
+            )[0]
         else:
             ncopies = int(args.k)
 
@@ -297,10 +355,10 @@ def run(args):
                 "internal": "",
                 "true_cluster": "c{0}".format(n),
                 "true_sequence": str(rec.seq),
-                "true_haplotype": "het0" if n%2==0 else "het1",
-                "true_variants": ';'.join(vars_added),
-                "true_inversions": ';'.join(invs_added),
-                "true_duplications": ';'.join(dups_added)
+                "true_haplotype": "het0" if n % 2 == 0 else "het1",
+                "true_variants": ";".join(vars_added),
+                "true_inversions": ";".join(invs_added),
+                "true_duplications": ";".join(dups_added),
             }
 
         if args.out.endswith("fastq.gz"):
@@ -317,4 +375,8 @@ def run(args):
 
     outf.close()
 
-    logger.info("{0} variants, {1} inversions, {2} duplications added in {3} reads".format(nvars_added, ninvs_added, ndups_added, nreads))
+    logger.info(
+        "{0} variants, {1} inversions, {2} duplications added in {3} reads".format(
+            nvars_added, ninvs_added, ndups_added, nreads
+        )
+    )

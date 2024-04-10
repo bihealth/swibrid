@@ -21,24 +21,60 @@ def setup_argparse(parser):
     parser.add_argument(
         "--aligner", dest="aligner", default="last", help="""alignment algorithm used [last]"""
     )
-    parser.add_argument("--msa_path", dest="msa_path", default="pipeline/{sample}/{sample}_msa.npz",
-                        help="""path pattern for msa files ["pipeline/{sample}/{sample}_msa.npz"]""")
-    parser.add_argument("--msa_csv_path", dest="msa_csv_path", default="pipeline/{sample}/{sample}_msa.csv",
-                        help="""path pattern for msa csv files ["pipeline/{sample}/{sample}_msa.csv"]""")
-    parser.add_argument("--info_path", dest="info_path", default="input/{sample}_info.csv",
-                        help="""path pattern for info csv files ["input/{sample}_info.csv"]""")
-    parser.add_argument("--process_path", dest="process_path", default="pipeline/{sample}/{sample}_processed.out",
-                        help="""path pattern for processing output ["pipeline/{sample}/{sample}_processed.out"]""")
-    parser.add_argument("--process_stats_path", dest="process_stats_path", default="pipeline/{sample}/{sample}_process_stats.csv",
-                        help="""path pattern for process stats csv ["pipeline/{sample}/{sample}_process_stats.csv"]""")
-    parser.add_argument("--alignment_pars_path", dest="alignment_pars_path", default="pipeline/{sample}/{sample}_{aligner}_pars.npz",
-                        help="""path pattern for alignment pars ["pipeline/{sample}/{sample}_{aligner}_pars.npz"]""")
-    parser.add_argument("--breakpoint_alignments_path", dest="breakpoint_alignments_path", default="pipeline/{sample}/{sample}_breakpoint_alignments.csv",
-                        help="""path pattern for breakpoint alignments ["pipeline/{sample}/{sample}_breakpoint_alignments.csv"]""")
-    parser.add_argument("--inserts_tsv_path", dest="inserts_tsv_path", default="pipeline/{sample}/{sample}_inserts.tsv",
-                        help="""path pattern for inserts tsv ["pipeline/{sample}/{sample}_inserts.tsv"]""")
-    parser.add_argument("--bed_path", dest="bed_path", default="pipeline/{sample}/{sample}.bed",
-                        help="""path pattern for bed ["pipeline/{sample}/{sample}.bed"]""")
+    parser.add_argument(
+        "--msa_path",
+        dest="msa_path",
+        default="pipeline/{sample}/{sample}_msa.npz",
+        help="""path pattern for msa files ["pipeline/{sample}/{sample}_msa.npz"]""",
+    )
+    parser.add_argument(
+        "--msa_csv_path",
+        dest="msa_csv_path",
+        default="pipeline/{sample}/{sample}_msa.csv",
+        help="""path pattern for msa csv files ["pipeline/{sample}/{sample}_msa.csv"]""",
+    )
+    parser.add_argument(
+        "--info_path",
+        dest="info_path",
+        default="input/{sample}_info.csv",
+        help="""path pattern for info csv files ["input/{sample}_info.csv"]""",
+    )
+    parser.add_argument(
+        "--process_path",
+        dest="process_path",
+        default="pipeline/{sample}/{sample}_processed.out",
+        help="""path pattern for processing output ["pipeline/{sample}/{sample}_processed.out"]""",
+    )
+    parser.add_argument(
+        "--process_stats_path",
+        dest="process_stats_path",
+        default="pipeline/{sample}/{sample}_process_stats.csv",
+        help="""path pattern for process stats csv ["pipeline/{sample}/{sample}_process_stats.csv"]""",
+    )
+    parser.add_argument(
+        "--alignment_pars_path",
+        dest="alignment_pars_path",
+        default="pipeline/{sample}/{sample}_{aligner}_pars.npz",
+        help="""path pattern for alignment pars ["pipeline/{sample}/{sample}_{aligner}_pars.npz"]""",
+    )
+    parser.add_argument(
+        "--breakpoint_alignments_path",
+        dest="breakpoint_alignments_path",
+        default="pipeline/{sample}/{sample}_breakpoint_alignments.csv",
+        help="""path pattern for breakpoint alignments ["pipeline/{sample}/{sample}_breakpoint_alignments.csv"]""",
+    )
+    parser.add_argument(
+        "--inserts_tsv_path",
+        dest="inserts_tsv_path",
+        default="pipeline/{sample}/{sample}_inserts.tsv",
+        help="""path pattern for inserts tsv ["pipeline/{sample}/{sample}_inserts.tsv"]""",
+    )
+    parser.add_argument(
+        "--bed_path",
+        dest="bed_path",
+        default="pipeline/{sample}/{sample}.bed",
+        help="""path pattern for bed ["pipeline/{sample}/{sample}.bed"]""",
+    )
 
 
 def run(args):
@@ -74,13 +110,14 @@ def run(args):
 
     logger.info("getting alignment pars")
     pars = np.load(args.alignment_pars_path.format(sample=sample, aligner=args.aligner))
-    os.makedirs(os.path.dirname(args.alignment_pars_path.format(sample=args.output, aligner=args.aligner)), exist_ok=True)
+    os.makedirs(
+        os.path.dirname(args.alignment_pars_path.format(sample=args.output, aligner=args.aligner)),
+        exist_ok=True,
+    )
     np.savez(args.alignment_pars_path.format(sample=args.output, aligner=args.aligner), **pars)
 
     logger.info("getting output from process_alignments")
-    process = pd.read_csv(
-        args.process_path.format(sample=sample), header=0, index_col=0, sep="\t"
-    )
+    process = pd.read_csv(args.process_path.format(sample=sample), header=0, index_col=0, sep="\t")
     process_stats = pd.read_csv(
         args.process_stats_path.format(sample=sample), header=None, index_col=0
     ).squeeze()
@@ -89,13 +126,13 @@ def run(args):
     )
 
     os.makedirs(os.path.dirname(args.process_path.format(sample=args.output)), exist_ok=True)
-    process.loc[reads].to_csv(
-        args.process_path.format(sample=args.output), sep="\t", index=True
-    )
+    process.loc[reads].to_csv(args.process_path.format(sample=args.output), sep="\t", index=True)
     os.makedirs(os.path.dirname(args.process_stats_path.format(sample=args.output)), exist_ok=True)
     process_stats.to_csv(args.process_stats_path.format(sample=args.output), header=False)
 
-    os.makedirs(os.path.dirname(args.breakpoint_alignments_path.format(sample=args.output)), exist_ok=True)
+    os.makedirs(
+        os.path.dirname(args.breakpoint_alignments_path.format(sample=args.output)), exist_ok=True
+    )
     breakpoint_alignments.loc[reads.intersection(breakpoint_alignments.index)].to_csv(
         args.breakpoint_alignments_path.format(sample=args.output)
     )

@@ -47,7 +47,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--annotation",
         dest="annotation",
-        nargs='?',
+        nargs="?",
         help="""bed file with gene annotation""",
     )
     parser.add_argument(
@@ -85,7 +85,7 @@ def setup_argparse(parser):
         dest="omit_scale_bar",
         action="store_true",
         default=False,
-        help="""omit scale bar"""
+        help="""omit scale bar""",
     )
     parser.add_argument(
         "--fig_width",
@@ -130,7 +130,9 @@ def setup_argparse(parser):
         help="""file with haplotype clustering (from find_variants)""",
     )
     parser.add_argument(
-        "--realignments", dest="realignments", help="""indicate realignment scores with breakpoint realignments"""
+        "--realignments",
+        dest="realignments",
+        help="""indicate realignment scores with breakpoint realignments""",
     )
     parser.add_argument(
         "--dpi",
@@ -421,22 +423,22 @@ def run(args):
     linkage_border = args.linkage_border if args.linkage else 0.01
     insert_border = 0.2 if args.show_inserts else 0.01
     if args.sidebar_color_by is not None:
-        sidebar_colors = args.sidebar_color_by.split(',')
-        valid_cols = set(['strand','isotype','cluster','haplotype'])
+        sidebar_colors = args.sidebar_color_by.split(",")
+        valid_cols = set(["strand", "isotype", "cluster", "haplotype"])
         if args.info:
             valid_cols |= set(read_info.columns)
         sidebar_colors = [s for s in sidebar_colors if s in valid_cols]
         num_sidebars = len(sidebar_colors)
     else:
         num_sidebars = 0
-    sidebar_width = .01
-    left = .01 + linkage_border + num_sidebars * sidebar_width
-    width = .99 - linkage_border - insert_border - num_sidebars * sidebar_width
+    sidebar_width = 0.01
+    left = 0.01 + linkage_border + num_sidebars * sidebar_width
+    width = 0.99 - linkage_border - insert_border - num_sidebars * sidebar_width
 
     if args.linkage:
         logger.info("reading linkage from {0} and creating dendrogram".format(args.linkage))
         Z = np.load(args.linkage)["Z"]
-        ax = fig.add_axes([0.01, bottom, left - num_sidebars * sidebar_width - .015, height])
+        ax = fig.add_axes([0.01, bottom, left - num_sidebars * sidebar_width - 0.015, height])
         lw = fig.bbox_inches.height * ax.get_position().height * 72 / nreads
         with plt.rc_context({"lines.linewidth": min(lw, 0.5)}):
             L = scipy.cluster.hierarchy.dendrogram(
@@ -472,8 +474,9 @@ def run(args):
     if num_sidebars > 0:
         logger.info("adding {0} sidebars".format(len(sidebar_colors)))
         for nsc, sidebar_color in enumerate(sidebar_colors):
-            ax = fig.add_axes([left - (num_sidebars - nsc) * sidebar_width, 
-                               bottom, .9 * sidebar_width, height])
+            ax = fig.add_axes(
+                [left - (num_sidebars - nsc) * sidebar_width, bottom, 0.9 * sidebar_width, height]
+            )
             if sidebar_color == "isotype":
                 sidebar_values = clustering["isotype"].astype("category").cat.codes.values % 9
                 sidebar_cmap = plt.cm.Set1
@@ -538,11 +541,11 @@ def run(args):
                 vmax=max(1, sidebar_values.max()),
             )
             ax.set_axis_off()
-            ax.set_title(sidebar_color, rotation=45, size=4, ha='left')
+            ax.set_title(sidebar_color, rotation=45, size=4, ha="left")
 
     logger.info("plotting MSA")
     ax = fig.add_axes([left, bottom, width, height])
-    ax.set_facecolor('w')
+    ax.set_facecolor("w")
 
     # plot the image in chunks
     nchunks = np.ceil(nreads / args.chunksize).astype(int)
@@ -586,7 +589,7 @@ def run(args):
             use = np.isin(y, variants["rel_pos"])
             ax.scatter(
                 y[use],
-                nreads - (x[use] + n * args.chunksize) - .5,
+                nreads - (x[use] + n * args.chunksize) - 0.5,
                 marker=".",
                 lw=0,
                 s=0.1,
@@ -631,8 +634,8 @@ def run(args):
     minor_ticks = []
     minor_labels = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) 
-        end = shift_coord(int(rec[3][2]), cov_int) 
+        start = shift_coord(int(rec[3][1]), cov_int)
+        end = shift_coord(int(rec[3][2]), cov_int)
         major_ticks += [start, end]
         minor_ticks.append((start + end) / 2)
         minor_labels.append(rec[3][3])

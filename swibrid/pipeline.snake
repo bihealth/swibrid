@@ -318,7 +318,8 @@ rule cluster:
     stats='pipeline/{sample}/{sample}_cluster_stats.csv',
     scanning='pipeline/{sample}/{sample}_cutoff_scanning.csv'
   params:
-    cutoff=config['CLUSTERING_CUTOFF']
+    cutoff=config['CLUSTERING_CUTOFF'],
+    filtering_cutoff=config['CLUSTER_FILTERING_CUTOFF']
   threads: 1
   resources:
     mem_mb=increase_mem,
@@ -330,7 +331,7 @@ rule cluster:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
-    swibrid find_clusters -l {input.linkage} -i {input.msa} -o {output.cluster} -s {output.stats} --scanning {output.scanning} -f {params.cutoff} 2> {log}
+    swibrid find_clusters -l {input.linkage} -i {input.msa} -o {output.cluster} -s {output.stats} --scanning {output.scanning} -f {params.cutoff} --filtering_cutoff {params.filtering_cutoff} 2> {log}
     """
 
 
@@ -341,7 +342,6 @@ rule variants:
     pars='pipeline/{sample}/{sample}_last_pars.npz' if config['ALIGNER']=='LAST' else 'pipeline/{sample}/{sample}_minimap_pars.npz',
   output:
     txt='pipeline/{sample}/{sample}_variants.txt',
-    txt_complete='pipeline/{sample}/{sample}_variants_complete.txt',
     mat='pipeline/{sample}/{sample}_variants.npz',
     ht='pipeline/{sample}/{sample}_haplotypes.csv',
   params:
@@ -360,7 +360,7 @@ rule variants:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
-    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --out_complete {output.txt_complete} --haplotypes {output.ht}  --variant_annotation {params.variant_annotation} 2> {log}
+    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht}  --variant_annotation {params.variant_annotation} 2> {log}
     """
 
 
@@ -472,6 +472,7 @@ rule downsample_clustering:
     max_gap=config['MAX_GAP'],
     metric=config['CLUSTERING_METRIC'],
     method=config['CLUSTERING_METHOD'],
+    filtering_cutoff=config['CLUSTER_FILTERING_CUTOFF'],
     nreads=config['CLUSTER_DOWNSAMPLING_NREADS'],
     nreps=config['CLUSTER_DOWNSAMPLING_NREPS']
   threads: 1
@@ -484,7 +485,7 @@ rule downsample_clustering:
   log: "logs/cluster/{sample}_downsampling.log"
   shell:
     r"""
-    swibrid downsample_clustering -s {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --cluster_stats {input.cluster_stats} --metric {params.metric} --method {params.method} --nreads {params.nreads} --nreps {params.nreps} 2> {log}
+    swibrid downsample_clustering -s {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --cluster_stats {input.cluster_stats} --metric {params.metric} --method {params.method} --nreads {params.nreads} --nreps {params.nreps} --filtering_cutoff {params.filtering_cutoff} 2> {log}
     """
 
 
@@ -515,6 +516,7 @@ rule breakpoint_stats:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
+    mkdir -p output/breakpoint_plots
     swibrid get_breakpoint_stats -g {input.gaps} -c {input.clustering} -a {input.analysis} -r {input.rearrangements} -b {params.binsize} --max_gap {params.max_gap} --homology {input.homology} --motifs {input.motifs} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} -o {output.stats} --weights {params.weights} --plot {output.plot} --sample {wildcards.sample} 2> {log}
     """
 
@@ -549,7 +551,7 @@ rule plot_clustering:
   log: "logs/plots/{sample}.log"
   shell:
     r"""
-    mkdir -p output/{wildcards.sample}
+    mkdir -p output/read_plots
     swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by isotype,haplotype 2> {log}
     swibrid plot_clustering --msa {input.msa} --figure {output.coverage} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} {params.annotation} --color_by coverage --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by isotype,haplotype
     """
@@ -586,6 +588,7 @@ rule summary:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
+    mkdir -p output/QC_plots
     swibrid get_summary --sample {wildcards.sample} --figure {output.plot} --stats {output.stats} --process {input.process} --info {input.info} --gaps {input.gaps} --clustering {input.clustering} --scanning {input.scanning} --cluster_stats {input.cluster_stats} --switch_anno {params.switch_annotation} --switch_coords {params.switch} --breakpoint_stats {input.breakpoint_stats} --max_gap {params.max_gap} --cluster_analysis {input.cluster_analysis} --cluster_downsampling {input.cluster_downsampling} --variants {input.variants} --weights {params.weights} 2> {log}
     """
 

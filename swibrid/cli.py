@@ -101,7 +101,7 @@ def test_pipeline(args, snake_options):
         logger.info("copying test_config.yaml")
         configfile = Path(__file__).parent.parent.joinpath("test_data/test_config.yaml")
         os.system("cp {0} .".format(configfile))
-    
+
     Path("index").mkdir(exist_ok=True)
     if not os.path.isfile("index/hg38_chr14_105-106MB.fa") or args.overwrite:
         logger.info("setting up index for switch region of hg38")
@@ -110,7 +110,9 @@ def test_pipeline(args, snake_options):
         os.system("samtools faidx index/hg38_chr14_105-106MB.fa")
         os.system("lastdb index/hg38_chr14_105-106MBdb index/hg38_chr14_105-106MB.fa")
 
-    switch_regions = Path(__file__).parent.parent.joinpath("test_data/hg38_chr14_105-106MB_switch_regions.bed")
+    switch_regions = Path(__file__).parent.parent.joinpath(
+        "test_data/hg38_chr14_105-106MB_switch_regions.bed"
+    )
     if not os.path.isfile("index/hg38_chr14_105-106MB_switch_regions.bed") or args.overwrite:
         os.system("cp {0} index".format(switch_regions))
 
@@ -192,8 +194,9 @@ def main(argv=None):
     swibrid downsample             downsample (aligned & processed) reads from a sample
     """
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     description=dedent(__doc__))
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent(__doc__)
+    )
     parser.add_argument(
         "-v",
         "--verbose",
@@ -222,13 +225,19 @@ def main(argv=None):
         help="""overwrite files if present [no]""",
     )
 
-    pipeline_parser = subparsers.add_parser("run", formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent("""\
+    pipeline_parser = subparsers.add_parser(
+        "run",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(
+            """\
         main command: run the entire pipeline
         run `swibrid setup` and edit config.yaml first!
-        
+
         this will call snakemake; additional options are passed to snakemake
         e.g., for a dry run use `swibrid run -n`, or `swibrid run --unlock` after a failed run
-        """))
+        """
+        ),
+    )
     pipeline_parser.add_argument(
         "-s",
         "--snakefile",
@@ -267,13 +276,19 @@ def main(argv=None):
         help="pass options to snakemake (...)",
     )
 
-    test_parser = subparsers.add_parser("test", formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent("""\
+    test_parser = subparsers.add_parser(
+        "test",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(
+            """\
         test the pipline
         this will create synthetic reads in `input` and run the pipeline on this data,
         using a reduced hg38 genome in `index` with only the switch region (chr14:105000000-106000000)
         this will probably take about 30-60 minutes and will call snakemake, passing on additional options
         e.g., for a dry run use `swibrid test -n`, and do `swibrid test --unlock` after a failed run
-        """))
+        """
+        ),
+    )
     test_parser.add_argument(
         "-f",
         "--overwrite",
@@ -320,73 +335,173 @@ def main(argv=None):
         help="pass options to snakemake (...)",
     )
 
-    demultiplex.setup_argparse(subparsers.add_parser("demultiplex", formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent(demultiplex.__doc__)))
+    demultiplex.setup_argparse(
+        subparsers.add_parser(
+            "demultiplex",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(demultiplex.__doc__),
+        )
+    )
     plot_demux_report.setup_argparse(
-        subparsers.add_parser("plot_demux_report", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(plot_demux_report.__doc__))
+        subparsers.add_parser(
+            "plot_demux_report",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(plot_demux_report.__doc__),
+        )
     )
     process_alignments.setup_argparse(
-        subparsers.add_parser("process_alignments", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(process_alignments.__doc__))
+        subparsers.add_parser(
+            "process_alignments",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(process_alignments.__doc__),
+        )
     )
     get_alignment_pars.setup_argparse(
-        subparsers.add_parser("get_alignment_pars", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_alignment_pars.__doc__))
+        subparsers.add_parser(
+            "get_alignment_pars",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_alignment_pars.__doc__),
+        )
     )
-    create_bed.setup_argparse(subparsers.add_parser("create_bed", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(create_bed.__doc__)))
+    create_bed.setup_argparse(
+        subparsers.add_parser(
+            "create_bed",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(create_bed.__doc__),
+        )
+    )
     construct_msa.setup_argparse(
-        subparsers.add_parser("construct_msa", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(construct_msa.__doc__))
+        subparsers.add_parser(
+            "construct_msa",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(construct_msa.__doc__),
+        )
     )
-    get_gaps.setup_argparse(subparsers.add_parser("get_gaps", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_gaps.__doc__)))
+    get_gaps.setup_argparse(
+        subparsers.add_parser(
+            "get_gaps",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_gaps.__doc__),
+        )
+    )
     construct_linkage.setup_argparse(
-        subparsers.add_parser("construct_linkage", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(construct_linkage.__doc__))
+        subparsers.add_parser(
+            "construct_linkage",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(construct_linkage.__doc__),
+        )
     )
     find_clusters.setup_argparse(
-        subparsers.add_parser("find_clusters", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(find_clusters.__doc__))
+        subparsers.add_parser(
+            "find_clusters",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(find_clusters.__doc__),
+        )
     )
     find_variants.setup_argparse(
-        subparsers.add_parser("find_variants", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(find_variants.__doc__))
+        subparsers.add_parser(
+            "find_variants",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(find_variants.__doc__),
+        )
     )
     find_rearrangements.setup_argparse(
-        subparsers.add_parser("find_rearrangements", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(find_rearrangements.__doc__))
+        subparsers.add_parser(
+            "find_rearrangements",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(find_rearrangements.__doc__),
+        )
     )
     plot_clustering.setup_argparse(
-        subparsers.add_parser("plot_clustering", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(plot_clustering.__doc__))
+        subparsers.add_parser(
+            "plot_clustering",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(plot_clustering.__doc__),
+        )
     )
     get_summary.setup_argparse(
-        subparsers.add_parser("get_summary", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_summary.__doc__))
+        subparsers.add_parser(
+            "get_summary",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_summary.__doc__),
+        )
     )
     get_breakpoint_stats.setup_argparse(
-        subparsers.add_parser("get_breakpoint_stats", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_breakpoint_stats.__doc__))
+        subparsers.add_parser(
+            "get_breakpoint_stats",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_breakpoint_stats.__doc__),
+        )
     )
     get_switch_homology.setup_argparse(
         subparsers.add_parser(
-            "get_switch_homology", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_switch_homology.__doc__)
+            "get_switch_homology",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_switch_homology.__doc__),
         )
     )
     get_switch_motifs.setup_argparse(
-        subparsers.add_parser("get_switch_motifs", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_switch_motifs.__doc__))
+        subparsers.add_parser(
+            "get_switch_motifs",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_switch_motifs.__doc__),
+        )
     )
     analyze_clustering.setup_argparse(
-        subparsers.add_parser("analyze_clustering", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(analyze_clustering.__doc__))
+        subparsers.add_parser(
+            "analyze_clustering",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(analyze_clustering.__doc__),
+        )
     )
     downsample_clustering.setup_argparse(
-        subparsers.add_parser("downsample_clustering", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(downsample_clustering.__doc__))
+        subparsers.add_parser(
+            "downsample_clustering",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(downsample_clustering.__doc__),
+        )
     )
     get_synthetic_reads.setup_argparse(
-        subparsers.add_parser("get_synthetic_reads", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_synthetic_reads.__doc__))
+        subparsers.add_parser(
+            "get_synthetic_reads",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_synthetic_reads.__doc__),
+        )
     )
     get_unique_clones_bed.setup_argparse(
-        subparsers.add_parser("get_unique_clones_bed", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_unique_clones_bed.__doc__))
+        subparsers.add_parser(
+            "get_unique_clones_bed",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_unique_clones_bed.__doc__),
+        )
     )
     combine_replicates.setup_argparse(
-        subparsers.add_parser("combine_replicates", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(combine_replicates.__doc__))
+        subparsers.add_parser(
+            "combine_replicates",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(combine_replicates.__doc__),
+        )
     )
     downsample.setup_argparse(
-        subparsers.add_parser("downsample", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(downsample.__doc__))
+        subparsers.add_parser(
+            "downsample",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(downsample.__doc__),
+        )
     )
     collect_results.setup_argparse(
-        subparsers.add_parser("collect_results", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(collect_results.__doc__))
+        subparsers.add_parser(
+            "collect_results",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(collect_results.__doc__),
+        )
     )
     get_annotation.setup_argparse(
-        subparsers.add_parser("get_annotation", formatter_class=argparse.RawDescriptionHelpFormatter,description=dedent(get_annotation.__doc__))
+        subparsers.add_parser(
+            "get_annotation",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description=dedent(get_annotation.__doc__),
+        )
     )
 
     args, extra = parser.parse_known_args(argv)
@@ -423,7 +538,7 @@ def main(argv=None):
         "combine_replicates": combine_replicates.run,
         "downsample": downsample.run,
         "collect_results": collect_results.run,
-        "get_annotation": get_annotation.run
+        "get_annotation": get_annotation.run,
     }
 
     if args.cmd == "run":

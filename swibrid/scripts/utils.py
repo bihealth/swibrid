@@ -2,6 +2,7 @@ import numpy as np
 from logzero import logger
 
 ncodes = dict(zip(list("ACGTacgt"), [1, 2, 3, 4, -1, -2, -3, -4]))
+
 IUPAC = {
     "A": "A",
     "C": "C",
@@ -21,6 +22,24 @@ IUPAC = {
 }
 
 RC = {"A": "T", "C": "G", "G": "C", "T": "A", "N": "N"}
+
+isotype_colors = {
+    "SM": "#000000",
+    "SG3": "#FF96BC",
+    "SG1": "#FF629B",
+    "SA1": "#13C203",
+    "SG2": "#C81E5C",
+    "SG4": "#76002B",
+    "SE": "#E3D913",
+    "SA2": "#006709",
+    "Sm": "#000000",
+    "Sg3": "#FF96BC",
+    "Sg1": "#FF629B",
+    "Sa": "#13C203",
+    "Sg2b": "#C81E5C",
+    "Sg2c": "#76002B",
+    "Se": "#E3D913",
+}
 
 
 def parse_switch_coords(switch_coords):
@@ -62,7 +81,9 @@ def get_switch_coverage(switch_anno, switch_chrom, switch_start, switch_end):
 
 
 def merge_intervals(intervals, add_count=False):
-    """interval merging function from here: http://codereview.stackexchange.com/questions/69242/merging-overlapping-intervals but extended to include chromosome as first entry of tuple"""
+    """interval merging function from here: http://codereview.stackexchange.com/questions/69242/merging-overlapping-intervals
+    but extended to include chromosome as first entry of tuple, and to optionally count number of overlaps
+    """
 
     sorted_by_lower_bound = sorted(intervals, key=lambda tup: (tup[0], tup[1]))
     merged = []
@@ -80,8 +101,10 @@ def merge_intervals(intervals, add_count=False):
                     lower[0],
                     lower[1],
                     upper_bound,
-                )  + ((merged[-1][3] + 1,) if add_count else ()) # replace by merged interval
-                
+                ) + (
+                    (merged[-1][3] + 1,) if add_count else ()
+                )  # replace by merged interval
+
             else:
                 merged.append(higher + ((1,) if add_count else ()))
 
@@ -294,6 +317,7 @@ def nonzero_intervals(vec, start):
 
 
 def shift_coord(coord, cov_int, ignore=False):
+    """shift a genomic coordinate into a relative coordinate over the interval set cov_int"""
     shift = cov_int[0][0]
     for k in range(1, len(cov_int)):
         if coord >= cov_int[k][0]:
@@ -306,6 +330,7 @@ def shift_coord(coord, cov_int, ignore=False):
 
 
 def get_leader_height(Z, C):
+    """get leader heights of nodes in linkage for a given clustering"""
     import scipy.cluster.hierarchy
     import pandas as pd
 
@@ -324,6 +349,8 @@ def get_leader_height(Z, C):
 
 
 def filter_clustering(Z, C, p=0.95, min_size=0):
+    """filter a clustering such that only the largest clusters (and those with the smallest leader height)
+    containing at least a fraction p of reads are retained"""
     clusts, cinv, csize = np.unique(C, return_inverse=True, return_counts=True)
     heights = get_leader_height(Z, C)
     o = np.lexsort([heights.max() - heights.loc[clusts].values, csize])[::-1]
@@ -336,14 +363,20 @@ def filter_clustering(Z, C, p=0.95, min_size=0):
 
 
 def f2(p, x):
+    """helper function for fitting a double exponential trend"""
     return p[0] * np.exp(-p[1] * x) + p[2] * np.exp(-p[3] * x)
 
 
 def res2(p, x, y):
+    """helper function for the residual (of the log values) of f2 and y"""
     return np.log(f2(p, x)) - np.log(y)
 
 
 def get_gap_positions(msa, max_gap=25):
+    """find gap positions in MSA (sparse matrix)
+    returns a tuple of vectors of length # gaps,  containing
+    the read (=row) index, the left and right (=col) positions and the size
+    """
     # get indices of nonzero elements
     ii, jj = msa.nonzero()
     # find all "normal" breakpoint positions (between empty and nonzero)
@@ -384,6 +417,7 @@ def vrange(starts, stops):
 
 
 def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
+    """removes gaps smaller than max_gap from MSA"""
     import numpy as np
     import scipy.sparse
 
@@ -436,6 +470,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
 
 
 def parse_range(numString: str):
+    """parses a range given like so: 1,3,5-8 into a set of integers"""
     import itertools
 
     def expand_range(s: str):
@@ -452,6 +487,10 @@ def parse_range(numString: str):
 
 
 def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
+    """returns a sparse matrix of dimensions nreads x npos
+    containing alternative nucleotides encoded as integers
+    (uses only positions with strand bias < max_bias
+    """
     import scipy.sparse
     import pandas as pd
 
@@ -482,6 +521,7 @@ def construct_mut_matrix(mutations, nreads, npos, max_bias=0.25):
 
 
 def nmf_consistency(U_max, U_all):
+    """assesses consistency over list of NMF-induced clusterings"""
     from sklearn.metrics.cluster import contingency_matrix
 
     gmax = np.argmax(U_max, axis=1)
@@ -496,11 +536,12 @@ def nmf_consistency(U_max, U_all):
     return np.mean(np.array(c), 0)
 
 
-def get_switch_iis(anno_recs, cov_int, eff_start, binsize):
+def get_switch_iis(anno_recs, cov_int, binsize):
+    """makes vector of switch region annotations over region bins of size binsize"""
     switch_iis = []
     for rec in anno_recs:
-        start = shift_coord(int(rec[3][1]), cov_int) 
-        end = shift_coord(int(rec[3][2]), cov_int) 
+        start = shift_coord(int(rec[3][1]), cov_int)
+        end = shift_coord(int(rec[3][2]), cov_int)
         switch_iis.append([rec[3][3].upper()] * (end // binsize - start // binsize))
     return np.concatenate(switch_iis)
 

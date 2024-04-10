@@ -2,7 +2,7 @@
 find clusters by cutting linkage dendrogram
 inputs are the linkage matrix (from construct_linkage) and read info (from construct_msa)
 output is a csv file that adds cluster identity to the read info file
-cutoff can be fixed or determined by scanning cutoffs between cmin and cmax 
+cutoff can be fixed or determined by scanning cutoffs between cmin and cmax
 and finding an inflection point (either by distance, or from the intersection of two exponential trends)
 small and isolated clusters are flagged, filtered clusters contain at least 95% of reads
 """
@@ -21,7 +21,9 @@ def setup_argparse(parser):
         dest="input",
         help="""required: read info (output of construct_msa.py)""",
     )
-    parser.add_argument("-o", "--output", dest="output", help="""required: output file with clustering""")
+    parser.add_argument(
+        "-o", "--output", dest="output", help="""required: output file with clustering"""
+    )
     parser.add_argument("-s", "--stats", dest="stats", help="""file with statistics""")
     parser.add_argument(
         "-f",
@@ -61,6 +63,13 @@ def setup_argparse(parser):
         default=100,
         type=int,
         help="""number of cutoff values between cmin and cmax [100]""",
+    )
+    parser.add_argument(
+        "--filtering_cutoff",
+        dest="filtering_cutoff",
+        default=0.95,
+        type=float,
+        help="""filter out smallest clusters, keeping at least this fraction of reads [.95]""",
     )
 
 
@@ -146,7 +155,7 @@ def run(args):
     clustering = cc[:, cutoffs == c_opt].flatten()
 
     logger.info("filtering clusters")
-    filtered_clustering = filter_clustering(Z, clustering)
+    filtered_clustering = filter_clustering(Z, clustering, p=args.filtering_cutoff)
 
     if args.stats:
         logger.info("saving stats to {0}".format(args.stats))

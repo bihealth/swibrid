@@ -17,11 +17,11 @@ SAMPLES: ["sample1","sample2"]
 # minimum read length
 MINLENGTH: 500
 # reference genome (fasta file, index should be present)
-REFERENCE: 'index/hs1.fa'
+REFERENCE: 'index/hg38.fa'
 # LAST index of reference genome
-LAST_INDEX: 'index/hs1db'
+LAST_INDEX: 'index/hg38db'
 # minimap2 index of reference genome
-MINIMAP_INDEX: 'index/hs1-ont.mmi'
+MINIMAP_INDEX: 'index/hg38-ont.mmi'
 # aligner to use (LAST is more precise and recommended, minimap2 is much faster)
 ALIGNER: 'LAST'
 # fasta file specifying the telomer repeat unit
@@ -29,7 +29,7 @@ TELO_REPEAT: 'index/telomerSequence.fasta'
 # coordinates of switch region (altogether)
 SWITCH: 'chr14:99840000-100138000:-'
 # bed file with coordinates of individual switch regions
-SWITCH_ANNOTATION: 'index/hs1_switch_regions.bed'
+SWITCH_ANNOTATION: 'index/hg38_switch_regions.bed'
 # bed file with gene annotation
 ANNOTATION: 'index/chm13.draft_v2.0.gene_annotation.exon_shorted.bed'
 # vcf file with variant annotation
@@ -42,12 +42,14 @@ CLUSTERING_METRIC: 'cosine'
 CLUSTERING_METHOD: 'average'
 # fixed clustering cutoff
 CLUSTERING_CUTOFF: 0.01
+# cutoff for cluster filtering
+CLUSTER_FILTERING_CUTOFF: 0.95
 # max gap size to remove before clustering
 MAX_GAP: 75
 # bin size for breakpoint analysis
 BINSIZE: 50
 # blacklisted regions for insert detection
-BLACKLIST_REGIONS: 'index/hs1_blacklist_regions.bed'
+BLACKLIST_REGIONS: 'index/hg38_blacklist_regions.bed'
 # weights to use for averaging features over clusters (or reads)
 WEIGHTS: 'cluster'
 # number of reads to use for downsampling analysis

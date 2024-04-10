@@ -1,12 +1,13 @@
 """\
    construct (pseudo) MSA from processed alignments
    this script will take aligned segments and sequences from process_alignments and construct a MSA
-   the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file. 
+   the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file.
    matrix values m code for coverage and nucleotide identity:
        m % 10 gives nucleotide identity with A=1, C=2, G=3, T=4, gaps are zeros
        m // 10 gives coverage of genomic regions by one read (1x, 2x, ...)  and indicates tandem duplications
    if `--use_orientation` is set, inversions are also considered and associated coverage values are negative
 """
+
 
 def setup_argparse(parser):
     parser.add_argument(
@@ -145,8 +146,8 @@ def run(args):
 
     cov = np.sign(x[ind])
     cons = np.abs(x[ind])
-    #cov2 = np.sign(x[ind])
-    #cons2 = np.abs(x[ind])
+    # cov2 = np.sign(x[ind])
+    # cons2 = np.abs(x[ind])
 
     if len(ind) < len(i):
         xx = scipy.sparse.csr_matrix((x, (np.arange(len(inv)), inv)))
@@ -158,12 +159,19 @@ def run(args):
         logger.warn(
             "{0} positions in MSA are covered multiple times; getting consensus".format(len(p1))
         )
-        #for k, p in enumerate(p1):
+        # for k, p in enumerate(p1):
         #    cov2[p] = np.sum(np.sign(xx[:, k].data))
         #    cons2[p] = np.bincount(np.abs(xx[:, k].data)).argmax()
-        cov[p1] = (np.sum(xx > 0,axis=0) - np.sum(xx < 0,axis=0)).A1
-        cons[p1] = np.vstack([np.bincount(xx.nonzero()[1][np.abs(xx.data) == k + 1],
-                                          minlength=xx.shape[1]) for k in range(4)]).argmax(0) + 1
+        cov[p1] = (np.sum(xx > 0, axis=0) - np.sum(xx < 0, axis=0)).A1
+        cons[p1] = (
+            np.vstack(
+                [
+                    np.bincount(xx.nonzero()[1][np.abs(xx.data) == k + 1], minlength=xx.shape[1])
+                    for k in range(4)
+                ]
+            ).argmax(0)
+            + 1
+        )
 
     msa = scipy.sparse.csr_matrix(
         (10 * cov + cons, (i[ind], j[ind])), shape=(nreads, Ltot), dtype=np.int8

@@ -8,9 +8,19 @@
 
 
 def setup_argparse(parser):
-    parser.add_argument("-i", "--input", dest="input", help="""required: input fastq(.gz)""", required=True)
-    parser.add_argument("-b", "--blast", dest="blast", help="""required: BLAST output file (or stdin)""", required=True)
-    parser.add_argument("-o", "--outdir", dest="outdir", help="""required: output directory""", required=True)
+    parser.add_argument(
+        "-i", "--input", dest="input", help="""required: input fastq(.gz)""", required=True
+    )
+    parser.add_argument(
+        "-b",
+        "--blast",
+        dest="blast",
+        help="""required: BLAST output file (or stdin)""",
+        required=True,
+    )
+    parser.add_argument(
+        "-o", "--outdir", dest="outdir", help="""required: output directory""", required=True
+    )
     parser.add_argument(
         "-c",
         "--cutoff",

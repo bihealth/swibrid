@@ -339,7 +339,7 @@ def run(args):
 
     df = pd.concat([df, insert_stats, realignment_stats], axis=1)
 
-    switch_iis = get_switch_iis(anno_recs, cov_int, eff_start, 1)
+    switch_iis = get_switch_iis(anno_recs, cov_int, 1)
     for isotype in np.unique(switch_iis):
         df["length_" + isotype] = avg_msa[:, switch_iis == isotype].sum(1)
 

@@ -31,8 +31,8 @@ def setup_argparse(parser):
     parser.add_argument(
         "--motifs",
         dest="motifs",
-        default="TG,CA,TCCA,CAGCC,CAGCT",
-        help="""comma-separated list of sequence motifs [TG,CA,TCCA,CAGCC,CAGCT]""",
+        default="S,W,WGCW,GAGCT,GGGST",
+        help="""comma-separated list of sequence motifs [S=G/C,W=A/T,WGCW,GAGCT,GGGST]""",
     )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
 
@@ -46,6 +46,7 @@ def run(args):
         read_switch_anno,
         get_switch_coverage,
         shift_coord,
+        IUPAC,
     )
 
     genome = pysam.FastaFile(args.genome)
@@ -67,28 +68,16 @@ def run(args):
     binsize = args.binsize
 
     motif_counts = {}
-    motif_counts["G_C"] = (
-        np.array(
-            [
-                sum(1 for _ in re.finditer("G|C", stot[k * binsize : (k + 1) * binsize]))
-                for k in range(len(stot) // binsize)
-            ]
-        )
-        / binsize
-    )
-    motif_counts["A_T"] = (
-        np.array(
-            [
-                sum(1 for _ in re.finditer("A|T", stot[k * binsize : (k + 1) * binsize]))
-                for k in range(len(stot) // binsize)
-            ]
-        )
-        / binsize
-    )
     for motif in args.motifs.split(","):
         motif_counts[motif] = np.array(
             [
-                sum(1 for _ in re.finditer(motif, stot[k * binsize : (k + 1) * binsize]))
+                sum(
+                    1
+                    for _ in re.finditer(
+                        r"".join(IUPAC[m.upper()] for m in motif),
+                        stot[k * binsize : (k + 1) * binsize],
+                    )
+                )
                 for k in range(len(stot) // binsize)
             ]
         ) / (binsize / len(motif))

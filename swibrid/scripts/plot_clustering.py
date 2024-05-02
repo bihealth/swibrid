@@ -391,6 +391,8 @@ def run(args):
         cmap = plt.cm.PiYG
     elif args.color_by == "coverage":
         cmap = plt.cm.rainbow_r
+    elif args.color_by == "sequence":
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list('nucleotides',['#0000FF','#FF0000','#00CC00','#FFFF00'],N=10)
     elif args.color_by == "strand" and args.info:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
@@ -569,6 +571,9 @@ def run(args):
             values = np.array([0, 1])
         elif args.color_by == "coverage":
             im[np.nonzero(msa_chunk)] = (msa_chunk.data // 10 + 2) / 4
+            values = np.array([0, 1])
+        elif args.color_by == "sequence":
+            im[np.nonzero(msa_chunk)] = (msa_chunk.data % 10 - 1) / 3.
             values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T

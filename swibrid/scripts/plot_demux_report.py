@@ -24,20 +24,31 @@ def run(args):
     matplotlib.use("Agg")
     from matplotlib import pyplot as plt
 
-    logger.info("reading sample sheet from " + args.sample_sheet)
-    sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
-    whitelist = sample_sheet.index
+    if args.sample_sheet is not None:
 
-    logger.info("reading read info from " + args.outdir)
-    read_info = {}
-    for comb in list(whitelist):
-        fname = os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+        logger.info("reading sample sheet from " + args.sample_sheet)
+        sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
+        whitelist = sample_sheet.index
+
+        logger.info("reading read info from " + args.outdir)
+        read_info = {}
+        for comb in list(whitelist):
+            fname = os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+            if os.path.isfile(fname):
+                read_info[comb] = pd.read_csv(fname)
+                
+        fname = os.path.join(args.outdir, "undetermined_info.csv")
         if os.path.isfile(fname):
-            read_info[comb] = pd.read_csv(fname)
+            read_info["undetermined"] = pd.read_csv(fname)
 
-    fname = os.path.join(args.outdir, "undetermined_info.csv")
-    if os.path.isfile(fname):
-        read_info["undetermined"] = pd.read_csv(fname)
+    else:
+        
+        read_info = {}
+        for fname in os.listdir(args.outdir):
+            if fname.endswith('_info.csv'):
+                read_info[fname.split('_info.csv')[0]] = pd.read_csv(os.path.join(args.outdir, fname))
+
+        whitelist = list(read_info.keys())
 
     nreads = pd.Series(dict((k, v.shape[0]) for k, v in read_info.items())).sort_values(
         ascending=False

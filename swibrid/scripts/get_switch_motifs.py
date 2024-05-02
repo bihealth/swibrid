@@ -34,7 +34,21 @@ def setup_argparse(parser):
         default="S,W,WGCW,GAGCT,GGGST",
         help="""comma-separated list of sequence motifs [S=G/C,W=A/T,WGCW,GAGCT,GGGST]""",
     )
+    parser.add_argument(
+        "-k",
+        dest='k',
+        type=int,
+        default=5,
+        help="""value k for estimate of k-mer complexity [5]""",
+    )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
+
+
+def get_complexity (seq, k):
+    """computes kmer complexity (number of observed kmers / number of possible kmers)"""
+    observed = len(set(seq[i:i+k] for i in range(len(seq)-k)))
+    possible = min(4**k, len(seq) - k)
+    return observed / possible
 
 
 def run(args):
@@ -69,7 +83,7 @@ def run(args):
 
     motif_counts = {}
     for motif in args.motifs.split(","):
-        motif_counts[motif] = np.array(
+        motif_counts['score_' + motif] = np.array(
             [
                 sum(
                     1
@@ -81,6 +95,9 @@ def run(args):
                 for k in range(len(stot) // binsize)
             ]
         ) / (binsize / len(motif))
+
+    motif_counts['complexity'] = np.array(
+           [   get_complexity(stot[k * binsize : (k + 1) * binsize], args.k) for k in range(len(stot) // binsize) ])
 
     if args.output:
         np.savez(args.output, **motif_counts)

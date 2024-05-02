@@ -75,6 +75,13 @@ def setup_argparse(parser):
         help="""keep reads with internal primers""",
     )
     parser.add_argument(
+        "--remove-duplicates",
+        dest="remove_duplicates",
+        action="store_true",
+        default=False,
+        help="""remove duplicate reads (from "is_duplicate" column in info file)""",
+    )
+    parser.add_argument(
         "--telo",
         dest="telo",
         default="",
@@ -167,6 +174,12 @@ def setup_argparse(parser):
         "--realign_breakpoints",
         dest="realign_breakpoints",
         help="""re-align reads around breakpoints and save results to this file (requires --raw_reads and --genome)""",
+    )
+    parser.add_argument(
+        "--realignment_penalties",
+        dest="realignment_penalties",
+        default="ont",
+        help="""re-alignment penalties ("ont", "hifi" or "sr") [ont]"""
     )
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with unaligned reads""")
     parser.add_argument("--genome", dest="genome", help="""reference genome file""")
@@ -416,20 +429,33 @@ def combine_alignments(al1, al2, pad):
     return s1, m1, s0, m2, s2
 
 
-def realign_breakpoints(matches, genome, read_seq, pad=20):
+def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
     from Bio import Align
 
     def revcomp(seq):
         from swibrid.scripts.utils import RC
-
         return "".join(RC[s] for s in seq[::-1])
 
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"
-    aligner.match_score = 2
-    aligner.mismatch_score = -4
-    aligner.open_gap_score = -4
-    aligner.extend_gap_score = -2
+    if penalties == "ont":
+        aligner.match_score = 2             # -A
+        aligner.mismatch_score = -4         # -B
+        aligner.open_gap_score = -4         # -O
+        aligner.extend_gap_score = -2       # -E
+    elif penalties == "hifi":
+        aligner.match_score = 1             # -A
+        aligner.mismatch_score = -4         # -B
+        aligner.open_gap_score = -6         # -O
+        aligner.extend_gap_score = -2       # -E
+    elif penalties == "sr":
+        aligner.match_score = 2             # -A
+        aligner.mismatch_score = -8         # -B
+        aligner.open_gap_score = -12        # -O
+        aligner.extend_gap_score = -2       # -E
+    else:
+        raise ValueError("unknown gap penalties {0}".format(penalties))
+
 
     res = []
     for i in range(len(matches) - 1):
@@ -559,6 +585,7 @@ def run(args):
         "nreads_mapped": 0,
         "nreads_removed_short": 0,
         "nreads_removed_incomplete": 0,
+        "nreads_removed_duplicate": 0,
         "nreads_removed_internal_primer": 0,
         "nreads_removed_no_switch": 0,
         "nreads_removed_length_mismatch": 0,
@@ -621,6 +648,10 @@ def run(args):
         ):
             stats["nreads_removed_incomplete"] += 1
             use = False
+
+        if args.remove_duplicates and "is_duplicate" in read_info.columns and read_info.loc[read, "is_duplicate"]:
+            stats["nreads_removed_duplicate"] += 1
+            use =False
 
         internal = read_info.loc[read, "internal"]
         if not args.keep_internal and not pd.isna(internal) and "primer" in internal:
@@ -1031,7 +1062,7 @@ def run(args):
                 continue
 
             realignments[rec.id] = realign_breakpoints(
-                processed_matches[rec.id], genome, str(rec.seq)
+                processed_matches[rec.id], genome, str(rec.seq), penalties=args.realignment_penalties
             )
 
         logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)

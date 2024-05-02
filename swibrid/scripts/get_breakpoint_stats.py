@@ -8,15 +8,16 @@ output file contains following values:
 - frac_breaks_duplications: fraction of breaks leading to duplication events
 - frac_breaks_inversions: fraction of breaks leading to inversion events
 - frac_breaks_single: fraction of breaks from SM to elsewhere
-- frac_breaks_multiple: fraction of breaks to different regions but not SM
-- frac_breaks_within: fraction of breaks within a region
-- frac_breaks_inversions/duplications_within: frac breaks with inversions/duplications within regions
+- frac_breaks_sequential: fraction of breaks to different regions but not SM
+- frac_breaks_intra: fraction of breaks within a region
+- frac_breaks_inversions/duplications_intra: frac breaks with inversions/duplications within regions
 - frac_breaks_X_X: fraction of breaks connecting indicated regions
 - spread_XX: spread (standard deviation) of breakpoint positions in a region
 - homology_fw: homology in bins around breakpoint positions (same orientation)
 - homology_rv: homology in bins around breakpoint positions (opposite orientation)
 - homology_fw/rv_XX: homologies for breaks connecting indicated regions
-- donor/receiver_score_XX: motif scores for donor and receiver breakpoints for different motifs, subdivided by region
+- donor/receiver_score(_XX): motif scores for donor and receiver breakpoints for different motifs (subdivided by region)
+- donor/receiver_complexity(_XX): sequence complexity for donoer and receiver breakpoints (subdivided by region)
 """
 
 
@@ -143,6 +144,7 @@ def run(args):
         get_switch_coverage,
         parse_range,
         get_switch_iis,
+        weighted_avg_and_std,
     )
 
     (
@@ -230,17 +232,17 @@ def run(args):
         inv_size = rearrangements["inv_size"]
 
         # inversions
-        take = (
+        take_inv = (
             (inv_size >= args.max_gap)
             & (inv_left // binsize < Leff)
             & (inv_right // binsize < Leff)
         )
         bp_hist_inv = scipy.sparse.csr_matrix(
             (
-                weights[inv_read[take]],
+                weights[inv_read[take_inv]],
                 (
-                    np.maximum(inv_left[take], inv_right[take]) // binsize,
-                    np.minimum(inv_left[take], inv_right[take]) // binsize,
+                    np.maximum(inv_left[take_inv], inv_right[take_inv]) // binsize,
+                    np.minimum(inv_left[take_inv], inv_right[take_inv]) // binsize,
                 ),
             ),
             shape=(Leff, Leff),
@@ -253,17 +255,17 @@ def run(args):
         dup_size = rearrangements["dup_size"]
 
         # duplications
-        take = (
+        take_dup = (
             (dup_size >= args.max_gap)
             & (dup_left // binsize < Leff)
             & (dup_right // binsize < Leff)
         )
         bp_hist_dup = scipy.sparse.csr_matrix(
             (
-                weights[dup_read[take]],
+                weights[dup_read[take_dup]],
                 (
-                    np.maximum(dup_left[take], dup_right[take]) // binsize,
-                    np.minimum(dup_left[take], dup_right[take]) // binsize,
+                    np.maximum(dup_left[take_dup], dup_right[take_dup]) // binsize,
+                    np.minimum(dup_left[take_dup], dup_right[take_dup]) // binsize,
                 ),
             ),
             shape=(Leff, Leff),
@@ -281,6 +283,7 @@ def run(args):
     nbreaks = bp_hist.sum()
     ninversions = bp_hist_inv.sum()
     nduplications = bp_hist_dup.sum()
+    stats["mean_break_size"], stats["std_break_size"] = weighted_avg_and_std(gap_size[take], weights[gap_read[take]])
     stats["breaks_normalized"] = nbreaks
     stats["frac_breaks_inversions"] = ninversions / (nbreaks + ninversions + nduplications)
     stats["frac_breaks_duplications"] = nduplications / (nbreaks + ninversions + nduplications)
@@ -288,16 +291,16 @@ def run(args):
     single_event = ((switch_iis[xx] == "SM") | (switch_iis[yy] == "SM")) & (
         switch_iis[xx] != switch_iis[yy]
     )
-    multiple_event = (
+    sequential_event = (
         (switch_iis[xx] != "SM") & (switch_iis[yy] != "SM") & (switch_iis[xx] != switch_iis[yy])
     )
-    within_event = switch_iis[xx] == switch_iis[yy]
+    intra_event = switch_iis[xx] == switch_iis[yy]
 
     stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
-    stats["frac_breaks_multiple"] = bp_hist[multiple_event].sum() / nbreaks
-    stats["frac_breaks_within"] = bp_hist[within_event].sum() / nbreaks
-    stats["frac_breaks_inversions_within"] = bp_hist_inv[within_event].sum() / ninversions
-    stats["frac_breaks_duplications_within"] = bp_hist_dup[within_event].sum() / nduplications
+    stats["frac_breaks_sequential"] = bp_hist[sequential_event].sum() / nbreaks
+    stats["frac_breaks_intra"] = bp_hist[intra_event].sum() / nbreaks
+    stats["frac_breaks_inversions_intra"] = bp_hist_inv[intra_event].sum() / (nbreaks + ninversions + nduplications)
+    stats["frac_breaks_duplications_intra"] = bp_hist_dup[intra_event].sum() / (nbreaks + ninversions + nduplications)
 
     # collapse different gamma and alpha isotypes for frac_breaks, spread and homology scores
     switch_iis = np.array([si[:2] for si in switch_iis])
@@ -348,10 +351,10 @@ def run(args):
         motif_counts = np.load(args.motifs)
         for motif in motif_counts.files:
             counts = motif_counts[motif]
-            stats["donor_score_{0}".format(motif)] = np.sum(bp_hist.sum(0).A1 * counts) / (
+            stats["donor_{0}".format(motif)] = np.sum(bp_hist.sum(0).A1 * counts) / (
                 bp_hist.sum(0).A1.sum() * counts.sum()
             )
-            stats["receiver_score_{0}".format(motif)] = np.sum(bp_hist.sum(1).A1 * counts) / (
+            stats["receiver_{0}".format(motif)] = np.sum(bp_hist.sum(1).A1 * counts) / (
                 bp_hist.sum(1).A1.sum() * counts.sum()
             )
         r1 = regions[0]
@@ -360,10 +363,10 @@ def run(args):
             take2 = switch_iis == r2
             for motif in motif_counts.files:
                 counts = motif_counts[motif]
-                stats["donor_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                stats["donor_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(0).A1[take1] * counts[take1]
                 ) / (bp_hist.sum(0).A1[take1].sum() * counts[take1].sum())
-                stats["receiver_score_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                stats["receiver_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(1).A1[take2] * counts[take2]
                 ) / (bp_hist.sum(1).A1[take2].sum() * counts[take2].sum())
 

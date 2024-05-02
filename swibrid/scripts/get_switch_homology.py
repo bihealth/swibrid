@@ -38,8 +38,8 @@ def setup_argparse(parser):
 
 
 def get_rc(seq):
-    rc = {"A": "T", "C": "G", "G": "C", "T": "A"}
-    return "".join(rc[c] for c in seq[::-1])
+    from swibrid.scripts.utils import RC
+    return "".join(RC[c] for c in seq[::-1])
 
 
 def jaccard_distance(s1, s2, n=5, rc=False):

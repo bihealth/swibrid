@@ -574,6 +574,8 @@ def weighted_avg_and_std(values, weights):
     values, weights -- Numpy ndarrays with the same shape.
     taken from https://stackoverflow.com/questions/2413522/weighted-standard-deviation-in-numpy
     """
+    if weights.sum() <= 0:
+        return (np.nan, np.nan)
     average = np.average(values, weights=weights)
     # Fast and numerically precise:
     variance = np.average((values - average) ** 2, weights=weights)

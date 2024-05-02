@@ -92,10 +92,9 @@ def run(args):
         logger.info("reading sample sheet from " + args.sample_sheet)
         sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze()
         whitelist = sample_sheet.index
-
-    assert len(whitelist) == len(
-        whitelist.unique()
-    ), "sample sheet contains repeated barcodes. exiting ..."
+        assert len(whitelist) == len(
+            whitelist.unique()
+        ), "sample sheet contains repeated barcodes. exiting ..."
 
     if args.blast is not None:
         logger.info("reading and filtering BLAST output from " + args.blast)
@@ -115,20 +114,22 @@ def run(args):
         read = ls[1]
         hit = dict(
             query=ls[0],
-            query_len=int(ls[2]),
-            seq_len=int(ls[3]),
-            pid=float(ls[4]),
-            matchlen=int(ls[5]),
+            #seq_len=int(ls[2]),
+            #query_len=int(ls[3]),
+            #pid=float(ls[4]),
+            #matchlen=int(ls[5]),
             orientation="+" if int(ls[7]) > int(ls[6]) else "-",
             sstart=min(int(ls[6]), int(ls[7])),
             send=max(int(ls[6]), int(ls[7])),
-            evalue=float(ls[8]),
+            #evalue=float(ls[8]),
             pideff=int(ls[5]) * float(ls[4]) / float(ls[2]),
-            relpos=0.5 * (int(ls[6]) + int(ls[7])) / float(ls[3]),
         )
         if hit["pideff"] > args.cutoff:
             m += 1
             all_hits[read].append(hit)
+
+        if args.nmax and len(all_hits) > args.nmax:
+            break
 
     if len(all_hits) == 0:
         logger.warn("no hits in BLAST output file! exiting ...")
@@ -196,7 +197,8 @@ def run(args):
             read_hits = sorted(
                 set(
                     (
-                        re.sub("_[0-9]*$", "", h["query"]),
+                        # collapse different primer variants
+                        re.sub(r"^(primer.*)_[0-9]*$", r"\1", h["query"]),
                         h["sstart"],
                         h["send"],
                         h["orientation"],

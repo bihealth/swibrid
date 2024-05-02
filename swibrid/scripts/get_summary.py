@@ -11,8 +11,8 @@ produces cluster distribution statistics similar to downsample_clustering (the l
 - cluster_inverse_simpson: inverse simpson coefficient (post-filtering)
 - top_clone_occupancy: relative fraction of reads in biggest cluster
 - big_clones_occupancy: fraction of reads in clusters > 1% occupancy
-- PCR_length_bias: regression coefficient of log(cluster_size) ~ length
-- PCR_GC_bias: regression coefficient of log(cluster_size) ~ GC
+- size_length_bias: regression coefficient of log(cluster_size) ~ length
+- size_GC_bias: regression coefficient of log(cluster_size) ~ GC
 averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters
 collects number of reads / clusters per isotype
 gets statistics on variants (germline vs. somatic, transitions vs. transversions, etc.)
@@ -231,20 +231,20 @@ def run(args):
         ].mean()
 
         try:
-            stats["PCR_length_bias"] = scipy.stats.linregress(
+            stats["size_length_bias"] = scipy.stats.linregress(
                 cluster_analysis.loc[clones, "length"],
                 np.log(cluster_analysis.loc[clones, "size"]),
             )[0]
         except ValueError:
-            stats["PCR_length_bias"] = 0
+            stats["size_length_bias"] = 0
 
         try:
-            stats["PCR_GC_bias"] = scipy.stats.linregress(
+            stats["size_GC_bias"] = scipy.stats.linregress(
                 cluster_analysis.loc[clones, "GC"],
                 np.log(cluster_analysis.loc[clones, "size"]),
             )[0]
         except ValueError:
-            stats["PCR_GC_bias"] = 0
+            stats["size_GC_bias"] = 0
 
     if args.cluster_downsampling:
         logger.info(
@@ -451,7 +451,7 @@ def run(args):
         ax = axs[0, 0]
         ax.hist(
             read_info["length"],
-            bins=np.geomspace(read_info["length"].min(), read_info["length"].max(), 100),
+            bins=np.geomspace(.95*read_info["length"].min(), 1.05*read_info["length"].max(), 100),
             histtype="step",
         )
         ax.set_yscale("log")
@@ -488,11 +488,12 @@ def run(args):
                 "clusters\n(n={0})".format(isotype_cluster_count.sum()): isotype_cluster_fraction,
             }
         )
+        isotype_fracs.index = isotype_fracs.index.str.split("_").str[-1]
         isotype_fracs.T.plot(
             kind="barh",
             stacked=True,
             ax=ax,
-            color=[isotype_colors[it.split("_")[-1]] for it in isotype_fracs.index],
+            color=[isotype_colors[it] if it in isotype_colors else 'gray' for it in isotype_fracs.index],
         )
         ax.set_xlabel("fraction")
         ax.legend(

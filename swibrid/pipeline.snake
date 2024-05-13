@@ -44,7 +44,7 @@ rule demux:
     mkdir -p input demux
     cat {params.barcodes_primers} | makeblastdb -in - -title "barcodes_primers" -out demux/barcodes_primers -input_type fasta -dbtype nucl 2> {log}
     gunzip -c {input} | awk '{{if(NR%4==1) {{printf(">%s\n",substr($0,2));}} else if(NR%4==2) print;}}' | blastn -db demux/barcodes_primers -query - -task blastn-short -max_target_seqs 50 -outfmt "6 saccver qaccver slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -num_threads 1 -perc_identity 50 > demux/blast_output.txt 2>> {log}
-    swibrid demultiplex -i {input} -b demux/blast_output.txt -f demux/summary.png --collapse -o input -r demux/stats.csv --split-reads -s {params.sample_sheet} -c 50 2>> {log}
+    swibrid demultiplex -i {input} -b demux/blast_output.txt -f demux/summary.png --collapse -o input -r demux/stats.csv --split_reads -s {params.sample_sheet} -c 50 2>> {log}
     """
 
 def get_simulation_params(config, sample, param):
@@ -190,8 +190,8 @@ rule process:
     alignments='pipeline/{sample}/{sample}_breakpoint_alignments.csv'
   params:
     minlength=config['MINLENGTH'],
-    complete=lambda wildcards: "--only-complete" if 'plasmid' not in wildcards.sample else "",
-    internal=lambda wildcards: "--keep-internal" if ('exon' in wildcards.sample or 'plasmid' in wildcards.sample) else "",
+    complete=lambda wildcards: "--only_complete" if 'plasmid' not in wildcards.sample else "",
+    internal=lambda wildcards: "--keep_internal" if ('exon' in wildcards.sample or 'plasmid' in wildcards.sample) else "",
     switch=config['SWITCH'],
     switch_anno=config['SWITCH_ANNOTATION'],
     genome=config['REFERENCE'],
@@ -207,7 +207,7 @@ rule process:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
-    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} --blacklist_regions {params.blacklist_regions} --realign_breakpoints {output.alignments} --raw_reads {input.reads} --genome {params.genome} --info {input.info} --min-length {params.minlength} {params.complete} {params.internal} 2> {log}
+    swibrid process_alignments --alignments {input.alignments} --switch_coords {params.switch} --switch_annotation {params.switch_anno} --outfile {output.out} --stats {output.stats} --min_cov {params.min_cov} --telo {input.telo} --telo_cutoff 90 --sequences {output.fasta} --blacklist_regions {params.blacklist_regions} --realign_breakpoints {output.alignments} --raw_reads {input.reads} --genome {params.genome} --info {input.info} --min_length {params.minlength} {params.complete} {params.internal} 2> {log}
     """
 
 

@@ -310,14 +310,20 @@ def run(args):
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
 
+        # filter out realignments across breaks smaller than max_gap
+        gap_size = realignments["pos_left"].str.split(":").str[1].astype(int) - realignments["pos_right"].str.split(":").str[1].astype(int)
+        #keep = (gap_size >= args.max_gap) | (realignments["pos_left"].str.split(":").str[0] != realignments["pos_right"].str.split(":").str[0])
+        #ealignments = realignments[keep]
+
         if realignments.shape[0] > 0:
             realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
             realignment_stats = (
                 realignments.groupby(["type", "cluster"])
-                .agg({"n_homology": "mean", "n_untemplated": "mean"})
+                .agg({"n_homology": ["mean", "std"],
+                      "n_untemplated": ["mean", "std"]})
                 .unstack(level=0)
             )
-            realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
+            realignment_stats.columns = ["_".join(c).replace("_mean", "") for c in realignment_stats.columns.tolist()]
 
     df = pd.DataFrame(
         {

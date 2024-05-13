@@ -283,7 +283,6 @@ def run(args):
     nbreaks = bp_hist.sum()
     ninversions = bp_hist_inv.sum()
     nduplications = bp_hist_dup.sum()
-    stats["mean_break_size"], stats["std_break_size"] = weighted_avg_and_std(gap_size[take], weights[gap_read[take]])
     stats["breaks_normalized"] = nbreaks
     stats["frac_breaks_inversions"] = ninversions / (nbreaks + ninversions + nduplications)
     stats["frac_breaks_duplications"] = nduplications / (nbreaks + ninversions + nduplications)
@@ -295,6 +294,13 @@ def run(args):
         (switch_iis[xx] != "SM") & (switch_iis[yy] != "SM") & (switch_iis[xx] != switch_iis[yy])
     )
     intra_event = switch_iis[xx] == switch_iis[yy]
+
+    take_intra = (gap_size >= args.max_gap) & \
+        (gap_left // binsize < Leff) & \
+        (gap_right // binsize < Leff) & \
+        (switch_iis[gap_left // binsize] == switch_iis[gap_right // binsize]) 
+    stats["mean_intra_break_size"], stats["std_intra_break_size"] = weighted_avg_and_std(gap_size[take_intra], 
+                                                                                         weights[gap_read[take_intra]])
 
     stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
     stats["frac_breaks_sequential"] = bp_hist[sequential_event].sum() / nbreaks

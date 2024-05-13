@@ -820,15 +820,30 @@ def run(args):
             ax.scatter(
                 np.maximum(pleft, pright),
                 nreads - pos,
-                s=0.1 * (1 + nu),
+                s=nu,
+                lw=lw,
+                marker="_",
+                zorder=2,
+                edgecolor='k',
+                clip_on=False,
+                vmin=0,
+                vmax=1,
+                cmap=plt.cm.Greys,
+            )
+
+            ax.scatter(
+                np.maximum(pleft, pright),
+                nreads - pos,
+                s=nh,
                 c=nh,
                 lw=0,
+                marker="o",
                 zorder=2,
                 edgecolor=None,
                 clip_on=False,
                 vmin=0,
-                vmax=10,
-                cmap=plt.cm.winter,
+                vmax=5,
+                cmap=plt.cm.Reds,
             )
 
     if args.figure is not None:

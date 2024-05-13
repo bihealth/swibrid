@@ -59,19 +59,19 @@ def setup_argparse(parser):
     )
     parser.add_argument("-s", "--seed", dest="seed", type=int, default=1)
     parser.add_argument(
-        "--no-mutations",
+        "--no_mutations",
         dest="no_mutations",
         action="store_true",
         default=False,
     )
     parser.add_argument(
-        "--no-deletions",
+        "--no_deletions",
         dest="no_deletions",
         action="store_true",
         default=False,
     )
     parser.add_argument(
-        "--no-insertions",
+        "--no_insertions",
         dest="no_insertions",
         action="store_true",
         default=False,

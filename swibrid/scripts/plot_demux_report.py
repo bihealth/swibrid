@@ -6,7 +6,7 @@ def setup_argparse(parser):
     parser.add_argument("-f", "--figure", dest="figure", help="""summary figure""")
     parser.add_argument(
         "-s",
-        "--sample-sheet",
+        "--sample_sheet",
         dest="sample_sheet",
         help="""sample sheet (barcode <tab> sample_name, no header)""",
     )

@@ -38,7 +38,7 @@ def setup_argparse(parser):
         help="""file with scanning data""",
     )
     parser.add_argument(
-        "--fit-method",
+        "--fit_method",
         dest="fit_method",
         default="distance",
         help="""cutoff determination method: "trend" or "distance" [distance]""",

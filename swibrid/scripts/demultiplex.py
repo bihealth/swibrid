@@ -49,7 +49,7 @@ def setup_argparse(parser):
     parser.add_argument("-r", "--report", dest="report", help="""summary report""")
     parser.add_argument(
         "-s",
-        "--sample-sheet",
+        "--sample_sheet",
         dest="sample_sheet",
         help="""sample sheet (barcode <tab> sample_name, no header)""",
     )
@@ -61,19 +61,21 @@ def setup_argparse(parser):
         help="""count reads regardless of whether one or both barcodes are present (for identical barcodes)? [False]""",
     )
     parser.add_argument(
-        "--split-reads",
+        "--split_reads",
         dest="split_reads",
         default=False,
         action="store_true",
         help="""split reads with adjacent internal primer binding sites""",
     )
     parser.add_argument(
-        "--max-split-dist",
+        "--max_split_dist",
         dest="max_split_dist",
         default=200,
         help="""maximum distance between internal primer matches to split read""",
     )
     parser.add_argument("--nmax", dest="nmax", type=int, help="""maximum number of reads""")
+    parser.add_argument("--add_umi", dest="add_umi", action="store_true", default=False, help="""add UMI to read name""")
+    parser.add_argument("--umi_regex", dest="umi_regex", default=r"[ACGTN]{12}", help="""regex to find UMI in read description""")
 
 
 def run(args):
@@ -108,8 +110,8 @@ def run(args):
     m = 0
     for line in inf:
         n += 1
-        if n % 1000 == 0:
-            logger.info("{0}k hits read, {1} kept".format(n // 1000, m))
+        if n % 1000000 == 0:
+            logger.info("{0}M hits read, {1} kept".format(n // 1000000, m))
         ls = line.strip("\n").split("\t")
         read = ls[1]
         hit = dict(
@@ -164,6 +166,7 @@ def run(args):
         whitelist = combs
 
     if args.outdir is not None:
+
         logger.info("using these barcode combinations for demultiplexing: " + ", ".join(combs))
 
         outf = {}
@@ -179,6 +182,7 @@ def run(args):
         outf["undetermined"] = gzip.open(os.path.join(args.outdir, "undetermined.fastq.gz"), "wt")
 
         read_info = defaultdict(dict)
+        nreads = defaultdict(int)
 
         logger.info("demultiplexing reads from " + args.input)
         if args.input.endswith(".gz"):
@@ -188,8 +192,6 @@ def run(args):
 
         nsplit = 0
         for n, rec in enumerate(SeqIO.parse(inf, "fastq")):
-            if n % 1000 == 0:
-                logger.info("{0:4d}k reads processed".format(n // 1000))
             if args.nmax and n >= args.nmax:
                 break
 
@@ -207,6 +209,8 @@ def run(args):
                 ),
                 key=lambda x: x[1],
             )
+
+
 
             # check if there are clusters of multiple primers or barcodes within args.max_split_dist
             clusters = []
@@ -264,7 +268,14 @@ def run(args):
                     comb = comb
                 else:
                     comb = "undetermined"
+
+                if args.add_umi:
+                    umi_match = re.search(args.umi_regex, rec.description)
+                    if umi_match:
+                        rec.id += '_' + umi_match.group()
+
                 SeqIO.write(rec, outf[comb], "fastq")
+                nreads[comb] += 1
                 read_info[comb][rec.id] = dict(
                     map(lambda x: x.split("="), rec.description.split()[2:])
                 )
@@ -345,6 +356,7 @@ def run(args):
                     else:
                         comb = "undetermined"
                     SeqIO.write(rsub, outf[comb], "fastq")
+                    nreads[comb] += 1
                     read_info[comb][rsub.id] = dict(
                         map(lambda x: x.split("="), rsub.description.split()[2:])
                     )
@@ -359,29 +371,38 @@ def run(args):
                         )
                     )
 
-        logger.info("{0} reads split ... collecting info".format(nsplit))
-        for comb in read_info.keys():
-            read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
-            if "start_time" in read_info[comb].columns:
-                read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
-                    lambda x: time.mktime(x.timetuple())
-                )
-                read_info[comb]["start_time"] = (
-                    read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
-                )
+            if n % 1000 == 0 and n > 0:
 
-            if args.sample_sheet is not None and comb in sample_sheet.index:
-                read_info[comb].to_csv(os.path.join(args.outdir, sample_sheet[comb] + "_info.csv"))
-            else:
-                read_info[comb].to_csv(os.path.join(args.outdir, comb + "_info.csv"))
+                logger.info("{0:4d}k reads processed".format(n // 1000))
+                for comb in read_info.keys():
+                    read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
+                    if "start_time" in read_info[comb].columns:
+                        read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
+                            lambda x: time.mktime(x.timetuple())
+                        )
+                        read_info[comb]["start_time"] = (
+                            read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
+                        )
+
+                    if args.sample_sheet is not None and comb in sample_sheet.index:
+                        info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+                    else:
+                        info_file=os.path.join(args.outdir, comb + "_info.csv")
+
+                    if n == 1000 or not os.path.isfile(info_file):
+                        read_info[comb].to_csv(info_file, mode='w', header=True)
+                    else:
+                        read_info[comb].to_csv(info_file, mode='a', header=False)
+
+                read_info = defaultdict(dict)
 
         logger.info("done")
 
-    nreads = pd.Series(dict((k, v.shape[0]) for k, v in read_info.items())).sort_values(
-        ascending=False
-    )
+    for f in outf.values():
+        f.close()
+
     if args.report is not None:
-        nreads.to_csv(args.report)
+        pd.Series(nreads).sort_values(ascending=False).to_csv(args.report)
 
     if args.figure is not None:
         from .plot_demux_report import run as plot_demux_report

@@ -54,32 +54,25 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument(
-        "--min-length",
+        "--min_length",
         dest="min_length",
         default=500,
         type=int,
         help="""minimum read length""",
     )
     parser.add_argument(
-        "--only-complete",
+        "--only_complete",
         dest="only_complete",
         action="store_true",
         default=False,
         help="""use only complete reads with two primers""",
     )
     parser.add_argument(
-        "--keep-internal",
+        "--keep_internal",
         dest="keep_internal",
         action="store_true",
         default=False,
         help="""keep reads with internal primers""",
-    )
-    parser.add_argument(
-        "--remove-duplicates",
-        dest="remove_duplicates",
-        action="store_true",
-        default=False,
-        help="""remove duplicate reads (from "is_duplicate" column in info file)""",
     )
     parser.add_argument(
         "--telo",
@@ -92,7 +85,7 @@ def setup_argparse(parser):
         dest="min_switch_match",
         default=100,
         type=int,
-        help="""min match length to switch region on both sides of an insert[100]""",
+        help="""min match length to switch region""",
     )
     parser.add_argument(
         "--max_switch_overlap",
@@ -102,15 +95,15 @@ def setup_argparse(parser):
         help="""max overlap between switch parts of different orientation [0]""",
     )
     parser.add_argument(
-        "--max_gap",
-        dest="max_gap",
+        "--max_insert_gap",
+        dest="max_insert_gap",
         default=100,
         type=int,
         help="""max gap between insert and switch parts (on the read) [100]""",
     )
     parser.add_argument(
-        "--max_overlap",
-        dest="max_overlap",
+        "--max_insert_overlap",
+        dest="max_insert_overlap",
         default=50,
         type=int,
         help="""max overlap between switch and insert parts (on the read) [50]""",
@@ -137,11 +130,11 @@ def setup_argparse(parser):
         help="""coverage cutoff on reads [0.95 but 0.4 for plasmid]""",
     )
     parser.add_argument(
-        "--min_gap",
-        dest="min_gap",
+        "--max_gap",
+        dest="max_gap",
         default=75,
         type=float,
-        help="""ignore reads containing small gaps [-1]""",
+        help="""split alignments with gaps beyond that value [75]""",
     )
     parser.add_argument(
         "--isotype_extra",
@@ -190,7 +183,7 @@ def setup_argparse(parser):
     )
 
 
-def parse_sam(sam_input, min_gap=75):
+def parse_sam(sam_input, max_gap=75):
     import pysam
 
     read_matches = []
@@ -210,6 +203,7 @@ def parse_sam(sam_input, min_gap=75):
         read_start_chunk = clip_start
         ref_start_chunk = 0
         insertions = 0
+        deletions = 0
         chunks = []
         for op, n in rec.cigartuples:
             if op in [0, 7, 8]:  # alignment match
@@ -219,7 +213,7 @@ def parse_sam(sam_input, min_gap=75):
                 ref_pos += n
 
             elif op == 1:  # insertion
-                if n > min_gap:  # split insertions of more than min_gap nucleotides
+                if n >= max_gap:  # split insertions beyond max_gap nucleotides
                     chnk = (
                         read_start_chunk,
                         clip_start + read_pos - read_start_chunk,
@@ -239,8 +233,25 @@ def parse_sam(sam_input, min_gap=75):
                 al_pos += n
                 read_pos += n
 
-            elif op == 2:  # deletion
-                aligned_seq += "-" * n
+            elif op in [2, 3]:  # deletion / skip
+
+                if n >= max_gap:  # split deletions beyond max_gap nucleotides
+                    chnk = (
+                        read_start_chunk,
+                        clip_start + read_pos - read_start_chunk,
+                        read_len,
+                        rec.reference_name,
+                        rec.reference_start + ref_start_chunk,
+                        ref_pos - ref_start_chunk,
+                        -1 if rec.is_reverse else 1,
+                        str(aligned_seq),
+                    )
+                    chunks.append(chnk)
+                    aligned_seq = ""
+                    read_start_chunk = clip_start + read_pos
+                    ref_start_chunk = ref_pos + n
+                    deletions += n
+
                 ref_pos += n
 
             elif op == 4:  # soft clip
@@ -272,7 +283,7 @@ def parse_sam(sam_input, min_gap=75):
             read_id = rec.query_name
             read_matches = []
 
-        assert sum(c[5] for c in chunks) == rec.reference_length, "ref lengths dont match!"
+        assert sum(c[5] for c in chunks) + deletions == rec.reference_length, "ref lengths dont match!"
         assert (
             sum(c[1] for c in chunks) + clip_start + clip_end + insertions == read_len
         ), "read lengths dont match!"
@@ -282,7 +293,7 @@ def parse_sam(sam_input, min_gap=75):
     yield read_id, read_matches
 
 
-def parse_maf(alignments, min_gap=75):
+def parse_maf(alignments, max_gap=75):
     import re
     import gzip
     from Bio import AlignIO
@@ -308,8 +319,8 @@ def parse_maf(alignments, min_gap=75):
         num_ref_gaps = 0
         num_read_gaps = 0
         chunks = []
-        # find ref gaps of at least min_gap
-        for m in re.finditer(r"\-{{{0},}}".format(min_gap), ref_seq):
+        # find ref gaps beyond max_gap
+        for m in re.finditer(r"\-{{{0},}}".format(max_gap), ref_seq):
             new_ref_gaps = ref_seq[pos : m.start()].count("-")
             ref_start_chunk = ref_start + pos - num_ref_gaps
             ref_end_chunk = ref_start + m.start() - num_ref_gaps - new_ref_gaps
@@ -393,18 +404,20 @@ def combine_alignments(al1, al2, pad):
     s2B = al2[1]
     while i < len(s1A) and j < len(s2A):
         if s1A[i] == "-":
-            s1 += s1B[i].lower()
-            m1 += " "
-            s0 += "-"
-            s2 += "-"
-            m2 += " "
+            if s1B[i] != 'N':
+                s1 += s1B[i].lower() 
+                m1 += " "
+                s0 += "-"
+                s2 += "-"
+                m2 += " "
             i += 1
         elif s2A[j] == "-":
-            s1 += "-"
-            m1 += " "
-            s0 += "-"
-            m2 += " "
-            s2 += s2B[j].lower()
+            if s2B[j] != 'N':
+                s1 += "-"
+                m1 += " "
+                s0 += "-"
+                m2 += " "
+                s2 += s2B[j].lower()
             j += 1
         elif s1A[i] == s2A[j]:
             s1 += s1B[i]
@@ -416,8 +429,9 @@ def combine_alignments(al1, al2, pad):
             j += 1
         else:
             raise Exception("stop")
-        if len(s1A[:i].replace("-", "")) != len(s2A[:j].replace("-", "")):
-            raise Exception("stop")
+
+        assert len(s1A[:i].replace("-", "")) == len(s2A[:j].replace("-", "")), "mismatched sequence lengths in combine_alignments"
+
         if (len(s1A[:i].replace("-", "")) == pad or len(s1A[i:].replace("-", "")) == pad) and not (
             s1A[i] == "-" or s2A[j] == "-"
         ):
@@ -437,8 +451,8 @@ def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
         return "".join(RC[s] for s in seq[::-1])
 
     aligner = Align.PairwiseAligner()
-    aligner.mode = "global"
-    if penalties == "ont":
+    aligner.mode = "global"   
+    if penalties == "ont":                  # use minimap2 presets
         aligner.match_score = 2             # -A
         aligner.mismatch_score = -4         # -B
         aligner.open_gap_score = -4         # -O
@@ -473,6 +487,7 @@ def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
         else:
             pos_left = matches[i][2] + ":" + str(matches[i][4])
             gseq1 = genome.fetch(matches[i][2], matches[i][4] - pad, matches[i][4] + pad).upper()
+
         if orientation[1] == -1:
             pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][4])
             gseq2 = revcomp(
@@ -489,13 +504,21 @@ def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
         if gseq1 == "" or gseq2 == "" or rseq == "":
             continue
 
-        # al1 = pairwise2.align.globalms(rseq, gseq1, 2, -4, -4, -2)
-        # al2 = pairwise2.align.globalms(rseq, gseq2, 2, -4, -4, -2)
+        # mask identical bases for small gaps
+        lchrom = pos_left.split(":")[0]
+        lpos = int(pos_left.split(":")[1])
+        rchrom = pos_right.split(":")[0]
+        rpos = int(pos_right.split(":")[1])
+        posdiff = rpos - lpos
+        if lchrom == rchrom and posdiff < pad:
+            gseq1 = gseq1[:-(pad - posdiff)] + 'N' * (pad - posdiff) 
+            gseq2 = 'N' * (pad - posdiff) + gseq2[(pad - posdiff):] 
 
         al1 = aligner.align(rseq, gseq1)
         al2 = aligner.align(rseq, gseq2)
 
         s1, m1, s0, m2, s2 = combine_alignments(al1[0], al2[0], pad)
+
 
         m1s = m1.split("/")
         m2s = m2.split("/")
@@ -585,7 +608,7 @@ def run(args):
         "nreads_mapped": 0,
         "nreads_removed_short": 0,
         "nreads_removed_incomplete": 0,
-        "nreads_removed_duplicate": 0,
+        "nreads_removed_no_info": 0,
         "nreads_removed_internal_primer": 0,
         "nreads_removed_no_switch": 0,
         "nreads_removed_length_mismatch": 0,
@@ -605,9 +628,9 @@ def run(args):
 
     logger.info("processing reads from " + args.alignments)
     if args.alignments.endswith(".bam") or args.alignments.endswith(".bam"):
-        alignments = parse_sam(args.alignments, min_gap=args.min_gap)
+        alignments = parse_sam(args.alignments, max_gap=args.max_gap)
     else:
-        alignments = parse_maf(args.alignments, min_gap=args.min_gap)
+        alignments = parse_maf(args.alignments, max_gap=args.max_gap)
 
     outf = open(args.outfile, "w")
     outf.write(
@@ -621,11 +644,13 @@ def run(args):
             else open(args.sequences, "w")
         )
 
-    realignments = {}
-
     for read, matches in alignments:
         use = True
         stats["nreads_mapped"] += 1
+
+        if read not in read_info.index:
+            stats["nreads_removed_no_info"] += 1
+            continue
 
         # filter reads based on length
         if read_info.loc[read, "length"] < args.min_length:
@@ -648,10 +673,6 @@ def run(args):
         ):
             stats["nreads_removed_incomplete"] += 1
             use = False
-
-        if args.remove_duplicates and "is_duplicate" in read_info.columns and read_info.loc[read, "is_duplicate"]:
-            stats["nreads_removed_duplicate"] += 1
-            use =False
 
         internal = read_info.loc[read, "internal"]
         if not args.keep_internal and not pd.isna(internal) and "primer" in internal:
@@ -845,8 +866,8 @@ def run(args):
                 if (
                     switch_left
                     and switch_right
-                    and all(gap < args.max_gap for gap in gaps)
-                    and overlap <= args.max_overlap
+                    and all(gap < args.max_insert_gap for gap in gaps)
+                    and overlap <= args.max_insert_overlap
                 ):
                     filtered_inserts.append(
                         (
@@ -946,7 +967,7 @@ def run(args):
 
         if args.interrupt_for_read and read in args.interrupt_for_read:
             print(read, [sm[:7] for sm in matches])
-            # raise Exception("stop")
+            raise Exception("stop")
 
         if not use:
             continue
@@ -1052,6 +1073,7 @@ def run(args):
         genome = pysam.FastaFile(args.genome)
 
         logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
+        realignments = {}
         for rec in SeqIO.parse(
             gzip.open(args.raw_reads, "rt")
             if args.raw_reads.endswith(".gz")

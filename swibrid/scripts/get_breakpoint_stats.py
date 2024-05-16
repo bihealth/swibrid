@@ -425,7 +425,7 @@ def run(args):
         )
         bph_d.eliminate_zeros()
 
-        # raise Exception('stop')
+        markersize = (3.6 * .85 * 72 / (Leff // scale_factor) - .2)**2
 
         ax = fig.add_axes([0.12, 0.03, 0.85, 0.7])
         ax.scatter(
@@ -434,7 +434,7 @@ def run(args):
             c=np.log(bph_p.data),
             cmap=plt.cm.Greys,
             marker="s",
-            s=15,
+            s=markersize,
             linewidths=0.2,
             edgecolors="k",
         )
@@ -445,7 +445,7 @@ def run(args):
                 c=np.log(bph_i.data),
                 cmap=plt.cm.Reds,
                 marker=MarkerStyle("o", fillstyle="right"),
-                s=12,
+                s=markersize,
                 linewidths=0.2,
                 edgecolors="r",
             )
@@ -455,7 +455,7 @@ def run(args):
                 c=np.log(bph_d.data),
                 cmap=plt.cm.Blues,
                 marker=MarkerStyle("o", fillstyle="left"),
-                s=12,
+                s=markersize,
                 linewidths=0.2,
                 edgecolors="b",
             )

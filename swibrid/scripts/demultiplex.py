@@ -279,6 +279,7 @@ def run(args):
                 read_info[comb][rec.id] = dict(
                     map(lambda x: x.split("="), rec.description.split()[2:])
                 )
+                read_info[comb][rec.id]["part"] = pd.NA
                 read_info[comb][rec.id].update(
                     dict(
                         meanQ=np.mean(rec.letter_annotations["phred_quality"]),
@@ -389,6 +390,9 @@ def run(args):
                     else:
                         info_file=os.path.join(args.outdir, comb + "_info.csv")
 
+                    if read_info[comb].shape[0] == 0:
+                        continue
+
                     if n == 1000 or not os.path.isfile(info_file):
                         read_info[comb].to_csv(info_file, mode='w', header=True)
                     else:
@@ -396,10 +400,33 @@ def run(args):
 
                 read_info = defaultdict(dict)
 
-        logger.info("done")
+        logger.info("{0:4d} reads processed".format(n))
+        for comb in read_info.keys():
 
-    for f in outf.values():
-        f.close()
+            read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
+            if "start_time" in read_info[comb].columns:
+                read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
+                    lambda x: time.mktime(x.timetuple())
+                )
+                read_info[comb]["start_time"] = (
+                    read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
+                )
+
+            if args.sample_sheet is not None and comb in sample_sheet.index:
+                info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+            else:
+                info_file=os.path.join(args.outdir, comb + "_info.csv")
+
+            if read_info[comb].shape[0] == 0:
+                continue
+
+            if not os.path.isfile(info_file):
+                read_info[comb].to_csv(info_file, mode='w', header=True)
+            else:
+                read_info[comb].to_csv(info_file, mode='a', header=False)
+
+        for f in outf.values():
+            f.close()
 
     if args.report is not None:
         pd.Series(nreads).sort_values(ascending=False).to_csv(args.report)

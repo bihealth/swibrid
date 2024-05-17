@@ -27,13 +27,13 @@ ALIGNER: 'LAST'
 # fasta file specifying the telomer repeat unit
 TELO_REPEAT: 'index/telomerSequence.fasta'
 # coordinates of switch region (altogether)
-SWITCH: 'chr14:99840000-100138000:-'
+SWITCH: 'chr14:105583000-105872000:-'
 # bed file with coordinates of individual switch regions
 SWITCH_ANNOTATION: 'index/hg38_switch_regions.bed'
 # bed file with gene annotation
-ANNOTATION: 'index/chm13.draft_v2.0.gene_annotation.exon_shorted.bed'
+ANNOTATION: 'index/gencode.v33.annotation.exon.gene_shorted.bed'
 # vcf file with variant annotation
-VARIANT_ANNOTATION: 'index/chm13v2.0_dbSNPv155.switch.vcf.gz'
+VARIANT_ANNOTATION: 'index/dbSNP.hg38.switch.vcf.gz'
 # max number of reads to cluster
 NMAX: 50000
 # clustering metric to use 

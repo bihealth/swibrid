@@ -177,6 +177,13 @@ def setup_argparse(parser):
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with unaligned reads""")
     parser.add_argument("--genome", dest="genome", help="""reference genome file""")
     parser.add_argument(
+        "--preload_genome", 
+        dest="preload_genome",
+        action="store_true",
+        default=False,
+        help="""pre-load the switch-region genome for faster realignment"""
+    )
+    parser.add_argument(
         "--interrupt_for_read",
         dest="interrupt_for_read",
         help="""(for debugging) interrupt for specified read(s)""",
@@ -443,12 +450,19 @@ def combine_alignments(al1, al2, pad):
     return s1, m1, s0, m2, s2
 
 
-def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
+def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont'):
     from Bio import Align
 
     def revcomp(seq):
         from swibrid.scripts.utils import RC
         return "".join(RC[s] for s in seq[::-1])
+
+    def fetch(match, genome_dict, ind, pad):
+        if 'insert' in match[-1] or not 'switch_genome' in genome_dict:
+            return genome_dict['genome'].fetch(match[2], match[ind] - pad, match[ind] + pad).upper()
+        else:
+            return genome_dict['switch_genome'][(match[ind] - pad - genome_dict['offset']):
+                                                (match[ind] + pad - genome_dict['offset'])].upper()
 
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"   
@@ -471,6 +485,7 @@ def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
         raise ValueError("unknown gap penalties {0}".format(penalties))
 
 
+    #genome = genome_dict['genome']
     res = []
     for i in range(len(matches) - 1):
         rseq = read_seq[
@@ -481,25 +496,29 @@ def realign_breakpoints(matches, genome, read_seq, pad=20, penalties='ont'):
         orientation = (matches[i][5], matches[i + 1][5])
         if orientation[0] == -1:
             pos_left = matches[i][2] + ":" + str(matches[i][3])
-            gseq1 = revcomp(
-                genome.fetch(matches[i][2], matches[i][3] - pad, matches[i][3] + pad).upper()
-            )
+            gseq1 = revcomp(fetch(matches[i], genome_dict, 3, pad))
+            #gseq1 = revcomp(
+            #    genome.fetch(matches[i][2], matches[i][3] - pad, matches[i][3] + pad).upper()
+            #)
         else:
             pos_left = matches[i][2] + ":" + str(matches[i][4])
-            gseq1 = genome.fetch(matches[i][2], matches[i][4] - pad, matches[i][4] + pad).upper()
+            #gseq1 = genome.fetch(matches[i][2], matches[i][4] - pad, matches[i][4] + pad).upper()
+            gseq1 = fetch(matches[i], genome_dict, 4, pad)
 
         if orientation[1] == -1:
             pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][4])
-            gseq2 = revcomp(
-                genome.fetch(
-                    matches[i + 1][2], matches[i + 1][4] - pad, matches[i + 1][4] + pad
-                ).upper()
-            )
+            #gseq2 = revcomp(
+            #    genome.fetch(
+            #        matches[i + 1][2], matches[i + 1][4] - pad, matches[i + 1][4] + pad
+            #    ).upper()
+            #)
+            gseq2 = revcomp(fetch(matches[i + 1], genome_dict, 4, pad))
         else:
             pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][3])
-            gseq2 = genome.fetch(
-                matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
-            ).upper()
+            #gseq2 = genome.fetch(
+            #    matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
+            #).upper()
+            gseq2 = fetch(matches[i + 1], genome_dict, 3, pad)
 
         if gseq1 == "" or gseq2 == "" or rseq == "":
             continue
@@ -1069,8 +1088,14 @@ def run(args):
     if args.realign_breakpoints is not None:
         import pysam
 
-        logger.info("loading genomes from " + args.genome)
-        genome = pysam.FastaFile(args.genome)
+        logger.info("loading genome from " + args.genome)
+        genome_dict = {'genome': pysam.FastaFile(args.genome)}
+        
+        if args.preload_genome:
+            # pre-load switch region genome to speed up look-ups
+            genome_dict['switch_genome'] = genome_dict['genome'].fetch(switch_chrom, switch_start, switch_end)
+            genome_dict['offset'] = switch_start
+
 
         logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
         realignments = {}
@@ -1084,7 +1109,9 @@ def run(args):
                 continue
 
             realignments[rec.id] = realign_breakpoints(
-                processed_matches[rec.id], genome, str(rec.seq), penalties=args.realignment_penalties
+                processed_matches[rec.id], 
+                genome_dict,
+                str(rec.seq), penalties=args.realignment_penalties
             )
 
         logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)

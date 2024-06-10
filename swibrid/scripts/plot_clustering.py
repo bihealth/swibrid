@@ -749,17 +749,26 @@ def run(args):
                     color="k",
                     markersize=0.5,
                 )
-                arrows.append([(0, p + 0.5), (-dx, p + 0.5)])
+                if switch_orientation == '+':
+                    arrows.append([(Ltot, p + 0.5), (Ltot + dx, p + 0.5)])
+                else:
+                    arrows.append([(0, p + 0.5), (-dx, p + 0.5)])
                 uinsert = [
                     ins
                     for ins in unique_inserts
                     if interval_length(intersect_intervals([insert], [ins])) > 0
                 ][0]
                 if uinsert in insert_pos:
-                    arrows.append([(-dx, p + 0.5), (-3 * dx, insert_pos[uinsert])])
+                    if switch_orientation == '+':
+                        arrows.append([(Ltot + dx, p + 0.5), (Ltot + 3 * dx, insert_pos[uinsert])])
+                    else:
+                        arrows.append([(-dx, p + 0.5), (-3 * dx, insert_pos[uinsert])])
                     continue
                 n -= dn
-                arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
+                if switch_orientation == '+':
+                    arrows.append([(Ltot + dx, p + 0.5), (Ltot + 3 * dx, n + 0.5)])
+                else:
+                    arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
                 insert_pos[uinsert] = n + 0.5
                 insert_anno = set()
                 if args.annotation:
@@ -770,15 +779,18 @@ def run(args):
                 else:
                     insert_anno = "|".join(insert_anno)
                 # insert_anno='{0}:{1}-{2}'.format(*uinsert)
-                arrows.append([(-3 * dx, n + 0.5), (-4 * dx, n + 0.5)])
+                if switch_orientation == '+':
+                    arrows.append([(Ltot + 3 * dx, n + 0.5), (Ltot + 4 * dx, n + 0.5)])
+                else:
+                    arrows.append([(-3 * dx, n + 0.5), (-4 * dx, n + 0.5)])
                 ax.text(
-                    -4.2 * dx,
+                    Ltot + 4.2 * dx if switch_orientation == '+' else - 4.2 * dx,
                     n + 0.5,
                     insert_anno,
                     size="xx-small",
                     color="k",
                     clip_on=False,
-                    ha="left",
+                    ha="left" if switch_orientation == '+' else "right",
                     va="center",
                 )
 

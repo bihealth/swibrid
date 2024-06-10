@@ -75,6 +75,13 @@ def setup_argparse(parser):
         help="""keep reads with internal primers""",
     )
     parser.add_argument(
+        "--remove_duplicates",
+        dest="remove_duplicates",
+        action="store_true",
+        default=False,
+        help="""remove duplicate reads (based on UMIs in read IDs)"""
+    )
+    parser.add_argument(
         "--telo",
         dest="telo",
         default="",
@@ -177,11 +184,11 @@ def setup_argparse(parser):
     parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with unaligned reads""")
     parser.add_argument("--genome", dest="genome", help="""reference genome file""")
     parser.add_argument(
-        "--preload_genome", 
-        dest="preload_genome",
+        "--keep_secondary_alignments", 
+        dest="keep_secondary_alignments", 
         action="store_true",
         default=False,
-        help="""pre-load the switch-region genome for faster realignment"""
+        help="""keep secondary alignments in SAM file (but conflicting alignments are not resolved!)"""
     )
     parser.add_argument(
         "--interrupt_for_read",
@@ -190,16 +197,18 @@ def setup_argparse(parser):
     )
 
 
-def parse_sam(sam_input, max_gap=75):
+def parse_sam(sam_input, max_gap=75, keep_secondary=False):
     import pysam
 
     read_matches = []
     read_id = ""
 
     for rec in pysam.Samfile(sam_input):
-        if rec.is_unmapped or rec.seq is None or rec.is_secondary:
+        if rec.is_unmapped or rec.seq is None:
             continue
-
+        if not keep_secondary and rec.is_secondary:
+            continue
+        
         clip_start = rec.cigartuples[0][1] if rec.cigartuples[0][0] == 5 else 0
         clip_end = rec.cigartuples[-1][1] if rec.cigartuples[-1][0] == 5 else 0
         read_len = len(rec.seq) + clip_start + clip_end
@@ -451,6 +460,8 @@ def combine_alignments(al1, al2, pad):
 
 
 def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont'):
+
+    import numpy as np
     from Bio import Align
 
     def revcomp(seq):
@@ -458,11 +469,14 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont')
         return "".join(RC[s] for s in seq[::-1])
 
     def fetch(match, genome_dict, ind, pad):
-        if 'insert' in match[-1] or not 'switch_genome' in genome_dict:
-            return genome_dict['genome'].fetch(match[2], match[ind] - pad, match[ind] + pad).upper()
+        if 'insert' in match[-1]:
+            seq = genome_dict['genome'].fetch(match[2], match[ind] - pad, match[ind] + pad).upper()
         else:
-            return genome_dict['switch_genome'][(match[ind] - pad - genome_dict['offset']):
+            seq = genome_dict['switch_genome'][(match[ind] - pad - genome_dict['offset']):
                                                 (match[ind] + pad - genome_dict['offset'])].upper()
+        assert len(seq) <= 2 * pad, "trying to align a sequence of length {0}".format(length(seq))
+        
+        return seq
 
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"   
@@ -497,27 +511,15 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont')
         if orientation[0] == -1:
             pos_left = matches[i][2] + ":" + str(matches[i][3])
             gseq1 = revcomp(fetch(matches[i], genome_dict, 3, pad))
-            #gseq1 = revcomp(
-            #    genome.fetch(matches[i][2], matches[i][3] - pad, matches[i][3] + pad).upper()
-            #)
         else:
             pos_left = matches[i][2] + ":" + str(matches[i][4])
-            #gseq1 = genome.fetch(matches[i][2], matches[i][4] - pad, matches[i][4] + pad).upper()
             gseq1 = fetch(matches[i], genome_dict, 4, pad)
 
         if orientation[1] == -1:
             pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][4])
-            #gseq2 = revcomp(
-            #    genome.fetch(
-            #        matches[i + 1][2], matches[i + 1][4] - pad, matches[i + 1][4] + pad
-            #    ).upper()
-            #)
             gseq2 = revcomp(fetch(matches[i + 1], genome_dict, 4, pad))
         else:
             pos_right = matches[i + 1][2] + ":" + str(matches[i + 1][3])
-            #gseq2 = genome.fetch(
-            #    matches[i + 1][2], matches[i + 1][3] - pad, matches[i + 1][3] + pad
-            #).upper()
             gseq2 = fetch(matches[i + 1], genome_dict, 3, pad)
 
         if gseq1 == "" or gseq2 == "" or rseq == "":
@@ -528,7 +530,7 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont')
         lpos = int(pos_left.split(":")[1])
         rchrom = pos_right.split(":")[0]
         rpos = int(pos_right.split(":")[1])
-        posdiff = rpos - lpos
+        posdiff = np.abs(rpos - lpos)
         if lchrom == rchrom and posdiff < pad:
             gseq1 = gseq1[:-(pad - posdiff)] + 'N' * (pad - posdiff) 
             gseq2 = 'N' * (pad - posdiff) + gseq2[(pad - posdiff):] 
@@ -589,6 +591,7 @@ def run(args):
     from Bio import SeqIO, Seq, SeqRecord
     import gzip
     import re
+    from collections import defaultdict, Counter
     from logzero import logger
     from .utils import (
         parse_switch_coords,
@@ -636,6 +639,7 @@ def run(args):
         "nreads_removed_low_cov": 0,
         "nreads_removed_switch_order": 0,
         "nreads_removed_no_isotype": 0,
+        "nreads_removed_duplicate": 0
     }
 
     if args.realign_breakpoints is not None:
@@ -647,7 +651,7 @@ def run(args):
 
     logger.info("processing reads from " + args.alignments)
     if args.alignments.endswith(".bam") or args.alignments.endswith(".bam"):
-        alignments = parse_sam(args.alignments, max_gap=args.max_gap)
+        alignments = parse_sam(args.alignments, max_gap=args.max_gap, keep_secondary=args.keep_secondary_alignments)
     else:
         alignments = parse_maf(args.alignments, max_gap=args.max_gap)
 
@@ -662,6 +666,9 @@ def run(args):
             if args.sequences.endswith(".gz")
             else open(args.sequences, "w")
         )
+
+    if args.remove_duplicates:
+        processed_umis = defaultdict(dict)
 
     for read, matches in alignments:
         use = True
@@ -991,24 +998,19 @@ def run(args):
         if not use:
             continue
 
-        outf.write(
-            "{0}\t{1}\t{2}\t{3:.4f}\t{4:.4f}\t".format(
-                read,
+        out_string = "{0}\t{1}\t{2:.4f}\t{3:.4f}\t".format(
                 isotype,
                 "+" if main_orientation == 1 else "-",
                 tot_cov / tot_read_len,
                 1 - merged_switch_coverage / unmerged_switch_coverage,
             )
-        )
-        outf.write(
-            ";".join(
+
+        out_string += ";".join(
                 "{0}:{1}-{2}:{3}".format(chrom, start, end, orientation)
                 for chrom, start, end, orientation in read_mappings
             )
-        )
-        outf.write("\t")
-        outf.write(
-            ";".join(
+        out_string += "\t"
+        out_string += ";".join(
                 "insert_{0}:{1}_{2}_{3}-{4}_{5}_{6}:{7}-{8}_{9}_{10}:{11}".format(
                     switch_chrom,
                     left,
@@ -1036,9 +1038,17 @@ def run(args):
                     orientation,
                 ) in filtered_inserts
             )
-        )
 
-        outf.write("\n")
+        if args.remove_duplicates:
+            umi = read.split('_')[-1]
+            if out_string in processed_umis[umi]:
+                stats["nreads_removed_duplicate"] += 1
+                processed_umis[umi][out_string] += 1
+                continue
+            else:
+                processed_umis[umi][out_string] = 1
+
+        outf.write(read + "\t" + out_string + "\n")
 
         # write genomic alignments to fasta file for MSA construction
         if args.sequences is not None:
@@ -1065,7 +1075,7 @@ def run(args):
             )
             SeqIO.write(sequences, seq_out, "fasta")
 
-        # re-align breakpoints
+        # store coordinates for breakpoint realignment
         if args.realign_breakpoints is not None:
             processed_matches[read] = sorted(
                 [sm[:6] + ("switch",) for sm in switch_matches]
@@ -1091,11 +1101,9 @@ def run(args):
         logger.info("loading genome from " + args.genome)
         genome_dict = {'genome': pysam.FastaFile(args.genome)}
         
-        if args.preload_genome:
-            # pre-load switch region genome to speed up look-ups
-            genome_dict['switch_genome'] = genome_dict['genome'].fetch(switch_chrom, switch_start, switch_end)
-            genome_dict['offset'] = switch_start
-
+        # pre-load switch region genome to maybe speed up look-ups
+        genome_dict['switch_genome'] = genome_dict['genome'].fetch(switch_chrom, switch_start, switch_end)
+        genome_dict['offset'] = switch_start
 
         logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
         realignments = {}

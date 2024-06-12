@@ -285,13 +285,13 @@ def decode_insert(insert_string):
 
     m = re.match(
         r"insert_"
-        r"(?P<switch_chroml>\w+):(?P<switch_left>\d+)_"
+        r"(?P<switch_chroml>.+):(?P<switch_left>\d+)_"
         r"(?P<gapl>[-\d]+)_"
         r"(?P<istart>\d+)-(?P<iend>\d+)_"
         r"(?P<orientation>[\+\-])_"
-        r"(?P<insert_chrom>\w+):(?P<insert_start>\d+)-(?P<insert_end>\d+)_"
+        r"(?P<insert_chrom>.+):(?P<insert_start>\d+)-(?P<insert_end>\d+)_"
         r"(?P<gapr>[-\d]+)_"
-        r"(?P<switch_chromr>\w+):(?P<switch_right>\d+)",
+        r"(?P<switch_chromr>.+):(?P<switch_right>\d+)",
         insert_string,
     )
     return m

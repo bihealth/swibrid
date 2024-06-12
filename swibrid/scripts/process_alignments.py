@@ -725,9 +725,9 @@ def run(args):
             orientation,
             aligned_seq,
         ) in matches:
-            assert (
-                read_len > 0 and ref_len > 0 and tot_read_len > 0
-            ), "negative lengths in parsed alignments!"
+
+            if read_len <= 0 or ref_len <= 0:
+                continue
 
             if orientation == -1:
                 read_start = tot_read_len - read_start - read_len

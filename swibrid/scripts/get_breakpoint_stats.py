@@ -16,8 +16,8 @@ output file contains following values:
 - homology_fw: homology in bins around breakpoint positions (same orientation)
 - homology_rv: homology in bins around breakpoint positions (opposite orientation)
 - homology_fw/rv_XX: homologies for breaks connecting indicated regions
-- donor/receiver_score(_XX): motif scores for donor and receiver breakpoints for different motifs (subdivided by region)
-- donor/receiver_complexity(_XX): sequence complexity for donoer and receiver breakpoints (subdivided by region)
+- donor/acceptor_score(_XX): motif scores for donor and acceptor breakpoints for different motifs (subdivided by region)
+- donor/acceptor_complexity(_XX): sequence complexity for donoer and acceptor breakpoints (subdivided by region)
 """
 
 
@@ -115,9 +115,9 @@ def setup_argparse(parser):
         help="""output file with top donor sequences""",
     )
     parser.add_argument(
-        "--top_receiver",
-        dest="top_receiver",
-        help="""output file with top receiver sequences""",
+        "--top_acceptor",
+        dest="top_acceptor",
+        help="""output file with top acceptor sequences""",
     )
     parser.add_argument(
         "-n",
@@ -360,7 +360,7 @@ def run(args):
             stats["donor_{0}".format(motif)] = np.sum(bp_hist.sum(0).A1 * counts) / (
                 bp_hist.sum(0).A1.sum() * counts.sum()
             )
-            stats["receiver_{0}".format(motif)] = np.sum(bp_hist.sum(1).A1 * counts) / (
+            stats["acceptor_{0}".format(motif)] = np.sum(bp_hist.sum(1).A1 * counts) / (
                 bp_hist.sum(1).A1.sum() * counts.sum()
             )
         r1 = regions[0]
@@ -372,7 +372,7 @@ def run(args):
                 stats["donor_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(0).A1[take1] * counts[take1]
                 ) / (bp_hist.sum(0).A1[take1].sum() * counts[take1].sum())
-                stats["receiver_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
+                stats["acceptor_{0}_{1}_{2}".format(motif, r1, r2)] = np.sum(
                     bp_hist.sum(1).A1[take2] * counts[take2]
                 ) / (bp_hist.sum(1).A1[take2].sum() * counts[take2].sum())
 
@@ -546,7 +546,7 @@ def run(args):
 
         fig.savefig(args.plot, dpi=300)
 
-    if args.reference and args.top_donor and args.top_receiver:
+    if args.reference and args.top_donor and args.top_acceptor:
         genome = pysam.FastaFile(args.reference)
 
         switch_seqs = [genome.fetch(switch_chrom, ci[0], ci[1]).upper() for ci in cov_int]
@@ -562,14 +562,14 @@ def run(args):
                 + "\n"
             )
 
-        top_receiver_bins = np.argsort(bp_hist.sum(1).A1)[-args.ntop :]
-        top_receiver_bins.sort()
-        top_receiver_seqs = [stot[k * binsize : (k + 1) * binsize] for k in top_receiver_bins]
-        logger.info("saving top receiver sequences to " + args.top_receiver)
-        with open(args.top_receiver, "w") as outf:
+        top_acceptor_bins = np.argsort(bp_hist.sum(1).A1)[-args.ntop :]
+        top_acceptor_bins.sort()
+        top_acceptor_seqs = [stot[k * binsize : (k + 1) * binsize] for k in top_acceptor_bins]
+        logger.info("saving top acceptor sequences to " + args.top_acceptor)
+        with open(args.top_acceptor, "w") as outf:
             outf.write(
                 "\n".join(
-                    ">receiver_{0}\n{1}".format(k + 1, s) for k, s in enumerate(top_receiver_seqs)
+                    ">acceptor_{0}\n{1}".format(k + 1, s) for k, s in enumerate(top_acceptor_seqs)
                 )
                 + "\n"
             )

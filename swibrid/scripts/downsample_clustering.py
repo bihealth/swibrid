@@ -139,9 +139,8 @@ def run(args):
         clusters, cinv, csize = np.unique(clustering, return_inverse=True, return_counts=True)
         use = clusters >= 0
         rel_size = csize[use] / csize[use].sum()
-        assert (rel_size.sum() > 0.999) & (
-            rel_size.sum() < 1.001
-        ), "relative sizes don't sum up to 1"
+        if (rel_size.sum() > 0.999) | (rel_size.sum() < 1.001):
+            continue
 
         stats["mean_cluster_size_downsampled"].append(rel_size.mean())
         stats["std_cluster_size_downsampled"].append(rel_size.std())

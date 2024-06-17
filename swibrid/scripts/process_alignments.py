@@ -456,6 +456,7 @@ def combine_alignments(al1, al2, pad):
             s2 += "/"
             m1 += "/"
             m2 += "/"
+
     return s1, m1, s0, m2, s2
 
 
@@ -470,10 +471,14 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties='ont')
 
     def fetch(match, genome_dict, ind, pad):
         if 'insert' in match[-1]:
-            seq = genome_dict['genome'].fetch(match[2], match[ind] - pad, match[ind] + pad).upper()
+            seq = genome_dict['genome'].fetch(match[2], 
+                                              max(0, match[ind] - pad), 
+                                              min(genome_dict['genome'].get_reference_length(match[2]),
+                                                  match[ind] + pad)).upper()
         else:
-            seq = genome_dict['switch_genome'][(match[ind] - pad - genome_dict['offset']):
-                                                (match[ind] + pad - genome_dict['offset'])].upper()
+            seq = genome_dict['switch_genome'][max(0,match[ind] - pad - genome_dict['offset']):
+                                                   min(len(genome_dict['switch_genome']),
+                                                       match[ind] + pad - genome_dict['offset'])].upper()
         assert len(seq) <= 2 * pad, "trying to align a sequence of length {0}".format(length(seq))
         
         return seq

@@ -100,7 +100,7 @@ def run(args):
     logger.info("loading gaps from {0}".format(args.gaps))
     gaps = np.load(args.gaps)
 
-    logger.info("removing gaps > {0} from msa".format(args.max_gap))
+    logger.info("removing gaps <= {0} from msa".format(args.max_gap))
     msa_cleaned = remove_gaps(msa, gaps=gaps, max_gap=args.max_gap)
     if args.ignore_unused_positions:
         used = msa_cleaned.sum(0) > 0

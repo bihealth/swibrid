@@ -82,8 +82,11 @@ def run(args):
                         ins_sizes.append(ref_gap_size)
                         ref_gap_size = 0
 
-                    ref_nuc = ref_seq[ref_pos - rec.reference_start]
+                    ref_nuc = ref_seq[ref_pos - rec.reference_start].upper()
                     read_nuc = str(rec.seq[read_pos]).upper()
+
+                    if ref_nuc not in 'ACGT' or read_nuc not in 'ACGT':
+                        continue
 
                     if rec.is_reverse:
                         stats[(RC[read_nuc], RC[ref_nuc])] += 1
@@ -122,6 +125,9 @@ def run(args):
                     if ref_gap_size > 0:
                         ins_sizes.append(ref_gap_size)
                         ref_gap_size = 0
+
+                    if ref_nuc.upper() not in 'ACGT' or read_nuc.upper() not in 'ACGT':
+                        continue
 
                     stats[(read_nuc.upper(), ref_nuc.upper())] += 1
 

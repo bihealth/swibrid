@@ -206,6 +206,7 @@ def run(args):
         stats["mean_length"], stats["std_length"] = weighted_avg_and_std(
             cluster_analysis.loc[clones, "length"], w
         )
+
         stats["mean_GC"], stats["std_GC"] = weighted_avg_and_std(
             cluster_analysis.loc[clones, "GC"], w
         )
@@ -250,7 +251,7 @@ def run(args):
         logger.info(
             "reading cluster downsampling results from {0}".format(args.cluster_downsampling)
         )
-        downsampling = pd.read_csv(args.cluster_downsampling, header=0, index_col=0).mean(0)
+        downsampling = pd.read_csv(args.cluster_downsampling, header=0, index_col=0, ).mean(0)
         stats = pd.concat([stats, downsampling], axis=0)
 
     isotype_read_count = clustering["isotype"].dropna().value_counts()
@@ -297,6 +298,15 @@ def run(args):
         }
     )
 
+    if len(clones) > 0:
+        cluster_analysis['weights'] = np.nan
+        cluster_analysis.loc[clones,'weights'] = w
+        isotype_length = cluster_analysis.loc[clones].groupby("isotype_simple")[["length","weights"]].apply(lambda df: pd.DataFrame(weighted_avg_and_std(df['length'],df['weights']),index=['mean','std'])).squeeze()
+        isotype_length.index= [y + '_length_' + x for x, y in isotype_length.index.tolist()]
+    else:
+        isotype_length = None
+
+
     realignment_stats = (
         cluster_analysis.loc[clones]
         .groupby("isotype_simple")[["n_untemplated_switch", "n_homology_switch"]]
@@ -336,6 +346,7 @@ def run(args):
     stats = pd.concat(
         [
             stats,
+            isotype_length,
             isotype_read_fraction,
             isotype_cluster_fraction,
             alpha_ratio,
@@ -397,6 +408,7 @@ def run(args):
     if args.figure is not None:
         logger.info("reading read info")
         read_info = pd.read_csv(args.info, header=0, index_col=0)
+        assert read_info.index.is_unique, "index of info file is not unique!"
 
         barcode_locs = (
             [

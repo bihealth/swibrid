@@ -154,6 +154,13 @@ def setup_argparse(parser):
         type=float,
         help="""maximum height in dendrogram plot""",
     )
+    parser.add_argument(
+        "--paired_end_mode",
+        dest="paired_end_mode",
+        action="store_true",
+        default=False,
+        help="""use paired-end mode (requires coords file to indicate links)"""
+    )
 
 
 def rand_cmap(
@@ -318,12 +325,12 @@ def run(args):
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa).tocsr()
     nreads = msa.shape[0]
+    assert msa.shape[1] == Ltot, "MSA shape doesn't fit with switch region annotation"
 
     logger.info("loading clustering from {0}".format(args.clustering_results))
     clustering = pd.read_csv(args.clustering_results, index_col=0, header=0)
-    if clustering.shape[0] != nreads:
-        logger.warn("# of reads in clustering different from # of reads in msa!")
-        exit(1)
+    assert len(clustering['cluster'].dropna()) == nreads, "# of reads in clustering different from # of reads in msa!"
+
     reads = clustering["cluster"].dropna().index
     clustering = clustering.loc[reads]
     nreads = len(reads)
@@ -334,6 +341,7 @@ def run(args):
     if args.info:
         logger.info("reading read info from {0}".format(args.info))
         read_info = pd.read_csv(args.info, header=0, index_col=0)
+        assert read_info.index.is_unique, "index of info file is not unique!"
 
     if args.variants_table:
         logger.info("reading variant table from {0}".format(args.variants_table))
@@ -615,13 +623,26 @@ def run(args):
 
     if args.variants_table:
         logger.info("adding variant positions")
-        for typ, c in zip(("n.d.", "het0", "het1", "hom"), ("gray", "b", "r", "k")):
-            take = variants["type"] == typ
+        if 'type' in variants.columns:
+            for typ, c in zip(("n.d.", "het0", "het1", "hom"), ("gray", "b", "r", "k")):
+                take = variants["type"] == typ
+                ax.scatter(
+                    variants[take]["rel_pos"].values,
+                    nreads * np.ones(take.sum()),
+                    s=6,
+                    c=c,
+                    marker=7,
+                    lw=0,
+                    zorder=2,
+                    edgecolor=None,
+                    clip_on=False,
+                )
+        else:
             ax.scatter(
-                variants[take]["rel_pos"].values,
-                nreads * np.ones(take.sum()),
+                variants["rel_pos"].values,
+                nreads * np.ones(variants.shape[0]),
                 s=6,
-                c=c,
+                c='gray',
                 marker=7,
                 lw=0,
                 zorder=2,
@@ -804,6 +825,16 @@ def run(args):
         stats = stat_string.format(args.sample, nreads, nclusts, nclusts_eff)
 
         fig.text(0.01, 0.99, stats, size="x-small", ha="left", va="top")
+
+    if args.paired_end_mode:
+        assert args.coords is not None, "need processed read coordinates for paired-end mode!"
+        process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0).loc[reads]
+        mate_breaks = []
+        for read, mb in process["mate_breaks"].dropna().items():
+            p = nreads - reads[order].get_loc(read) - 1            
+            mate_breaks.append([(shift_coord(int(mb.split(";")[0]), cov_int), p + .5),
+                                (shift_coord(int(mb.split(";")[1]), cov_int), p + .5)])
+        ax.add_collection(LineCollection(mate_breaks, linewidths=lw, colors="lightgray", clip_on=False))
 
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("adding breakpoint realignment results")

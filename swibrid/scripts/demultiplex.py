@@ -76,6 +76,7 @@ def setup_argparse(parser):
     parser.add_argument("--nmax", dest="nmax", type=int, help="""maximum number of reads""")
     parser.add_argument("--add_umi", dest="add_umi", action="store_true", default=False, help="""add UMI to read name""")
     parser.add_argument("--umi_regex", dest="umi_regex", default=r"[ACGTN]{12}", help="""regex to find UMI in read description""")
+    parser.add_argument("--write_info_chunks", dest="write_info_chunks", action="store_true", default=False, help="""write info files in chunks""")
 
 
 def run(args):
@@ -182,6 +183,7 @@ def run(args):
         outf["undetermined"] = gzip.open(os.path.join(args.outdir, "undetermined.fastq.gz"), "wt")
 
         read_info = defaultdict(dict)
+        read_info_created = set()
         nreads = defaultdict(int)
 
         logger.info("demultiplexing reads from " + args.input)
@@ -375,30 +377,33 @@ def run(args):
             if n % 1000 == 0 and n > 0:
 
                 logger.info("{0:4d}k reads processed".format(n // 1000))
-                for comb in read_info.keys():
-                    read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
-                    if "start_time" in read_info[comb].columns:
-                        read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
-                            lambda x: time.mktime(x.timetuple())
-                        )
-                        read_info[comb]["start_time"] = (
-                            read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
-                        )
+                
+                if args.write_info_chunks:
+                    for comb in read_info.keys():
+                        read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
+                        if "start_time" in read_info[comb].columns:
+                            read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
+                                lambda x: time.mktime(x.timetuple())
+                            )
+                            read_info[comb]["start_time"] = (
+                                read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
+                            )
 
-                    if args.sample_sheet is not None and comb in sample_sheet.index:
-                        info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
-                    else:
-                        info_file=os.path.join(args.outdir, comb + "_info.csv")
+                        if args.sample_sheet is not None and comb in sample_sheet.index:
+                            info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+                        else:
+                            info_file=os.path.join(args.outdir, comb + "_info.csv")
 
-                    if read_info[comb].shape[0] == 0:
-                        continue
+                        if read_info[comb].shape[0] == 0:
+                            continue
 
-                    if n == 1000 or not os.path.isfile(info_file):
-                        read_info[comb].to_csv(info_file, mode='w', header=True)
-                    else:
-                        read_info[comb].to_csv(info_file, mode='a', header=False)
+                        if n == 1000 or comb not in read_info_created:
+                            read_info[comb].to_csv(info_file, mode='w', header=True)
+                            read_info_created.add(comb)
+                        else:
+                            read_info[comb].to_csv(info_file, mode='a', header=False)
 
-                read_info = defaultdict(dict)
+                    read_info = defaultdict(dict)
 
         logger.info("{0:4d} reads processed".format(n))
         for comb in read_info.keys():
@@ -420,8 +425,9 @@ def run(args):
             if read_info[comb].shape[0] == 0:
                 continue
 
-            if not os.path.isfile(info_file):
+            if comb not in read_info_created:
                 read_info[comb].to_csv(info_file, mode='w', header=True)
+                read_info_created.add(comb)
             else:
                 read_info[comb].to_csv(info_file, mode='a', header=False)
 

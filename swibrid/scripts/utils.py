@@ -288,7 +288,7 @@ def decode_insert(insert_string):
         r"(?P<switch_chroml>.+):(?P<switch_left>\d+)_"
         r"(?P<gapl>[-\d]+)_"
         r"(?P<istart>\d+)-(?P<iend>\d+)_"
-        r"(?P<orientation>[\+\-])_"
+        r"(?P<orientation>[\+\-])(?P<mate>[12]*)_"
         r"(?P<insert_chrom>.+):(?P<insert_start>\d+)-(?P<insert_end>\d+)_"
         r"(?P<gapr>[-\d]+)_"
         r"(?P<switch_chromr>.+):(?P<switch_right>\d+)",
@@ -356,7 +356,7 @@ def filter_clustering(Z, C, p=0.95, min_size=0):
     o = np.lexsort([heights.max() - heights.loc[clusts].values, csize])[::-1]
     o_rev = np.zeros_like(o)
     o_rev[o] = np.arange(len(o))
-    remove = ((csize < min_size) | (np.cumsum(csize[o])[o_rev] >= p * len(C)))[cinv]
+    remove = ((csize < min_size) | ((np.cumsum(csize[o])[o_rev] >= p * len(C)) & (csize <= p * len(C))))[cinv]
     C_filtered = np.copy(C)
     C_filtered[remove] = -1
     return C_filtered

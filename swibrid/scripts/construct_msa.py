@@ -132,6 +132,7 @@ def run(args):
             nt_ignored[read] += len(rec.seq)
             continue
         n = process.index.get_loc(read)
+        assert isinstance(n, int), "read index is not integer!"
         # find all the non-gap positions in this part of the read sequence
         for m in re.finditer("[ACGTacgt]", seq):
             i.append(n)
@@ -209,6 +210,8 @@ def run(args):
         )
     )
 
-    process[use][
-        ["isotype", "orientation", "frac_mapped", "frac_mapped_multi", "frac_ignored", "inserts"]
-    ].to_csv(args.out)
+    out_cols = ["isotype", "orientation", "frac_mapped", "frac_mapped_multi", "frac_ignored", "inserts"]
+    if "mate_breaks" in process.columns:
+        process["mate_breaks"] = process["mate_breaks"].apply(lambda x: ";".join(str(shift_coord(int(y), cov_int)) for y in x.split(";")) if not pd.isnull(x) else "")
+        out_cols += ["mate_breaks"]
+    process[use][out_cols].to_csv(args.out)

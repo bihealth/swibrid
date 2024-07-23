@@ -62,7 +62,7 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
-    parser.add_argument("--fdr", dest="fdr", default=0.05, help="""FDR for variant calling""")
+    parser.add_argument("--fdr", dest="fdr", default=0.05, type = float, help="""FDR for variant calling""")
     parser.add_argument(
         "--min_cov",
         dest="min_cov",
@@ -262,7 +262,7 @@ def run(args):
     logger.info("filtering variants")
     low_cov = nr < args.min_cov
     few_var = pp_adj > args.fdr
-    stranded = pstrand < 0.05
+    stranded = (pstrand < 0.05) & (np.abs(npos-nneg)/(npos + nneg) > .25)
     if D.nnz > 0:
         dnz = D.nonzero()
         no_clust_data = (A[dnz] > args.min_freq * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1

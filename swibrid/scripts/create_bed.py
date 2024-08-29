@@ -154,8 +154,8 @@ def run(args):
                 istart = int(insert.group("istart"))
                 iend = int(insert.group("iend"))
 
-                assert insert['mate'] in ['1','2'], "insert annotation lacks mate information for paired-end mode"
-                rec = rec1 if insert['mate'] == '1' else rec2
+                assert insert['mate'] in ['R1','R2'], "insert annotation lacks mate information for paired-end mode"
+                rec = rec1 if insert['mate'] == 'R1' else rec2
                 seq = rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
 
                 insert_table[rec.id] = dict(

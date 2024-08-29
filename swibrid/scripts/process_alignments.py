@@ -82,6 +82,13 @@ def setup_argparse(parser):
         help="""remove duplicate reads (based on UMIs in read IDs)"""
     )
     parser.add_argument(
+        "--ignore_order",
+        dest="ignore_order",
+        action="store_true",
+        default=False,
+        help="""don't check order of matches along read"""
+    )
+    parser.add_argument(
         "--telo",
         dest="telo",
         default="",
@@ -246,7 +253,7 @@ def parse_sam(sam_input, max_gap=75, keep_secondary=False):
                         ref_pos - ref_start_chunk,
                         -1 if rec.is_reverse else 1,
                         str(aligned_seq),
-                        rec.is_read1,
+                        'R1' if rec.is_read1 else 'R2',
                     )
                     chunks.append(chnk)
                     aligned_seq = ""
@@ -269,7 +276,7 @@ def parse_sam(sam_input, max_gap=75, keep_secondary=False):
                         ref_pos - ref_start_chunk,
                         -1 if rec.is_reverse else 1,
                         str(aligned_seq),
-                        rec.is_read1,
+                        'R1' if rec.is_read1 else 'R2',
                     )
                     chunks.append(chnk)
                     aligned_seq = ""
@@ -299,7 +306,7 @@ def parse_sam(sam_input, max_gap=75, keep_secondary=False):
             ref_pos - ref_start_chunk,
             -1 if rec.is_reverse else 1,
             str(aligned_seq),
-            rec.is_read1,
+            'R1' if rec.is_read1 else 'R2',
         )
         chunks.append(chnk)
 
@@ -370,7 +377,7 @@ def parse_maf(alignments, max_gap=75):
                 ref_end_chunk - ref_start_chunk,
                 orientation,
                 str(aligned_seq_chunk),
-                True,
+                'R1',
             )
 
             chunks.append(chnk)
@@ -402,7 +409,7 @@ def parse_maf(alignments, max_gap=75):
             ref_end_chunk - ref_start_chunk,
             orientation,
             str(aligned_seq_chunk),
-            True,
+            'R1',
         )
 
         chunks.append(chnk)
@@ -456,7 +463,7 @@ def combine_alignments(al1, al2, pad):
             i += 1
             j += 1
         else:
-            raise Exception("stop")
+            raise ValueError("no match in realignment!")
 
         assert len(s1A[:i].replace("-", "")) == len(s2A[:j].replace("-", "")), "mismatched sequence lengths in combine_alignments"
 
@@ -708,6 +715,7 @@ def run(args):
         if read in known_reads:
             logger.warn("read {0} already encountered; skipping".format(read))
             continue
+        known_reads.add(read)
 
         use = True
         stats["nreads_mapped"] += 1
@@ -750,7 +758,6 @@ def run(args):
         switch_matches = []
         # collect parts matching elsewhere
         inserts = []
-        # get total read coverage
 
         # get positions of matches to switch region and to elsewhere ("inserts")
         for (
@@ -762,7 +769,7 @@ def run(args):
             ref_len,
             orientation,
             aligned_seq,
-            is_read1
+            mate
         ) in matches:
 
             if read_len <= 0 or ref_len <= 0:
@@ -770,6 +777,7 @@ def run(args):
 
             if orientation == -1:
                 read_start = tot_read_len - read_start - read_len
+
             read_end = read_start + read_len
             ref_end = ref_start + ref_len
 
@@ -789,7 +797,7 @@ def run(args):
                         ref_end,
                         orientation,
                         aligned_seq,
-                        is_read1,
+                        mate,
                     )
                 )
             # find read parts that map elsewhere (including parts on the switch chromosome itself)
@@ -804,7 +812,7 @@ def run(args):
                         ref_start,
                         ref_end,
                         orientation,
-                        is_read1,
+                        mate,
                     )
                 )
 
@@ -820,12 +828,12 @@ def run(args):
 
         # check that matches have consistent orientation (choose the main orientation from read coverage)
         orientations = {"1": 0, "-1": 0}
-        for read_start, read_end, _, _, _, orientation, _, is_read1 in switch_matches:
-            orientations[str(orientation if is_read1 else -orientation)] += read_end - read_start
+        for read_start, read_end, _, _, _, orientation, _, mate in switch_matches:
+            orientations[str(orientation if mate == 'R1' else -orientation)] += read_end - read_start
         main_orientation = max([1, -1], key=lambda x: orientations[str(x)])
 
-        # sort switch matches by their order along the read
-        switch_matches = sorted(switch_matches, key=operator.itemgetter(0))
+        # sort switch matches by their order along the read (mates)
+        switch_matches = sorted(switch_matches, key=lambda x: (x[0], x[-1]))
 
         # check overlap of aligned segments on the read, or of different read mates in paired-end mode
         read_overlap = sum(
@@ -837,37 +845,32 @@ def run(args):
         ref_overlap = interval_length(
             intersect_intervals(
                 sorted(
-                    [("", m[3], m[4]) for m in switch_matches if m[5] == 1],
+                    [("", m[3], m[4]) for m in switch_matches if (m[5] if m[-1]=='R1' else -m[5]) == 1],
                     key=lambda x: x[1],
                 ),
                 sorted(
-                    [("", m[3], m[4]) for m in switch_matches if m[5] == -1],
+                    [("", m[3], m[4]) for m in switch_matches if (m[5] if m[-1]=='R1' else -m[5]) == -1],
                     key=lambda x: x[1],
                 ),
             )
         )
-
         mate_overlap = interval_length(
             intersect_intervals(
                 sorted(
-                    [("", m[4], m[4] + m[5]) for m in matches if m[-1]],
+                    [("", m[4], m[4] + m[5]) for m in matches if m[-1] == 'R1'],
                     key=lambda x: x[1],
                 ),
                 sorted(
-                    [("", m[4], m[4] + m[5]) for m in matches if not m[-1]],
+                    [("", m[4], m[4] + m[5]) for m in matches if m[-1] == 'R2'],
                     key=lambda x: x[1],
                 ),
             )
         )
 
-        if read_overlap > args.max_switch_overlap or ref_overlap > args.max_switch_overlap or (args.paired_end_mode and mate_overlap > args.max_switch_overlap):
+        if read_overlap > args.max_switch_overlap or \
+                ref_overlap > args.max_switch_overlap or \
+                (args.paired_end_mode and mate_overlap > args.max_switch_overlap):
             stats["nreads_removed_overlap_mismatch"] += 1
-            logger.warn(
-                "overlap mismatch (read: {0}, ref {1}{3}) for read {2}".format(
-                    read_overlap, ref_overlap, read,
-                    ", mate: " + str(mate_overlap) if args.paired_end_mode else ""
-                )
-            )
             use = False
 
         filtered_inserts = []
@@ -977,7 +980,7 @@ def run(args):
             for rm in sorted(
                 merge_intervals(
                     (
-                        x[2] + ("+" if (x[5] if x[-1] else -x[5]) == main_orientation else "-"),
+                        x[2] + ("+" if (x[5] if x[-1] == 'R1' else -x[5]) == main_orientation else "-"),
                         x[3],
                         x[4],
                     )
@@ -995,11 +998,14 @@ def run(args):
             use = False
 
         # check that more than args.min_cov of the read maps to the genome
-        if any(fi[8] < fi[7] for fi in filtered_inserts):
-            raise Exception("stop")
+        assert all(fi[8] >= fi[7] for fi in filtered_inserts), "coordinate mismatch for filtered inserts"
         tot_cov = sum(sm[1] - sm[0] for sm in switch_matches) + sum(
             fi[8] - fi[7] for fi in filtered_inserts
         )
+        # adjust total read length for paired-end reads
+        if args.paired_end_mode:
+            tot_read_len = sum(x[0] for x in set([(m[2], m[-1]) for m in matches]))
+
         if tot_cov / tot_read_len < args.min_cov:
             stats["nreads_removed_low_cov"] += 1
             use = False
@@ -1013,11 +1019,11 @@ def run(args):
         )
 
         # check that switch matches are in consistent order along the read and the genome (but ignore inverted segments)
-        read_order = np.argsort([sm[0] for sm in switch_matches if sm[5] == main_orientation])
-        genomic_order = np.argsort([sm[3] for sm in switch_matches if sm[5] == main_orientation])
-        if main_orientation == -1:
+        read_order = np.argsort([sm[0] for sm in switch_matches if (sm[5] if sm[-1] == 'R1' else -sm[5]) == main_orientation])
+        genomic_order = np.argsort([sm[3] for sm in switch_matches if (sm[5] if sm[-1] == 'R1' else -sm[5]) == main_orientation])
+        if main_orientation == -1 or args.paired_end_mode:
             genomic_order = genomic_order[::-1]
-        if not (read_order == genomic_order).all():
+        if not (read_order == genomic_order).all() and not args.ignore_order:
             stats["nreads_removed_switch_order"] += 1
             use = False
 
@@ -1073,14 +1079,14 @@ def run(args):
                     gapl,
                     istart,
                     iend,
-                    "+" if (orientation if is_read1 else -orientation) == 1 else "-",
+                    "+" if (orientation if mate == 'R1' else -orientation) == 1 else "-",
                     chrom,
                     start,
                     end,
                     gapr,
                     switch_chrom,
                     right,
-                    ("1" if is_read1 else "2") if args.paired_end_mode else "",
+                    mate if args.paired_end_mode else "",
                 )
                 for (
                     chrom,
@@ -1093,7 +1099,7 @@ def run(args):
                     istart,
                     iend,
                     orientation,
-                    is_read1,
+                    mate,
                 ) in filtered_inserts
             )
 
@@ -1113,7 +1119,6 @@ def run(args):
                 processed_umis[umi][out_string] = 1
 
         outf.write(read + "\t" + out_string + "\n")
-        known_reads.add(read)
 
         # write genomic alignments to fasta file for MSA construction
         if args.sequences is not None:
@@ -1125,7 +1130,7 @@ def run(args):
                         ref_chrom,
                         ref_start,
                         ref_end,
-                        "+" if ((orientation if is_read1 else -orientation) == main_orientation) else "-",
+                        "+" if ((orientation if mate == 'R1' else -orientation) == main_orientation) else "-",
                     ),
                 )
                 for (
@@ -1136,7 +1141,7 @@ def run(args):
                     ref_end,
                     orientation,
                     aligned_seq,
-                    is_read1,
+                    mate,
                 ) in switch_matches
             )
             SeqIO.write(sequences, seq_out, "fasta")
@@ -1150,7 +1155,7 @@ def run(args):
                     for f in filtered_inserts
                     if f[0] != "telomer"
                 ],
-                key=lambda x: (x[-1], x[0])
+                key=lambda x: (x[-1], x[0]),
             )
 
     outf.close()

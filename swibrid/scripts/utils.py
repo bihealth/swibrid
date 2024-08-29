@@ -288,7 +288,7 @@ def decode_insert(insert_string):
         r"(?P<switch_chroml>.+):(?P<switch_left>\d+)_"
         r"(?P<gapl>[-\d]+)_"
         r"(?P<istart>\d+)-(?P<iend>\d+)_"
-        r"(?P<orientation>[\+\-])(?P<mate>[12]*)_"
+        r"(?P<orientation>[\+\-])(?P<mate>[R12]*)_"
         r"(?P<insert_chrom>.+):(?P<insert_start>\d+)-(?P<insert_end>\d+)_"
         r"(?P<gapr>[-\d]+)_"
         r"(?P<switch_chromr>.+):(?P<switch_right>\d+)",

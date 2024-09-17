@@ -62,7 +62,9 @@ def setup_argparse(parser):
         dest="switch_annotation",
         help="""bed file with switch annotation""",
     )
-    parser.add_argument("--fdr", dest="fdr", default=0.05, type = float, help="""FDR for variant calling""")
+    parser.add_argument(
+        "--fdr", dest="fdr", default=0.05, type=float, help="""FDR for variant calling"""
+    )
     parser.add_argument(
         "--min_cov",
         dest="min_cov",
@@ -97,6 +99,12 @@ def setup_argparse(parser):
         default=0.4,
         type=float,
         help="""minimum allele frequency at potentially variable positions (in total or per cluster) [.4]""",
+    )
+    parser.add_argument(
+        "--nreads",
+        dest="nreads",
+        type=int,
+        help="""downsample to this number of reads to control sensitivity""",
     )
     parser.add_argument(
         "--variant_annotation",
@@ -163,9 +171,13 @@ def run(args):
 
     logger.info("loading msa from {0}".format(args.msa))
     msa = scipy.sparse.load_npz(args.msa).tocsr()
-    if nreads < msa.shape[0]:
-        logger.info("restricting msa to {0} reads in clustering".format(nreads))
-        msa = msa[:nreads]
+    assert nreads == msa.shape[0], "# of reads in clustering and MSA don't agree!"
+
+    if args.nreads is not None and args.nreads < nreads:
+        logger.info("downsampling to {0} reads".format(args.nreads))
+        read_ii = np.random.choice(nreads, size=args.nreads, replace=False)
+        msa = msa[read_ii, :]
+        clustering = clustering.iloc[read_ii]
 
     # remove coverage and orientation info from msa
     msa.data = msa.data % 10
@@ -262,7 +274,7 @@ def run(args):
     logger.info("filtering variants")
     low_cov = nr < args.min_cov
     few_var = pp_adj > args.fdr
-    stranded = (pstrand < 0.05) & (np.abs(npos-nneg)/(npos + nneg) > .25)
+    stranded = (pstrand < 0.05) & (np.abs(npos - nneg) / (npos + nneg) > 0.25)
     if D.nnz > 0:
         dnz = D.nonzero()
         no_clust_data = (A[dnz] > args.min_freq * D[dnz]).A1 & (D[dnz] >= args.min_cluster_cov).A1
@@ -445,6 +457,11 @@ def run(args):
 
     if args.mat is not None:
         logger.info("saving variant matrix to {0}".format(args.mat))
+        if args.nreads is not None and args.nreads < nreads:
+            mi, mj = mat.nonzero()
+            mat = scipy.sparse.csc_matrix(
+                (mat.data, (read_ii[mi], mj)), shape=(nreads, msa.shape[1]), dtype=np.int8
+            )
         scipy.sparse.save_npz(args.mat, mat)
 
     if args.out_complete:

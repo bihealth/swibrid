@@ -310,20 +310,59 @@ def run(args):
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
 
+        realignments["chrom_left"] = realignments["pos_left"].str.split(":").str[0]
+        realignments["chrom_right"] = realignments["pos_right"].str.split(":").str[0]
+
+        realignments["pos_left"] = realignments["pos_left"].str.split(":").str[1].astype(int)
+        realignments["pos_right"] = realignments["pos_right"].str.split(":").str[1].astype(int)
+
         # filter out realignments across breaks smaller than max_gap
-        gap_size = realignments["pos_left"].str.split(":").str[1].astype(int) - realignments["pos_right"].str.split(":").str[1].astype(int)
-        #keep = (gap_size >= args.max_gap) | (realignments["pos_left"].str.split(":").str[0] != realignments["pos_right"].str.split(":").str[0])
-        #ealignments = realignments[keep]
+        gap_size = np.abs(realignments["pos_left"] - realignments["pos_right"])
+        keep = (gap_size >= args.max_gap) | (
+            realignments["chrom_left"] != realignments["chrom_right"]
+        )
+        realignments = realignments[keep]
 
         if realignments.shape[0] > 0:
             realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
+
+            def group_realignments(df, max_dist=5):
+                # ignore results for breaks that appear only once per cluster (within a distance of max_dist)
+                all_pos = np.concatenate([df["pos_left"], df["pos_right"]])
+                nclose_left = np.array(
+                    [np.sum(np.abs(pl - all_pos) < max_dist) for pl in df["pos_left"]]
+                )
+                nclose_right = np.array(
+                    [np.sum(np.abs(pr - all_pos) < max_dist) for pr in df["pos_left"]]
+                )
+
+                if df.shape[0] > 1:
+                    take = (nclose_left > 1) & (nclose_right > 1)
+                    return pd.Series(
+                        {
+                            "n_homology": df[take]["n_homology"].mean(),
+                            "n_untemplated": df[take]["n_untemplated"].mean(),
+                        }
+                    )
+                return pd.Series(
+                    {
+                        "n_homology": df["n_homology"].mean(),
+                        "n_untemplated": df["n_untemplated"].mean(),
+                    }
+                )
+
+            # realignment_stats = (
+            #    realignments.groupby(["type", "cluster"])
+            #    .agg({"n_homology": "mean",
+            #          "n_untemplated": "mean"})
+            #    .unstack(level=0)
+            # )
+
             realignment_stats = (
-                realignments.groupby(["type", "cluster"])
-                .agg({"n_homology": ["mean", "std"],
-                      "n_untemplated": ["mean", "std"]})
-                .unstack(level=0)
+                realignments.groupby(["type", "cluster"]).apply(group_realignments).unstack(level=0)
             )
-            realignment_stats.columns = ["_".join(c).replace("_mean", "") for c in realignment_stats.columns.tolist()]
+
+            realignment_stats.columns = ["_".join(c) for c in realignment_stats.columns.tolist()]
 
     df = pd.DataFrame(
         {

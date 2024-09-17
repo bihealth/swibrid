@@ -21,13 +21,9 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)"""
+        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
     )
-    parser.add_argument(
-        "--msa_csv",
-        dest="msa_csv",
-        help="""msa read info (for paire_end_mode)"""
-    )
+    parser.add_argument("--msa_csv", dest="msa_csv", help="""msa read info (for paire_end_mode)""")
 
 
 def run(args):
@@ -46,10 +42,18 @@ def run(args):
 
     if args.paired_end_mode:
         import pandas as pd
+
         logger.info("paired_end_mode: removing mate breaks using {0}".format(args.msa_csv))
         msa_csv = pd.read_csv(args.msa_csv, index_col=None, header=0)
-        mate_breaks = dict((i,(int(mb.split(';')[0]),int(mb.split(';')[1]))) for i,mb in msa_csv['mate_breaks'].dropna().items() if not 'nan' in mb)
-        use=[i not in mate_breaks or mate_breaks[i]!=(l,r) for i,l,r in zip(read_idx,gap_left,gap_right)]
+        mate_breaks = dict(
+            (i, (int(mb.split(";")[0]), int(mb.split(";")[1])))
+            for i, mb in msa_csv["mate_breaks"].dropna().items()
+            if not "nan" in mb
+        )
+        use = [
+            i not in mate_breaks or mate_breaks[i] != (l, r)
+            for i, l, r in zip(read_idx, gap_left, gap_right)
+        ]
         read_idx = read_idx[use]
         gap_left = gap_left[use]
         gap_right = gap_right[use]

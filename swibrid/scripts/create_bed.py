@@ -19,13 +19,17 @@ def setup_argparse(parser):
         dest="outfile",
         help="""required: output table with insert information""",
     )
-    parser.add_argument("--raw_reads", dest="raw_reads", help="""fasta file with minION reads (comma-separated list of read mates for paired-end data)""")
+    parser.add_argument(
+        "--raw_reads",
+        dest="raw_reads",
+        help="""fasta file with minION reads (comma-separated list of read mates for paired-end data)""",
+    )
     parser.add_argument(
         "--paired_end_mode",
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)"""
+        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
     )
     parser.add_argument(
         "--switch_coords",
@@ -136,9 +140,21 @@ def run(args):
 
     insert_table = {}
     if args.paired_end_mode:
-        logger.info("parsing raw reads from " + ' and '.join(args.raw_reads.split(',')))
-        for rec1, rec2 in zip(SeqIO.parse(gzip.open(args.raw_reads.split(',')[0], 'rt') if args.raw_reads.split(',')[0].endswith('.gz') else open(args.raw_reads.split(',')[0]), "fastq"),
-                              SeqIO.parse(gzip.open(args.raw_reads.split(',')[1], 'rt') if args.raw_reads.split(',')[1].endswith('.gz') else open(args.raw_reads.split(',')[1]), "fastq")):
+        logger.info("parsing raw reads from " + " and ".join(args.raw_reads.split(",")))
+        for rec1, rec2 in zip(
+            SeqIO.parse(
+                gzip.open(args.raw_reads.split(",")[0], "rt")
+                if args.raw_reads.split(",")[0].endswith(".gz")
+                else open(args.raw_reads.split(",")[0]),
+                "fastq",
+            ),
+            SeqIO.parse(
+                gzip.open(args.raw_reads.split(",")[1], "rt")
+                if args.raw_reads.split(",")[1].endswith(".gz")
+                else open(args.raw_reads.split(",")[1]),
+                "fastq",
+            ),
+        ):
             if rec1.id != rec2.id or rec1.id not in inserts or rec2.id not in inserts:
                 continue
 
@@ -154,9 +170,14 @@ def run(args):
                 istart = int(insert.group("istart"))
                 iend = int(insert.group("iend"))
 
-                assert insert['mate'] in ['R1','R2'], "insert annotation lacks mate information for paired-end mode"
-                rec = rec1 if insert['mate'] == 'R1' else rec2
-                seq = rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
+                assert insert["mate"] in [
+                    "R1",
+                    "R2",
+                ], "insert annotation lacks mate information for paired-end mode"
+                rec = rec1 if insert["mate"] == "R1" else rec2
+                seq = (
+                    rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
+                )
 
                 insert_table[rec.id] = dict(
                     read=rec.id,
@@ -171,7 +192,9 @@ def run(args):
     else:
         logger.info("parsing raw reads from " + args.raw_reads)
         for rec in SeqIO.parse(
-            gzip.open(args.raw_reads, "rt") if args.raw_reads.endswith(".gz") else open(args.raw_reads),
+            gzip.open(args.raw_reads, "rt")
+            if args.raw_reads.endswith(".gz")
+            else open(args.raw_reads),
             "fastq",
         ):
             if rec.id not in inserts:
@@ -189,7 +212,9 @@ def run(args):
                 istart = int(insert.group("istart"))
                 iend = int(insert.group("iend"))
 
-                seq = rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
+                seq = (
+                    rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
+                )
 
                 insert_table[rec.id] = dict(
                     read=rec.id,

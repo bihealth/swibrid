@@ -295,18 +295,25 @@ def run(args):
     )
     intra_event = switch_iis[xx] == switch_iis[yy]
 
-    take_intra = (gap_size >= args.max_gap) & \
-        (gap_left // binsize < Leff) & \
-        (gap_right // binsize < Leff) & \
-        (switch_iis[gap_left // binsize] == switch_iis[gap_right // binsize]) 
-    stats["mean_intra_break_size"], stats["std_intra_break_size"] = weighted_avg_and_std(gap_size[take_intra], 
-                                                                                         weights[gap_read[take_intra]])
+    take_intra = (
+        (gap_size >= args.max_gap)
+        & (gap_left // binsize < Leff)
+        & (gap_right // binsize < Leff)
+        & (switch_iis[gap_left // binsize] == switch_iis[gap_right // binsize])
+    )
+    stats["mean_intra_break_size"], stats["std_intra_break_size"] = weighted_avg_and_std(
+        gap_size[take_intra], weights[gap_read[take_intra]]
+    )
 
     stats["frac_breaks_single"] = bp_hist[single_event].sum() / nbreaks
     stats["frac_breaks_sequential"] = bp_hist[sequential_event].sum() / nbreaks
     stats["frac_breaks_intra"] = bp_hist[intra_event].sum() / nbreaks
-    stats["frac_breaks_inversions_intra"] = bp_hist_inv[intra_event].sum() / (nbreaks + ninversions + nduplications)
-    stats["frac_breaks_duplications_intra"] = bp_hist_dup[intra_event].sum() / (nbreaks + ninversions + nduplications)
+    stats["frac_breaks_inversions_intra"] = bp_hist_inv[intra_event].sum() / (
+        nbreaks + ninversions + nduplications
+    )
+    stats["frac_breaks_duplications_intra"] = bp_hist_dup[intra_event].sum() / (
+        nbreaks + ninversions + nduplications
+    )
 
     # collapse different gamma and alpha isotypes for frac_breaks, spread and homology scores
     switch_iis = np.array([si[:2] for si in switch_iis])
@@ -425,7 +432,7 @@ def run(args):
         )
         bph_d.eliminate_zeros()
 
-        markersize = (3.6 * .85 * 72 / (Leff // scale_factor) - .2)**2
+        markersize = (3.6 * 0.85 * 72 / (Leff // scale_factor) - 0.2) ** 2
 
         ax = fig.add_axes([0.12, 0.03, 0.85, 0.7])
         ax.scatter(

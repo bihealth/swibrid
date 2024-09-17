@@ -74,9 +74,26 @@ def setup_argparse(parser):
         help="""maximum distance between internal primer matches to split read""",
     )
     parser.add_argument("--nmax", dest="nmax", type=int, help="""maximum number of reads""")
-    parser.add_argument("--add_umi", dest="add_umi", action="store_true", default=False, help="""add UMI to read name""")
-    parser.add_argument("--umi_regex", dest="umi_regex", default=r"[ACGTN]{12}", help="""regex to find UMI in read description""")
-    parser.add_argument("--write_info_chunks", dest="write_info_chunks", action="store_true", default=False, help="""write info files in chunks""")
+    parser.add_argument(
+        "--add_umi",
+        dest="add_umi",
+        action="store_true",
+        default=False,
+        help="""add UMI to read name""",
+    )
+    parser.add_argument(
+        "--umi_regex",
+        dest="umi_regex",
+        default=r"[ACGTN]{12}",
+        help="""regex to find UMI in read description""",
+    )
+    parser.add_argument(
+        "--write_info_chunks",
+        dest="write_info_chunks",
+        action="store_true",
+        default=False,
+        help="""write info files in chunks""",
+    )
 
 
 def run(args):
@@ -117,14 +134,14 @@ def run(args):
         read = ls[1]
         hit = dict(
             query=ls[0],
-            #seq_len=int(ls[2]),
-            #query_len=int(ls[3]),
-            #pid=float(ls[4]),
-            #matchlen=int(ls[5]),
+            # seq_len=int(ls[2]),
+            # query_len=int(ls[3]),
+            # pid=float(ls[4]),
+            # matchlen=int(ls[5]),
             orientation="+" if int(ls[7]) > int(ls[6]) else "-",
             sstart=min(int(ls[6]), int(ls[7])),
             send=max(int(ls[6]), int(ls[7])),
-            #evalue=float(ls[8]),
+            # evalue=float(ls[8]),
             pideff=int(ls[5]) * float(ls[4]) / float(ls[2]),
         )
         if hit["pideff"] > args.cutoff:
@@ -167,7 +184,6 @@ def run(args):
         whitelist = combs
 
     if args.outdir is not None:
-
         logger.info("using these barcode combinations for demultiplexing: " + ", ".join(combs))
 
         outf = {}
@@ -211,8 +227,6 @@ def run(args):
                 ),
                 key=lambda x: x[1],
             )
-
-
 
             # check if there are clusters of multiple primers or barcodes within args.max_split_dist
             clusters = []
@@ -274,7 +288,7 @@ def run(args):
                 if args.add_umi:
                     umi_match = re.search(args.umi_regex, rec.description)
                     if umi_match:
-                        rec.id += '_' + umi_match.group()
+                        rec.id += "_" + umi_match.group()
 
                 SeqIO.write(rec, outf[comb], "fastq")
                 nreads[comb] += 1
@@ -375,39 +389,37 @@ def run(args):
                     )
 
             if n % 1000 == 0 and n > 0:
-
                 logger.info("{0:4d}k reads processed".format(n // 1000))
-                
+
                 if args.write_info_chunks:
                     for comb in read_info.keys():
                         read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
                         if "start_time" in read_info[comb].columns:
-                            read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
-                                lambda x: time.mktime(x.timetuple())
-                            )
+                            read_info[comb]["start_time"] = pd.to_datetime(
+                                read_info[comb]["start_time"]
+                            ).apply(lambda x: time.mktime(x.timetuple()))
                             read_info[comb]["start_time"] = (
                                 read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
                             )
 
                         if args.sample_sheet is not None and comb in sample_sheet.index:
-                            info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+                            info_file = os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
                         else:
-                            info_file=os.path.join(args.outdir, comb + "_info.csv")
+                            info_file = os.path.join(args.outdir, comb + "_info.csv")
 
                         if read_info[comb].shape[0] == 0:
                             continue
 
                         if n == 1000 or comb not in read_info_created:
-                            read_info[comb].to_csv(info_file, mode='w', header=True)
+                            read_info[comb].to_csv(info_file, mode="w", header=True)
                             read_info_created.add(comb)
                         else:
-                            read_info[comb].to_csv(info_file, mode='a', header=False)
+                            read_info[comb].to_csv(info_file, mode="a", header=False)
 
                     read_info = defaultdict(dict)
 
         logger.info("{0:4d} reads processed".format(n))
         for comb in read_info.keys():
-
             read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
             if "start_time" in read_info[comb].columns:
                 read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
@@ -418,18 +430,18 @@ def run(args):
                 )
 
             if args.sample_sheet is not None and comb in sample_sheet.index:
-                info_file=os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
+                info_file = os.path.join(args.outdir, sample_sheet[comb] + "_info.csv")
             else:
-                info_file=os.path.join(args.outdir, comb + "_info.csv")
+                info_file = os.path.join(args.outdir, comb + "_info.csv")
 
             if read_info[comb].shape[0] == 0:
                 continue
 
             if comb not in read_info_created:
-                read_info[comb].to_csv(info_file, mode='w', header=True)
+                read_info[comb].to_csv(info_file, mode="w", header=True)
                 read_info_created.add(comb)
             else:
-                read_info[comb].to_csv(info_file, mode='a', header=False)
+                read_info[comb].to_csv(info_file, mode="a", header=False)
 
         for f in outf.values():
             f.close()

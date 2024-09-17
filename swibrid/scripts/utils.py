@@ -25,20 +25,20 @@ RC = {"A": "T", "C": "G", "G": "C", "T": "A", "N": "N"}
 
 isotype_colors = {
     "SM": "#000000",
-    "SG3": "#FF96BC",
-    "SG1": "#FF629B",
-    "SA1": "#13C203",
-    "SG2": "#C81E5C",
-    "SG4": "#76002B",
-    "SE": "#E3D913",
-    "SA2": "#006709",
+    "SG3": "#98E4FD",
+    "SG1": "#25C5C5",
+    "SA1": "#D92916",
+    "SG2": "#147F7F",
+    "SG4": "#084C4C",
+    "SE": "#C9C9C9",
+    "SA2": "#8A170C",
     "Sm": "#000000",
-    "Sg3": "#FF96BC",
-    "Sg1": "#FF629B",
-    "Sa": "#13C203",
-    "Sg2b": "#C81E5C",
-    "Sg2c": "#76002B",
-    "Se": "#E3D913",
+    "Sg3": "#98E4FD",
+    "Sg1": "#25C5C5",
+    "SA": "#D92916",
+    "Sg2b": "#147F7F",
+    "Sg2c": "#084C4C",
+    "Se": "#C9C9C9",
 }
 
 
@@ -356,7 +356,9 @@ def filter_clustering(Z, C, p=0.95, min_size=0):
     o = np.lexsort([heights.max() - heights.loc[clusts].values, csize])[::-1]
     o_rev = np.zeros_like(o)
     o_rev[o] = np.arange(len(o))
-    remove = ((csize < min_size) | ((np.cumsum(csize[o])[o_rev] >= p * len(C)) & (csize <= p * len(C))))[cinv]
+    remove = (
+        (csize < min_size) | ((np.cumsum(csize[o])[o_rev] >= p * len(C)) & (csize <= p * len(C)))
+    )[cinv]
     C_filtered = np.copy(C)
     C_filtered[remove] = -1
     return C_filtered

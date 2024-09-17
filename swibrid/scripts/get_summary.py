@@ -251,7 +251,11 @@ def run(args):
         logger.info(
             "reading cluster downsampling results from {0}".format(args.cluster_downsampling)
         )
-        downsampling = pd.read_csv(args.cluster_downsampling, header=0, index_col=0, ).mean(0)
+        downsampling = pd.read_csv(
+            args.cluster_downsampling,
+            header=0,
+            index_col=0,
+        ).mean(0)
         stats = pd.concat([stats, downsampling], axis=0)
 
     isotype_read_count = clustering["isotype"].dropna().value_counts()
@@ -299,13 +303,21 @@ def run(args):
     )
 
     if len(clones) > 0:
-        cluster_analysis['weights'] = np.nan
-        cluster_analysis.loc[clones,'weights'] = w
-        isotype_length = cluster_analysis.loc[clones].groupby("isotype_simple")[["length","weights"]].apply(lambda df: pd.DataFrame(weighted_avg_and_std(df['length'],df['weights']),index=['mean','std'])).squeeze()
-        isotype_length.index= [y + '_length_' + x for x, y in isotype_length.index.tolist()]
+        cluster_analysis["weights"] = np.nan
+        cluster_analysis.loc[clones, "weights"] = w
+        isotype_length = (
+            cluster_analysis.loc[clones]
+            .groupby("isotype_simple")[["length", "weights"]]
+            .apply(
+                lambda df: pd.DataFrame(
+                    weighted_avg_and_std(df["length"], df["weights"]), index=["mean", "std"]
+                )
+            )
+            .squeeze()
+        )
+        isotype_length.index = [y + "_length_" + x for x, y in isotype_length.index.tolist()]
     else:
         isotype_length = None
-
 
     realignment_stats = (
         cluster_analysis.loc[clones]
@@ -463,7 +475,9 @@ def run(args):
         ax = axs[0, 0]
         ax.hist(
             read_info["length"],
-            bins=np.geomspace(.95*read_info["length"].min(), 1.05*read_info["length"].max(), 100),
+            bins=np.geomspace(
+                0.95 * read_info["length"].min(), 1.05 * read_info["length"].max(), 100
+            ),
             histtype="step",
         )
         ax.set_yscale("log")
@@ -505,7 +519,9 @@ def run(args):
             kind="barh",
             stacked=True,
             ax=ax,
-            color=[isotype_colors[it] if it in isotype_colors else 'gray' for it in isotype_fracs.index],
+            color=[
+                isotype_colors[it] if it in isotype_colors else "gray" for it in isotype_fracs.index
+            ],
         )
         ax.set_xlabel("fraction")
         ax.legend(

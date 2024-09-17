@@ -159,7 +159,7 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (requires coords file to indicate links)"""
+        help="""use paired-end mode (requires coords file to indicate links)""",
     )
 
 
@@ -329,7 +329,9 @@ def run(args):
 
     logger.info("loading clustering from {0}".format(args.clustering_results))
     clustering = pd.read_csv(args.clustering_results, index_col=0, header=0)
-    assert len(clustering['cluster'].dropna()) == nreads, "# of reads in clustering different from # of reads in msa!"
+    assert (
+        len(clustering["cluster"].dropna()) == nreads
+    ), "# of reads in clustering different from # of reads in msa!"
 
     reads = clustering["cluster"].dropna().index
     clustering = clustering.loc[reads]
@@ -400,12 +402,20 @@ def run(args):
     elif args.color_by == "coverage":
         cmap = plt.cm.rainbow_r
     elif args.color_by == "sequence":
-        cmap = matplotlib.colors.LinearSegmentedColormap.from_list('nucleotides',['#0000FF','#FF0000','#00CC00','#FFFF00'],N=10)
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+            "nucleotides", ["#0000FF", "#FF0000", "#00CC00", "#FFFF00"], N=10
+        )
     elif args.color_by == "strand" and args.info:
         values = (clustering["orientation"] == "+").astype(int) + 1
         cmap = plt.cm.PiYG
     elif args.color_by == "haplotype" and args.haplotypes is not None:
-        values = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values
+        # values = haplotypes.loc[clustering["cluster"].astype(int).values, "haplotype"].values
+        values = (
+            haplotypes["haplotype"]
+            .reindex(clustering["cluster"].astype(int).unique(), fill_value=0.5)
+            .loc[clustering["cluster"].astype(int).values]
+            .values
+        )
         cmap = plt.cm.coolwarm
     else:
         logger.warn("no info on {0}!".format(args.color_by))
@@ -504,9 +514,15 @@ def run(args):
                 )
                 sidebar_values = crank[clustering["cluster"].astype(int)].values % nclust
             elif sidebar_color == "haplotype":
-                sidebar_values = haplotypes.loc[
-                    clustering["cluster"].astype(int).values, "haplotype"
-                ].values
+                sidebar_values = (
+                    haplotypes["haplotype"]
+                    .reindex(clustering["cluster"].astype(int).unique(), fill_value=0.5)
+                    .loc[clustering["cluster"].astype(int).values]
+                    .values
+                )
+                # sidebar_values = haplotypes.loc[
+                #    clustering["cluster"].astype(int).values, "haplotype"
+                # ].values
                 sidebar_cmap = plt.cm.coolwarm
             elif args.info and sidebar_color in read_info.columns:
                 info_col = read_info.loc[reads, sidebar_color]
@@ -581,7 +597,7 @@ def run(args):
             im[np.nonzero(msa_chunk)] = (msa_chunk.data // 10 + 2) / 4
             values = np.array([0, 1])
         elif args.color_by == "sequence":
-            im[np.nonzero(msa_chunk)] = (msa_chunk.data % 10 - 1) / 3.
+            im[np.nonzero(msa_chunk)] = (msa_chunk.data % 10 - 1) / 3.0
             values = np.array([0, 1])
         else:
             tmp = np.broadcast_to(values[order_chunk], msa_chunk.T.shape).T
@@ -623,7 +639,7 @@ def run(args):
 
     if args.variants_table:
         logger.info("adding variant positions")
-        if 'type' in variants.columns:
+        if "type" in variants.columns:
             for typ, c in zip(("n.d.", "het0", "het1", "hom"), ("gray", "b", "r", "k")):
                 take = variants["type"] == typ
                 ax.scatter(
@@ -642,7 +658,7 @@ def run(args):
                 variants["rel_pos"].values,
                 nreads * np.ones(variants.shape[0]),
                 s=6,
-                c='gray',
+                c="gray",
                 marker=7,
                 lw=0,
                 zorder=2,
@@ -770,7 +786,7 @@ def run(args):
                     color="k",
                     markersize=0.5,
                 )
-                if switch_orientation == '+':
+                if switch_orientation == "+":
                     arrows.append([(Ltot, p + 0.5), (Ltot + dx, p + 0.5)])
                 else:
                     arrows.append([(0, p + 0.5), (-dx, p + 0.5)])
@@ -780,13 +796,13 @@ def run(args):
                     if interval_length(intersect_intervals([insert], [ins])) > 0
                 ][0]
                 if uinsert in insert_pos:
-                    if switch_orientation == '+':
+                    if switch_orientation == "+":
                         arrows.append([(Ltot + dx, p + 0.5), (Ltot + 3 * dx, insert_pos[uinsert])])
                     else:
                         arrows.append([(-dx, p + 0.5), (-3 * dx, insert_pos[uinsert])])
                     continue
                 n -= dn
-                if switch_orientation == '+':
+                if switch_orientation == "+":
                     arrows.append([(Ltot + dx, p + 0.5), (Ltot + 3 * dx, n + 0.5)])
                 else:
                     arrows.append([(-dx, p + 0.5), (-3 * dx, n + 0.5)])
@@ -800,18 +816,18 @@ def run(args):
                 else:
                     insert_anno = "|".join(insert_anno)
                 # insert_anno='{0}:{1}-{2}'.format(*uinsert)
-                if switch_orientation == '+':
+                if switch_orientation == "+":
                     arrows.append([(Ltot + 3 * dx, n + 0.5), (Ltot + 4 * dx, n + 0.5)])
                 else:
                     arrows.append([(-3 * dx, n + 0.5), (-4 * dx, n + 0.5)])
                 ax.text(
-                    Ltot + 4.2 * dx if switch_orientation == '+' else - 4.2 * dx,
+                    Ltot + 4.2 * dx if switch_orientation == "+" else -4.2 * dx,
                     n + 0.5,
                     insert_anno,
                     size="xx-small",
                     color="k",
                     clip_on=False,
-                    ha="left" if switch_orientation == '+' else "right",
+                    ha="left" if switch_orientation == "+" else "right",
                     va="center",
                 )
 
@@ -831,10 +847,16 @@ def run(args):
         process = pd.read_csv(args.coords, sep="\t", header=0, index_col=0).loc[reads]
         mate_breaks = []
         for read, mb in process["mate_breaks"].dropna().items():
-            p = nreads - reads[order].get_loc(read) - 1            
-            mate_breaks.append([(shift_coord(int(mb.split(";")[0]), cov_int), p + .5),
-                                (shift_coord(int(mb.split(";")[1]), cov_int), p + .5)])
-        ax.add_collection(LineCollection(mate_breaks, linewidths=lw, colors="lightgray", clip_on=False))
+            p = nreads - reads[order].get_loc(read) - 1
+            mate_breaks.append(
+                [
+                    (shift_coord(int(mb.split(";")[0]), cov_int), p + 0.5),
+                    (shift_coord(int(mb.split(";")[1]), cov_int), p + 0.5),
+                ]
+            )
+        ax.add_collection(
+            LineCollection(mate_breaks, linewidths=lw, colors="lightgray", clip_on=False)
+        )
 
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("adding breakpoint realignment results")
@@ -867,7 +889,7 @@ def run(args):
                 lw=lw,
                 marker="_",
                 zorder=2,
-                edgecolor='k',
+                edgecolor="k",
                 clip_on=False,
                 vmin=0,
                 vmax=1,

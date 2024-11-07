@@ -10,7 +10,7 @@ swibrid documentation
    :maxdepth: 2
    :caption: Contents:
 
-   readme.rst
+   quickstart.rst
    configure.rst
    output.rst 
    cli.rst

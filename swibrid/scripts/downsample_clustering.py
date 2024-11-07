@@ -1,8 +1,9 @@
 """\
-downsample the clustering to get more robust diversity measures
+downsample the clustering to get more robust diversity measures: 
 given the input MSA (and associated gaps), clustering is repeated `nreps` times on a subsample of `nreads` reads
-using `fastcluster`  with (by defalt) cosine metric and average linkage and a cutoff derived from cluster_stats input
+using `fastcluster`  with (by defalt) cosine metric and average linkage and a cutoff derived from cluster_stats input.
 the following diversity measured are calculated:
+
 - mean_cluster_size (as fraction of reads)
 - std_cluster_size
 - nclusters_final (number of clusters after filtering)
@@ -38,7 +39,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--nreps", dest="nreps", type=int, default=10, help="""number of replicates [10]"""
     )
-    parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
+    parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",

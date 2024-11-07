@@ -1,18 +1,12 @@
 """\
-EXPERIMENTAL: find single-nucleotide variants in MSA and determine haplotypes
+EXPERIMENTAL: find single-nucleotide variants in MSA and determine haplotypes. variable positions in the input MSA (excluding positions at or near gaps) where nucleotide distributions are different than what's expected given mutation frequencies (estimated at the initial alignment step). potential variants are removed if
 
-single-nucleotide variants: variable positions in the input MSA (excluding positions at or near gaps) where
-nucleotide distributions are different than what's expected given mutation frequencies (estimated at the initial alignment step)
-potential variants are removed if
 - there's less than min_cov non-gaps
 - fewer variants than expected
 - high strand bias
 - no cluster with at least min_cluster_cov reads and allele frequency > min_freq
-variants are aggregated over clusters, and the distribution across clusters is tested for evenness
-variants can be annotated by dbSNP id
-motif occurrences around variants are also scored
 
-haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant
+variants are aggregated over clusters, and the distribution across clusters is tested for evenness. variants can be annotated by dbSNP id. motif occurrences around variants are also scored. haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant. 
 
 output is a vcf-style file with genomic (1-based) and relative (0-based) coordinates, and a matrix (sparse integer array, same shape as MSA) indicating which read contains a variant at which position
 """

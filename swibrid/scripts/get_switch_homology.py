@@ -1,7 +1,7 @@
 """\
-analyze sequence homology within switch region bins by jaccard similarity of k-mers
+analyze sequence homology within switch region bins by jaccard similarity of k-mers: 
 from switch region coordinates and a genome file, this script assesses homology of
-pairs of bins by jaccard similarity of k-mer occurrences in forward or reverse orientation
+pairs of bins by jaccard similarity of k-mer occurrences in forward or reverse orientation.
 output is a .npz file with pairwise forward and reverse homology arrays for each value of k
 """
 

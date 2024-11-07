@@ -29,7 +29,7 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
+        help="""EXPERIMENTAL: use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
     )
     parser.add_argument(
         "--switch_coords",

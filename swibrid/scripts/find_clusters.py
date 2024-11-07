@@ -1,9 +1,9 @@
 """\
-find clusters by cutting linkage dendrogram
-inputs are the linkage matrix (from construct_linkage) and read info (from construct_msa)
-output is a csv file that adds cluster identity to the read info file
+find clusters by cutting linkage dendrogram: inputs are the linkage matrix (from ``construct_linkage``) 
+and read info (``from construct_msa``). output is a csv file that adds cluster identity to the read info file
+
 cutoff can be fixed or determined by scanning cutoffs between cmin and cmax
-and finding an inflection point (either by distance, or from the intersection of two exponential trends)
+and finding an inflection point (either by distance, or from the intersection of two exponential trends).
 small and isolated clusters are flagged, filtered clusters contain at least 95% of reads
 """
 
@@ -13,13 +13,13 @@ def setup_argparse(parser):
         "-l",
         "--linkage",
         dest="linkage",
-        help="""required: output of construct_linkage.py""",
+        help="""required: output of construct_linkage""",
     )
     parser.add_argument(
         "-i",
         "--input",
         dest="input",
-        help="""required: read info (output of construct_msa.py)""",
+        help="""required: read info (output of construct_msa)""",
     )
     parser.add_argument(
         "-o", "--output", dest="output", help="""required: output file with clustering"""

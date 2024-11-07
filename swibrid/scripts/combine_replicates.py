@@ -92,8 +92,12 @@ def run(args):
     import gzip
     from logzero import logger
 
-    samples = args.samples.split(",")
-    assert len(samples) > 1, "please provide a comma-separated list of more than one sample"
+    samples = [
+        sample
+        for sample in args.samples.split(",")
+        if os.path.isfile(args.msa_path.format(sample=sample))
+    ]
+    assert len(samples) >= 1, "please provide a comma-separated list of more than one sample"
 
     assert all(
         os.path.isfile(args.msa_path.format(sample=sample)) for sample in samples

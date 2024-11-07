@@ -1,6 +1,8 @@
-"""analyze clustering\
-given the clustering from `find_clusters` as input, various aggregate statistics are generated per cluster.
+"""\
+analyze clustering: given the clustering from ``find_clusters`` as input, 
+various aggregate statistics are generated per cluster.
 output table contains the following columns:
+
 - cluster size (# of reads)
 - cluster isotype (most frequent)
 - average read fraction mapped per cluster
@@ -31,7 +33,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--clustering",
         dest="clustering",
-        help="""required: find_clusters.py output file""",
+        help="""required: find_clusters output file""",
     )
     parser.add_argument(
         "--msa",

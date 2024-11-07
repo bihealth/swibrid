@@ -1,7 +1,5 @@
 """\
-   prepare shortened annotation file for insert annotation
-   input is a GTF file (e.g., from GENCODE)
-   output is a bed file
+prepare shortened annotation file for insert annotation. input is a GTF file (e.g., from GENCODE), output is a bed file
 """
 
 

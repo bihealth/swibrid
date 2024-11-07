@@ -1,5 +1,5 @@
 """\
-produce a bed file with unique clones from the biggest clusters
+produce a bed file with unique clones from the biggest clusters.
 """
 
 

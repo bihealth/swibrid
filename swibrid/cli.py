@@ -1,5 +1,43 @@
-"""Command line interface for swibrid.
+"""
+Command line interface for swibrid.
+
 This is the main program entry point for the ``swibrid`` executable and its sub commands.
+
+main commands:
+
+- ``swibrid setup``                  copy config and snakefile to current directory
+- ``swibrid run``                   run the entire pipeline
+- ``swibrid test``                   perform a test run on synthetic reads
+
+subcommands to run pipeline steps individually:
+
+- ``swibrid demultiplex``            demultiplex minION run
+- ``swibrid process_alignments``     process and filter alignment output
+- ``swibrid get_alignment_pars``     get alignment parameters (mismatch + gap rates) from align output
+- ``swibrid create_bed``             create bed files and summary tables for insert-containing reads
+- ``swibrid construct_msa``          construct a (pseudo) MSA
+- ``swibrid get_gaps``               find gaps / breakpoints in MSA
+- ``swibrid construct_linkage``      construct hierarchical clustering linkage
+- ``swibrid find_clusters``          get read clustering from linkage
+- ``swibrid find_variants``          variant calling
+- ``swibrid find_rearrangements``    detect rearrangements (structural variants)
+- ``swibrid plot_clustering``        plot the read clustering
+- ``swibrid get_breakpoint_stats``   get breakpoint histograms and stats
+- ``swibrid get_switch_homology``    get switch sequence homology
+- ``swibrid get_switch_motifs``      get switch sequence motifs
+- ``swibrid analyze_clustering``     analyze clustering results
+- ``swibrid downsample_clustering``  downsample and analyze clustering
+- ``swibrid get_summary``            get sample summary stats and plot
+- ``swibrid collect_results``        collect results for multiple samples
+
+additional subcommands:
+
+- ``swibrid get_annotation``         prepare gene annotation
+- ``swibrid get_unique_clones_bed``  get bed file with unique clones
+- ``swibrid get_synthetic_reads``    create synthetic reads from bed file
+- ``swibrid plot_demux_report``      make a graphical summary of demultiplexing output
+- ``swibrid combine_replicates``     combine (aligned & processed) reads from replicates
+- ``swibrid downsample``             downsample (aligned & processed) reads from a sample
 """
 
 import argparse
@@ -153,356 +191,318 @@ def run_setup(args):
         logger.warn("refusing to overwrite config.yaml")
 
 
+parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent(__doc__)
+)
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    default=False,
+    help="Increase verbosity.",
+)
+parser.add_argument("--version", action="version", version="%%(prog)s %s" % __version__)
+
+subparsers = parser.add_subparsers(
+    dest="cmd",
+    title="commands",
+    help=argparse.SUPPRESS,
+)
+
+setup_parser = subparsers.add_parser(
+    "setup", description="main command: copy config and snakefile to current directory"
+)
+setup_parser.add_argument(
+    "-f",
+    "--overwrite",
+    dest="overwrite",
+    action="store_true",
+    default=False,
+    help="""overwrite files if present [no]""",
+)
+
+pipeline_parser = subparsers.add_parser(
+    "run",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=dedent(
+        """\
+    main command: run the entire pipeline.
+    run ``swibrid setup`` and edit config.yaml first!
+
+    this will call snakemake; additional options are passed to snakemake
+    e.g., for a dry run use ``swibrid run -n``, or ``swibrid run --unlock`` after a failed run
+    """
+    ),
+)
+pipeline_parser.add_argument(
+    "-s",
+    "--snakefile",
+    dest="snakefile",
+    default="pipeline.snake",
+    help="snakefile [pipeline.snake]",
+)
+pipeline_parser.add_argument(
+    "-c",
+    "--config",
+    dest="config",
+    default="config.yaml",
+    help="config file [config.yaml]",
+)
+pipeline_parser.add_argument(
+    "--slurm",
+    dest="slurm",
+    action="store_true",
+    help="submit to slurm",
+)
+pipeline_parser.add_argument(
+    "--sge",
+    dest="sge",
+    action="store_true",
+    help="submit to SGE",
+)
+pipeline_parser.add_argument(
+    "--queue",
+    dest="queue",
+    default="medium",
+    help="slurm queue [medium]",
+)
+pipeline_parser.add_argument(
+    "snake_options",
+    nargs=argparse.REMAINDER,
+    help="pass options to snakemake (...)",
+)
+
+test_parser = subparsers.add_parser(
+    "test",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    description=dedent(
+        """\
+    test the pipline. 
+    this will create synthetic reads in `input` and run the pipeline on this data,
+    using a reduced hg38 genome in `index` with only the switch region (chr14:105000000-106000000).
+    it will probably take about 30-60 minutes and will call snakemake, passing on additional options
+    e.g., for a dry run use ``swibrid test -n``, and do ``swibrid test --unlock`` after a failed run
+    """
+    ),
+)
+test_parser.add_argument(
+    "-f",
+    "--overwrite",
+    dest="overwrite",
+    action="store_true",
+    default=False,
+    help="""overwrite files if present [no]""",
+)
+test_parser.add_argument(
+    "-s",
+    "--snakefile",
+    dest="snakefile",
+    default="pipeline.snake",
+    help="snakefile [pipeline.snake]",
+)
+test_parser.add_argument(
+    "-c",
+    "--config",
+    dest="config",
+    default="test_config.yaml",
+    help="config file [test_config.yaml]",
+)
+test_parser.add_argument(
+    "--slurm",
+    dest="slurm",
+    action="store_true",
+    help="submit to slurm",
+)
+test_parser.add_argument(
+    "--sge",
+    dest="sge",
+    action="store_true",
+    help="submit to SGE",
+)
+test_parser.add_argument(
+    "--queue",
+    dest="queue",
+    default="medium",
+    help="slurm queue [medium]",
+)
+test_parser.add_argument(
+    "snake_options",
+    nargs=argparse.REMAINDER,
+    help="pass options to snakemake (...)",
+)
+
+demultiplex.setup_argparse(
+    subparsers.add_parser(
+        "demultiplex",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(demultiplex.__doc__),
+    )
+)
+plot_demux_report.setup_argparse(
+    subparsers.add_parser(
+        "plot_demux_report",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(plot_demux_report.__doc__),
+    )
+)
+process_alignments.setup_argparse(
+    subparsers.add_parser(
+        "process_alignments",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(process_alignments.__doc__),
+    )
+)
+get_alignment_pars.setup_argparse(
+    subparsers.add_parser(
+        "get_alignment_pars",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_alignment_pars.__doc__),
+    )
+)
+create_bed.setup_argparse(
+    subparsers.add_parser(
+        "create_bed",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(create_bed.__doc__),
+    )
+)
+construct_msa.setup_argparse(
+    subparsers.add_parser(
+        "construct_msa",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(construct_msa.__doc__),
+    )
+)
+get_gaps.setup_argparse(
+    subparsers.add_parser(
+        "get_gaps",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_gaps.__doc__),
+    )
+)
+construct_linkage.setup_argparse(
+    subparsers.add_parser(
+        "construct_linkage",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(construct_linkage.__doc__),
+    )
+)
+find_clusters.setup_argparse(
+    subparsers.add_parser(
+        "find_clusters",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(find_clusters.__doc__),
+    )
+)
+find_variants.setup_argparse(
+    subparsers.add_parser(
+        "find_variants",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(find_variants.__doc__),
+    )
+)
+find_rearrangements.setup_argparse(
+    subparsers.add_parser(
+        "find_rearrangements",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(find_rearrangements.__doc__),
+    )
+)
+plot_clustering.setup_argparse(
+    subparsers.add_parser(
+        "plot_clustering",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(plot_clustering.__doc__),
+    )
+)
+get_summary.setup_argparse(
+    subparsers.add_parser(
+        "get_summary",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_summary.__doc__),
+    )
+)
+get_breakpoint_stats.setup_argparse(
+    subparsers.add_parser(
+        "get_breakpoint_stats",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_breakpoint_stats.__doc__),
+    )
+)
+get_switch_homology.setup_argparse(
+    subparsers.add_parser(
+        "get_switch_homology",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_switch_homology.__doc__),
+    )
+)
+get_switch_motifs.setup_argparse(
+    subparsers.add_parser(
+        "get_switch_motifs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_switch_motifs.__doc__),
+    )
+)
+analyze_clustering.setup_argparse(
+    subparsers.add_parser(
+        "analyze_clustering",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(analyze_clustering.__doc__),
+    )
+)
+downsample_clustering.setup_argparse(
+    subparsers.add_parser(
+        "downsample_clustering",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(downsample_clustering.__doc__),
+    )
+)
+get_synthetic_reads.setup_argparse(
+    subparsers.add_parser(
+        "get_synthetic_reads",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_synthetic_reads.__doc__),
+    )
+)
+get_unique_clones_bed.setup_argparse(
+    subparsers.add_parser(
+        "get_unique_clones_bed",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_unique_clones_bed.__doc__),
+    )
+)
+combine_replicates.setup_argparse(
+    subparsers.add_parser(
+        "combine_replicates",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(combine_replicates.__doc__),
+    )
+)
+downsample.setup_argparse(
+    subparsers.add_parser(
+        "downsample",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(downsample.__doc__),
+    )
+)
+collect_results.setup_argparse(
+    subparsers.add_parser(
+        "collect_results",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(collect_results.__doc__),
+    )
+)
+get_annotation.setup_argparse(
+    subparsers.add_parser(
+        "get_annotation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=dedent(get_annotation.__doc__),
+    )
+)
+
+
 def main(argv=None):
     """Main entry point before parsing command line arguments."""
-
-    description = """
-    main commands:
-
-    swibrid setup                  copy config and snakefile to current directory
-    swibrid run                    run the entire pipeline
-    swibrid test                   perform a test run on synthetic reads
-
-    subcommands to run pipeline steps individually:
-
-    swibrid demultiplex            demultiplex minION run
-    swibrid process_alignments     process and filter alignment output
-    swibrid get_alignment_pars     get alignment parameters (mismatch + gap rates) from align output
-    swibrid create_bed             create bed files and summary tables for insert-containing reads
-    swibrid construct_msa          construct a (pseudo) MSA
-    swibrid get_gaps               find gaps / breakpoints in MSA
-    swibrid construct_linkage      construct hierarchical clustering linkage
-    swibrid find_clusters          get read clustering from linkage
-    swibrid find_variants          variant calling
-    swibrid find_rearrangements    detect rearrangements (structural variants)
-    swibrid plot_clustering        plot the read clustering
-    swibrid get_breakpoint_stats   get breakpoint histograms and stats
-    swibrid get_switch_homology    get switch sequence homology
-    swibrid get_switch_motifs      get switch sequence motifs
-    swibrid analyze_clustering     analyze clustering results
-    swibrid downsample_clustering  downsample and analyze clustering
-    swibrid get_summary            get sample summary stats and plot
-    swibrid collect_results        collect results for multiple samples
-
-    additional subcommands:
-
-    swibrid get_annotation         prepare gene annotation
-    swibrid get_unique_clones_bed  get bed file with unique clones
-    swibrid get_synthetic_reads    create synthetic reads from bed file
-    swibrid plot_demux_report      make a graphical summary of demultiplexing output
-    swibrid combine_replicates     combine (aligned & processed) reads from replicates
-    swibrid downsample             downsample (aligned & processed) reads from a sample
-    """
-
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter, description=dedent(__doc__)
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Increase verbosity.",
-    )
-    parser.add_argument("--version", action="version", version="%%(prog)s %s" % __version__)
-
-    subparsers = parser.add_subparsers(
-        dest="cmd",
-        title="commands",
-        description=description,
-        help=argparse.SUPPRESS,
-    )
-
-    setup_parser = subparsers.add_parser(
-        "setup", description="main command: copy config and snakefile to current directory"
-    )
-    setup_parser.add_argument(
-        "-f",
-        "--overwrite",
-        dest="overwrite",
-        action="store_true",
-        default=False,
-        help="""overwrite files if present [no]""",
-    )
-
-    pipeline_parser = subparsers.add_parser(
-        "run",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=dedent(
-            """\
-        main command: run the entire pipeline
-        run `swibrid setup` and edit config.yaml first!
-
-        this will call snakemake; additional options are passed to snakemake
-        e.g., for a dry run use `swibrid run -n`, or `swibrid run --unlock` after a failed run
-        """
-        ),
-    )
-    pipeline_parser.add_argument(
-        "-s",
-        "--snakefile",
-        dest="snakefile",
-        default="pipeline.snake",
-        help="snakefile [pipeline.snake]",
-    )
-    pipeline_parser.add_argument(
-        "-c",
-        "--config",
-        dest="config",
-        default="config.yaml",
-        help="config file [config.yaml]",
-    )
-    pipeline_parser.add_argument(
-        "--slurm",
-        dest="slurm",
-        action="store_true",
-        help="submit to slurm",
-    )
-    pipeline_parser.add_argument(
-        "--sge",
-        dest="sge",
-        action="store_true",
-        help="submit to SGE",
-    )
-    pipeline_parser.add_argument(
-        "--queue",
-        dest="queue",
-        default="medium",
-        help="slurm queue [medium]",
-    )
-    pipeline_parser.add_argument(
-        "snake_options",
-        nargs=argparse.REMAINDER,
-        help="pass options to snakemake (...)",
-    )
-
-    test_parser = subparsers.add_parser(
-        "test",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=dedent(
-            """\
-        test the pipline
-        this will create synthetic reads in `input` and run the pipeline on this data,
-        using a reduced hg38 genome in `index` with only the switch region (chr14:105000000-106000000)
-        this will probably take about 30-60 minutes and will call snakemake, passing on additional options
-        e.g., for a dry run use `swibrid test -n`, and do `swibrid test --unlock` after a failed run
-        """
-        ),
-    )
-    test_parser.add_argument(
-        "-f",
-        "--overwrite",
-        dest="overwrite",
-        action="store_true",
-        default=False,
-        help="""overwrite files if present [no]""",
-    )
-    test_parser.add_argument(
-        "-s",
-        "--snakefile",
-        dest="snakefile",
-        default="pipeline.snake",
-        help="snakefile [pipeline.snake]",
-    )
-    test_parser.add_argument(
-        "-c",
-        "--config",
-        dest="config",
-        default="test_config.yaml",
-        help="config file [test_config.yaml]",
-    )
-    test_parser.add_argument(
-        "--slurm",
-        dest="slurm",
-        action="store_true",
-        help="submit to slurm",
-    )
-    test_parser.add_argument(
-        "--sge",
-        dest="sge",
-        action="store_true",
-        help="submit to SGE",
-    )
-    test_parser.add_argument(
-        "--queue",
-        dest="queue",
-        default="medium",
-        help="slurm queue [medium]",
-    )
-    test_parser.add_argument(
-        "snake_options",
-        nargs=argparse.REMAINDER,
-        help="pass options to snakemake (...)",
-    )
-
-    demultiplex.setup_argparse(
-        subparsers.add_parser(
-            "demultiplex",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(demultiplex.__doc__),
-        )
-    )
-    plot_demux_report.setup_argparse(
-        subparsers.add_parser(
-            "plot_demux_report",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(plot_demux_report.__doc__),
-        )
-    )
-    process_alignments.setup_argparse(
-        subparsers.add_parser(
-            "process_alignments",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(process_alignments.__doc__),
-        )
-    )
-    get_alignment_pars.setup_argparse(
-        subparsers.add_parser(
-            "get_alignment_pars",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_alignment_pars.__doc__),
-        )
-    )
-    create_bed.setup_argparse(
-        subparsers.add_parser(
-            "create_bed",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(create_bed.__doc__),
-        )
-    )
-    construct_msa.setup_argparse(
-        subparsers.add_parser(
-            "construct_msa",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(construct_msa.__doc__),
-        )
-    )
-    get_gaps.setup_argparse(
-        subparsers.add_parser(
-            "get_gaps",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_gaps.__doc__),
-        )
-    )
-    construct_linkage.setup_argparse(
-        subparsers.add_parser(
-            "construct_linkage",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(construct_linkage.__doc__),
-        )
-    )
-    find_clusters.setup_argparse(
-        subparsers.add_parser(
-            "find_clusters",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(find_clusters.__doc__),
-        )
-    )
-    find_variants.setup_argparse(
-        subparsers.add_parser(
-            "find_variants",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(find_variants.__doc__),
-        )
-    )
-    find_rearrangements.setup_argparse(
-        subparsers.add_parser(
-            "find_rearrangements",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(find_rearrangements.__doc__),
-        )
-    )
-    plot_clustering.setup_argparse(
-        subparsers.add_parser(
-            "plot_clustering",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(plot_clustering.__doc__),
-        )
-    )
-    get_summary.setup_argparse(
-        subparsers.add_parser(
-            "get_summary",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_summary.__doc__),
-        )
-    )
-    get_breakpoint_stats.setup_argparse(
-        subparsers.add_parser(
-            "get_breakpoint_stats",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_breakpoint_stats.__doc__),
-        )
-    )
-    get_switch_homology.setup_argparse(
-        subparsers.add_parser(
-            "get_switch_homology",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_switch_homology.__doc__),
-        )
-    )
-    get_switch_motifs.setup_argparse(
-        subparsers.add_parser(
-            "get_switch_motifs",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_switch_motifs.__doc__),
-        )
-    )
-    analyze_clustering.setup_argparse(
-        subparsers.add_parser(
-            "analyze_clustering",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(analyze_clustering.__doc__),
-        )
-    )
-    downsample_clustering.setup_argparse(
-        subparsers.add_parser(
-            "downsample_clustering",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(downsample_clustering.__doc__),
-        )
-    )
-    get_synthetic_reads.setup_argparse(
-        subparsers.add_parser(
-            "get_synthetic_reads",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_synthetic_reads.__doc__),
-        )
-    )
-    get_unique_clones_bed.setup_argparse(
-        subparsers.add_parser(
-            "get_unique_clones_bed",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_unique_clones_bed.__doc__),
-        )
-    )
-    combine_replicates.setup_argparse(
-        subparsers.add_parser(
-            "combine_replicates",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(combine_replicates.__doc__),
-        )
-    )
-    downsample.setup_argparse(
-        subparsers.add_parser(
-            "downsample",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(downsample.__doc__),
-        )
-    )
-    collect_results.setup_argparse(
-        subparsers.add_parser(
-            "collect_results",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(collect_results.__doc__),
-        )
-    )
-    get_annotation.setup_argparse(
-        subparsers.add_parser(
-            "get_annotation",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            description=dedent(get_annotation.__doc__),
-        )
-    )
 
     args, extra = parser.parse_known_args(argv)
 

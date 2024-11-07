@@ -1,7 +1,7 @@
 """\
-find gaps in (pseudo)MSA
-takes the MSA matrix from construct_MSA and finds all gap positions
+find gaps in (pseudo)MSA: takes the MSA matrix from construct_MSA and finds all gap positions.
 output is a .npz file containing several integer arrays
+
 - read_idx: index of read
 - gap_left: left end (within the MSA; 0-based)
 - gap_right: right end

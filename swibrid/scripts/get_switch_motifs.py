@@ -1,7 +1,7 @@
 """\
-analyze sequence content within switch region bins by a number of motifs
+analyze sequence content within switch region bins by a number of motifs.
 given a list of motifs, genome file and switch region coordinates, this script
-counts the occurrences of these motifs in coordinate bins
+counts the occurrences of these motifs in coordinate bins.
 output is a .npz file with count arrays for each motif
 """
 

@@ -1,11 +1,11 @@
 """\
-   construct (pseudo) MSA from processed alignments
-   this script will take aligned segments and sequences from process_alignments and construct a MSA
-   the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file.
-   matrix values m code for coverage and nucleotide identity:
-       m % 10 gives nucleotide identity with A=1, C=2, G=3, T=4, gaps are zeros
-       m // 10 gives coverage of genomic regions by one read (1x, 2x, ...)  and indicates tandem duplications
-   if `--use_orientation` is set, inversions are also considered and associated coverage values are negative
+construct (pseudo) MSA from processed alignments: 
+this script will take aligned segments and sequences from process_alignments and construct a MSA.
+the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file.
+matrix values m code for coverage and nucleotide identity:
+
+- m % 10 gives nucleotide identity with A=1, C=2, G=3, T=4, gaps are zeros
+- m // 10 gives coverage of genomic regions by one read (1x, 2x, ...)  and indicates tandem duplications; if ``--use_orientation`` is set, inversions are also considered and associated coverage values are negative
 """
 
 

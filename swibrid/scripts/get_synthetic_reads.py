@@ -1,7 +1,7 @@
 """\
-create synthetic reads from bed file
-mutations, insertions and deletions will be added according to parameters estimated by LAST
-clone sizes can be uniform or distributed as Poisson or Negative Binomial
+create synthetic reads from bed file.
+mutations, insertions and deletions will be added according to parameters estimated by LAST.
+clone sizes can be uniform or distributed as Poisson or Negative Binomial.
 additional homozygous / heterozygous / other variants can be added
 """
 

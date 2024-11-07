@@ -1,7 +1,8 @@
 """\
-produce a summary of features derived from a sample and a plot
-collects statistics produced by process_alignments, find_clusters, and downsample_clustering
+produce a summary of features derived from a sample and a plot. 
+collects statistics produced by process_alignments, find_clusters, and downsample_clustering. 
 produces cluster distribution statistics similar to downsample_clustering (the latter are averaged):
+
 - mean_cluster_size (as fraction of reads)
 - std_cluster_size
 - nclusters_final (number of clusters after filtering)
@@ -13,8 +14,9 @@ produces cluster distribution statistics similar to downsample_clustering (the l
 - big_clones_occupancy: fraction of reads in clusters > 1% occupancy
 - size_length_bias: regression coefficient of log(cluster_size) ~ length
 - size_GC_bias: regression coefficient of log(cluster_size) ~ GC
-averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters
-collects number of reads / clusters per isotype
+
+averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters. 
+collects number of reads / clusters per isotype.   
 gets statistics on variants (germline vs. somatic, transitions vs. transversions, etc.)
 """
 
@@ -26,7 +28,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--process",
         dest="process",
-        help="""stats file from process_alignments.py""",
+        help="""stats file from process_alignments""",
     )
     parser.add_argument("--info", dest="info", help="""read info""")
     parser.add_argument("--gaps", dest="gaps", help="""gap distribution""")
@@ -68,7 +70,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants",
         dest="variants",
-        help="""file with variant table (from find_variants.py)""",
+        help="""file with variant table (from find_variants)""",
     )
     parser.add_argument(
         "--switch_coords",
@@ -224,12 +226,12 @@ def run(args):
         stats["mean_frac_mapped_multi"] = cluster_analysis.loc[clones, "frac_mapped_multi"].mean()
         stats["mean_frac_ignored"] = cluster_analysis.loc[clones, "frac_ignored"].mean()
 
-        stats["mean_inversion_size"] = cluster_analysis.loc[clones, "inversion_size"][
+        stats["median_inversion_size"] = cluster_analysis.loc[clones, "inversion_size"][
             cluster_analysis.loc[clones]["inversion_size"] > 0
-        ].mean()
-        stats["mean_duplication_size"] = cluster_analysis.loc[clones, "duplication_size"][
+        ].median()
+        stats["median_duplication_size"] = cluster_analysis.loc[clones, "duplication_size"][
             cluster_analysis.loc[clones]["duplication_size"] > 0
-        ].mean()
+        ].median()
 
         try:
             stats["size_length_bias"] = scipy.stats.linregress(

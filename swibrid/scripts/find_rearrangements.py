@@ -1,7 +1,6 @@
 """\
-find rearrangements (inversions/duplications) in MSA:
-regions with coverage larger or smaller than 1 and without gaps bigger than 25 nt
-output files
+find rearrangements (inversions/duplications) in MSA: regions with coverage larger or smaller than 1 and without gaps bigger than 25 nt. output files:
+
 - a .npz file with read indices, left/right positions and sizes for inversions and duplications per read
 - a bed file with consensus rearrangement coordinates (by merging individual events), type and allele frequency
 """

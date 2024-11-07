@@ -1,6 +1,5 @@
 """\
-get LAST-like parameters from a SAM or MAF file
-this will go through the alignments and tally mutation and indel frequencies
+get LAST-like parameters from a SAM or MAF file. this will go through the alignments and tally mutation and indel frequencies.
 """
 
 

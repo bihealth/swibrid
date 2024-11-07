@@ -1,9 +1,9 @@
 """\
-given a MSA and clustering results, this will display individual reads mapping over the switch regions
-reads will be ordered as dictated by the linkage, or simply by isotype and cluster value
-reads can be colored by different variables (isotype, cluster, haplotype, coverage, strand, orientation or other columns present in the info file)
-an additional sidebar can display additional variables
-variant positions or breakpoint realignment statistics can also be indicated
+given a MSA and clustering results, this will display individual reads mapping over the switch regions.
+reads will be ordered as dictated by the linkage, or simply by isotype and cluster value.
+reads can be colored by different variables (isotype, cluster, haplotype, coverage, strand, orientation or other columns present in the info file).
+an additional sidebar can display additional variables.
+variant positions or breakpoint realignment statistics can also be indicated.
 """
 
 

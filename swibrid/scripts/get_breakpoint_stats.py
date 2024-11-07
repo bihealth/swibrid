@@ -1,9 +1,8 @@
 """\
-analyze breakpoint statistics
-this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters
-homology scores are calculated from binned breakpoint frequencies weighted by homology of bins
-motif scores are calculated from binned breakpoint frequencies weighted by motif occurrences
+analyze breakpoint statistics: this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters. homology scores are calculated from binned breakpoint frequencies weighted by homology of bins; 
+motif scores are calculated from binned breakpoint frequencies weighted by motif occurrences.
 output file contains following values:
+
 - breaks_normalized: number of breaks divided by number of reads / clusters
 - frac_breaks_duplications: fraction of breaks leading to duplication events
 - frac_breaks_inversions: fraction of breaks leading to inversion events
@@ -26,13 +25,13 @@ def setup_argparse(parser):
         "-g",
         "--gaps",
         dest="gaps",
-        help="""required: file with gap positions (output of get_gaps.py)""",
+        help="""required: file with gap positions (output of get_gaps)""",
     )
     parser.add_argument(
         "-r",
         "--rearrangements",
         dest="rearrangements",
-        help="""required: file with inversion/duplication positions (output of find_variants.py)""",
+        help="""required: file with inversion/duplication positions (output of find_rearrangements)""",
     )
     parser.add_argument(
         "-c",
@@ -315,7 +314,15 @@ def run(args):
         nbreaks + ninversions + nduplications
     )
 
-    # collapse different gamma and alpha isotypes for frac_breaks, spread and homology scores
+    bps = (bp_hist + bp_hist.T).sum(1).A1
+    for sr in np.unique(switch_iis):
+        bps_here = bps[switch_iis == sr]
+        pos = binsize * np.arange(np.sum(switch_iis == sr))
+        m = np.sum(pos * bps_here) / np.sum(bps_here)
+        m2 = np.sum(pos**2 * bps_here) / np.sum(bps_here)
+        stats["spread_" + sr] = np.sqrt(m2 - m**2)
+
+    # collapse different gamma and alpha isotypes for frac_breaks and homology scores
     switch_iis = np.array([si[:2] for si in switch_iis])
     regions = np.unique(switch_iis)
     if switch_orientation == "-":
@@ -330,7 +337,6 @@ def run(args):
             )
             stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (nbreaks)
 
-    bps = (bp_hist + bp_hist.T).sum(1).A1
     for sr in np.unique(switch_iis):
         bps_here = bps[switch_iis == sr]
         pos = binsize * np.arange(np.sum(switch_iis == sr))

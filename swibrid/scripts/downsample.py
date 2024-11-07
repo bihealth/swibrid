@@ -1,5 +1,5 @@
 """\
-   downsample (aligned + processed) reads for a sample
+downsample (aligned + processed) reads for a sample
 """
 
 

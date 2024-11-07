@@ -1,8 +1,7 @@
 """\
-collect stats from different samples
-this will collect all summary files for the listed samples and produce one big table
-optionally, this will also collect all inserts and produce a multi-sheet excel file
-clustering analysis results can also be collected into an excel file
+collect stats from different samples: this will collect all summary files for the listed samples and produce one big table.
+optionally, this will also collect all inserts and produce a multi-sheet excel file.
+clustering analysis results can also be collected into an excel file.
 """
 
 

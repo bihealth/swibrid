@@ -1,8 +1,9 @@
 """\
-construct hiearchical agglomerative clustering from MSA
-from the input MSA, only coverage information will be used and gaps smaller than `max_gap` will be removed
-by default, `fastcluster` is used with cosine metric and average linkage
+construct hiearchical agglomerative clustering from MSA: 
+from the input MSA, only coverage information will be used and gaps smaller than `max_gap` will be removed.
+by default, `fastcluster` is used with cosine metric and average linkage.
 output is a npz file containing the linkage matrix
+
 EXPERIMENTAL: a sparse version building on pynndescent and gbbs agglomerative clustering, requires several libraries to be installed
 """
 
@@ -16,7 +17,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--linkage", dest="linkage", help="""required: output file contains linkage"""
     )
-    parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps.py""")
+    parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps""")
     parser.add_argument(
         "--max_gap",
         dest="max_gap",

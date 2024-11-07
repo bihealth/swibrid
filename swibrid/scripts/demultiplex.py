@@ -1,9 +1,9 @@
 """\
-   demultiplex reads using output of BLAST against primers and barcodes
+demultiplex reads using output of BLAST against primers and barcodes
 
-   BLAST output is created with `blastn -db {barcodes_primers} -query {query} -task blastn-short -max_target_seqs 50 -outfmt "6 saccver qaccver slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -num_threads 1 -perc_identity 50` where {barcodes_primers} is a database containing barcode and primer sequences and {query} is the input fasta file
+BLAST output is created with ``blastn -db {barcodes_primers} -query {query} -task blastn-short -max_target_seqs 50 -outfmt "6 saccver qaccver slen qlen pident length qstart qend evalue" -gapopen 5 -gapextend 2 -reward 3 -penalty -4 -evalue 1 -num_threads 1 -perc_identity 50`` where {barcodes_primers} is a database containing barcode and primer sequences and {query} is the input fasta file
 
-   optional (but recommended) input is a sample sheet (tab delimited, no header or row names, 1st column barcode, 2nd column sample name)
+optional (but recommended) input is a sample sheet (tab delimited, no header or row names, 1st column barcode, 2nd column sample name)
 """
 
 

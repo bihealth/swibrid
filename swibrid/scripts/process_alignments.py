@@ -1,16 +1,9 @@
 """\
-process alignments:
-for an input file with aligned reads (MAF if LAST output, SAM if minimap2 output),
-get alignments to switch regions and elsewhere (potential inserts)
-output table contains
-- isotype
-- read orientation
-- read coverage
-- fraction of read sequence mapping to the same genomic regions
-- mapped switch region segments
-- inserts
-aligned sequences can be saved separately (necessary to then construct a pseudo MSA)
+process alignments: for an input file with aligned reads (MAF if LAST output, SAM if minimap2 output),
+get alignments to switch regions and elsewhere (potential inserts).
+
 reads are removed if
+
 - they are too short
 - they don't contain a forward and reverse primer
 - they contain internal primers
@@ -20,6 +13,17 @@ reads are removed if
 - too little of the read maps
 - alignments to the switch region are in the wrong order
 - the isotype cannot be determined
+
+output table contains
+
+- isotype
+- read orientation
+- read coverage
+- fraction of read sequence mapping to the same genomic regions
+- mapped switch region segments
+- inserts
+
+aligned sequences can be saved separately (necessary to then construct a pseudo MSA).
 if `--realign_breakpoints` is set, 20nt on each side of a breakpoint are re-aligned, and statistics like number of homologous or untemplated bases are extracted
 """
 
@@ -180,7 +184,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--realign_breakpoints",
         dest="realign_breakpoints",
-        help="""re-align reads around breakpoints and save results to this file (requires --raw_reads and --genome)""",
+        help="""re-align reads around breakpoints and save results to this file (requires ``--raw_reads`` and ``--genome``)""",
     )
     parser.add_argument(
         "--realignment_penalties",
@@ -206,7 +210,7 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
+        help="""EXPERIMENTAL: use paired-end mode (``--raw_reads`` needs to be a comma-separated list of mates)""",
     )
     parser.add_argument(
         "--interrupt_for_read",

@@ -1,18 +1,20 @@
 # CONFIG FILE FOR SWIBRID
 #
 # name of conda environment (will be passed to snakemake)
-ENV: "swibrid"
+ENV: "swibrid_env"
 # default options to pass to snakemake
+# e.g., include ``--profile`` to reference a profile for SLURM
 SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10" 
-# study name
+# study name (used in summary output csv file)
 STUDY: "current_study"
 # input fastq file (if demultiplexing is included)
-INPUT: ""
+INPUT: "path/to/reads.fastq.gz"
 # sample sheet specifying barcodes and associated sample names
-SAMPLE_SHEET: ""
+SAMPLE_SHEET: "path/to/sample_sheet.csv"
 # fasta file with barcodes and primers used during demultiplexing 
 BARCODES_PRIMERS: 'index/barcodes_primers.fa'
 # list of samples for which  to run the pipeline
+# IMPORTANT: these sample names must appear in the sample sheet if demultiplexing is used
 SAMPLES: ["sample1","sample2"]
 # minimum read length
 MINLENGTH: 500
@@ -20,20 +22,20 @@ MINLENGTH: 500
 REFERENCE: 'index/hg38.fa'
 # LAST index of reference genome
 LAST_INDEX: 'index/hg38db'
-# minimap2 index of reference genome
+# minimap2 index of reference genome if ALIGNER==minimap2
 MINIMAP_INDEX: 'index/hg38-ont.mmi'
 # aligner to use (LAST is more precise and recommended, minimap2 is much faster)
 ALIGNER: 'LAST'
-# fasta file specifying the telomer repeat unit
-TELO_REPEAT: 'index/telomerSequence.fasta'
+# fasta file specifying the telomer repeat unit, e.g., CCTAACCCTAACCCTAACCCTAACCCTAAC
+TELO_REPEAT: ''
 # coordinates of switch region (altogether)
 SWITCH: 'chr14:105583000-105872000:-'
 # bed file with coordinates of individual switch regions
 SWITCH_ANNOTATION: 'index/hg38_switch_regions.bed'
 # bed file with gene annotation
 ANNOTATION: 'index/gencode.v33.annotation.exon.gene_shorted.bed'
-# vcf file with variant annotation
-VARIANT_ANNOTATION: 'index/dbSNP.hg38.switch.vcf.gz'
+# vcf file with variant annotation (e.g., from dbSNP restricted to switch region on chr14)
+VARIANT_ANNOTATION: '' 
 # max number of reads to cluster
 NMAX: 50000
 # clustering metric to use 
@@ -49,7 +51,7 @@ MAX_GAP: 75
 # bin size for breakpoint analysis
 BINSIZE: 50
 # blacklisted regions for insert detection
-BLACKLIST_REGIONS: 'index/hg38_blacklist_regions.bed'
+BLACKLIST_REGIONS: ''
 # weights to use for averaging features over clusters (or reads)
 WEIGHTS: 'cluster'
 # number of reads to use for downsampling analysis

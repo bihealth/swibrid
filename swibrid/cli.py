@@ -6,7 +6,7 @@ This is the main program entry point for the ``swibrid`` executable and its sub 
 main commands:
 
 - ``swibrid setup``                  copy config and snakefile to current directory
-- ``swibrid run``                   run the entire pipeline
+- ``swibrid run``                    run the entire pipeline
 - ``swibrid test``                   perform a test run on synthetic reads
 
 subcommands to run pipeline steps individually:
@@ -104,8 +104,8 @@ def run_pipeline(args, snake_options):
         logger.error("cannot submit to slurm and SGE at the same time!")
 
     if args.slurm:
-        s_command = """#!/bin/bash\n""" + s_command + " --profile=cubi-dev\n"
-        logger.info("run script content:\n" + s_command)
+        s_command = """#!/bin/bash\n""" + s_command
+        logger.info("run script content:\n" + s_command + "\n")
         run_script = Path("run_pipeline.sh")
         run_script.write_text(s_command)
         command = "sbatch -t 96:00:00 --mem=4G -n 1 -p {queue} run_pipeline.sh".format(
@@ -277,10 +277,10 @@ test_parser = subparsers.add_parser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=dedent(
         """\
-    test the pipline. 
-    this will create synthetic reads in `input` and run the pipeline on this data,
-    using a reduced hg38 genome in `index` with only the switch region (chr14:105000000-106000000).
-    it will probably take about 30-60 minutes and will call snakemake, passing on additional options
+    test the pipeline. 
+    this will create synthetic reads in ``input`` and run the pipeline on this data,
+    using a reduced hg38 genome in ``index`` with only the switch region (chr14:105000000-106000000).
+    it will probably take about 30-60 minutes and will call snakemake, passing on additional options.
     e.g., for a dry run use ``swibrid test -n``, and do ``swibrid test --unlock`` after a failed run
     """
     ),

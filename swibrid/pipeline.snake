@@ -524,19 +524,13 @@ rule breakpoint_stats:
 rule plot_clustering:
   input:
     process='pipeline/{sample}/{sample}_processed.out',
-    realignments='pipeline/{sample}/{sample}_breakpoint_alignments.csv',
     info='input/{sample}_info.csv',
     clustering='pipeline/{sample}/{sample}_clustering.csv',
     linkage='pipeline/{sample}/{sample}_linkage.npz',
-    scanning='pipeline/{sample}/{sample}_cutoff_scanning.csv',
     msa='pipeline/{sample}/{sample}_msa.npz',
     stats='pipeline/{sample}/{sample}_cluster_stats.csv',
-    variants_table='pipeline/{sample}/{sample}_variants.txt',
-    variants_matrix='pipeline/{sample}/{sample}_variants.npz',
-    haplotypes='pipeline/{sample}/{sample}_haplotypes.csv'
   output:
     reads='output/read_plots/{sample}_reads_by_cluster.png',
-    coverage='output/read_plots/{sample}_reads_by_coverage.png',
   params:
     switch=config['SWITCH'],
     annotation=config['ANNOTATION'] if 'ANNOTATION' in config else [],
@@ -552,8 +546,39 @@ rule plot_clustering:
   shell:
     r"""
     mkdir -p output/read_plots
-    swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by isotype,haplotype 2> {log}
-    swibrid plot_clustering --msa {input.msa} --figure {output.coverage} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} {params.annotation} --color_by coverage --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by isotype,haplotype
+    swibrid plot_clustering --msa {input.msa} --figure {output.reads} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} --annotation {params.annotation} --color_by cluster --clustering_stats {input.stats} --sample {wildcards.sample} --dpi 500 --sidebar_color_by isotype 2> {log}
+    """
+
+
+rule plot_variants:
+  input:
+    process='pipeline/{sample}/{sample}_processed.out',
+    info='input/{sample}_info.csv',
+    clustering='pipeline/{sample}/{sample}_clustering.csv',
+    linkage='pipeline/{sample}/{sample}_linkage.npz',
+    msa='pipeline/{sample}/{sample}_msa.npz',
+    stats='pipeline/{sample}/{sample}_cluster_stats.csv',
+    variants_table='pipeline/{sample}/{sample}_variants.txt',
+    variants_matrix='pipeline/{sample}/{sample}_variants.npz',
+    haplotypes='pipeline/{sample}/{sample}_haplotypes.csv'
+  output:
+    coverage='output/read_plots/{sample}_reads_by_coverage.png',
+  params:
+    switch=config['SWITCH'],
+    annotation=config['ANNOTATION'] if 'ANNOTATION' in config else [],
+    switch_annotation=config['SWITCH_ANNOTATION'],
+  threads: 1
+  resources:
+    mem_mb=increase_mem,
+    time='04:00:00',
+    partition=get_partition
+  conda:
+    config['ENV']
+  log: "logs/plots/{sample}_coverage.log"
+  shell:
+    r"""
+    mkdir -p output/read_plots
+    swibrid plot_clustering --msa {input.msa} --figure {output.coverage} --linkage {input.linkage} --info {input.info}  --clustering_results {input.clustering} --switch_annotation {params.switch_annotation} --switch_coords {params.switch} {params.annotation} --color_by coverage --clustering_stats {input.stats} --sample {wildcards.sample} --variants_table {input.variants_table} --variants_matrix {input.variants_matrix} --dpi 500 --haplotypes {input.haplotypes} --sidebar_color_by cluster,haplotype 2>> {log}
     """
 
 

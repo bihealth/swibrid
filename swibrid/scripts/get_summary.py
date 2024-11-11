@@ -120,7 +120,6 @@ def run(args):
 
     matplotlib.use("Agg")
     from matplotlib import pyplot as plt
-    import seaborn as sns
 
     from logzero import logger
 
@@ -486,7 +485,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("# reads")
         ax.set_xlabel("read length")
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         ax = axs[0, 1]
         ax.hist(
@@ -507,16 +507,18 @@ def run(args):
         ax.set_yscale("log")
         ax.set_ylabel("# reads")
         ax.set_xlabel("relative position")
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         ax = axs[1, 0]
+        isotype_read_fraction.index = isotype_read_fraction.index.str.split("_").str[-1]
+        isotype_cluster_fraction.index = isotype_cluster_fraction.index.str.split("_").str[-1]
         isotype_fracs = pd.DataFrame(
             {
                 "reads\n(n={0})".format(isotype_read_count.sum()): isotype_read_fraction,
                 "clusters\n(n={0})".format(isotype_cluster_count.sum()): isotype_cluster_fraction,
             }
         )
-        isotype_fracs.index = isotype_fracs.index.str.split("_").str[-1]
         isotype_fracs.T.plot(
             kind="barh",
             stacked=True,
@@ -535,7 +537,8 @@ def run(args):
             prop={"size": "small"},
         )
         ax.set_ylim([-0.5, 2])
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         ax = axs[1, 1]
         cc = cutoff_scanning.index
@@ -593,7 +596,8 @@ def run(args):
         ax.set_ylabel("# clusters")
         ax.set_xlabel("cluster size")
         ax.legend(loc=1, handlelength=1, prop={"size": "small"}, frameon=False)
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         ax = axs[2, 1]
         ax.plot(
@@ -604,7 +608,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("length")
         ax.set_xlabel("cluster size")
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         logger.info("loading gaps from " + args.gaps)
         gaps = np.load(args.gaps)
@@ -616,7 +621,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("# events")
         ax.set_xlabel("gap size")
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         ax = axs[3, 1]
         use = gaps["gap_size"] > args.max_gap
@@ -637,6 +643,7 @@ def run(args):
         ax.set_xticklabels(minor_labels, minor=True, size="small")
         ax.tick_params(which="minor", length=0)
         ax.legend(loc=9, handlelength=1, frameon=False, prop={"size": "small"}, ncol=2)
-        sns.despine(ax=ax)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
         fig.savefig(args.figure)

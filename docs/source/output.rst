@@ -174,7 +174,7 @@ diversity features
                 fraction of reads in biggest clone
 
         big_clones_occupancy(_downsampled)
-                fraction of reads in all clones > 1%
+                fraction of reads in all clones that contain more than 1% of reads
 
         mean_length
                 mean length of clusters (in nt)

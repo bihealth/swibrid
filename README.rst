@@ -117,4 +117,4 @@ and a file with barcode and primer sequences like so::
 documentation
 -------------
 
-read the `documentation<swibrid.readthedocs.io>`_.
+read the `documentation <swibrid.readthedocs.io>`_.

@@ -1,5 +1,5 @@
-swibrid documentation
-#####################
+swibrid
+#######
 
 SWIBRID (SWItch joint Breakpoint Repertoire IDentification) is a computational pipeline to analyze long-read sequencing data of switch joints occurring during class switch recombination.
 
@@ -112,3 +112,9 @@ and a file with barcode and primer sequences like so::
         swibrid run            # for an actual run
         swibrid run --slurm    # submit to slurm
         swibrid run --unlock   # unlock snakemake before restarting an interrupted/killed instance
+
+
+documentation
+-------------
+
+read the :ref:`documentation`<swibrid.readthedocs.io>`

@@ -132,10 +132,10 @@ def run(args):
         minor_ticks = np.array(minor_ticks)
         major_ticks = np.array(np.unique(major_ticks))
 
-        fig, axs = plt.subplots(1, len(jd) // 2, figsize=(2 * len(jd), 4))
+        fig, axs = plt.subplots(1, len(jd) // 2, figsize=(2 * len(jd), 4), squeeze=False)
 
         for k, n in enumerate(parse_range(args.range)):
-            ax = axs[k]
+            ax = axs[0, k]
             jj = np.zeros_like(jd["fw_{0}".format(n)])
             iu = np.triu_indices(len(stot) // binsize)
             il = np.tril_indices(len(stot) // binsize)

@@ -124,17 +124,18 @@ def run(args):
         minor_ticks = np.array(minor_ticks)
         major_ticks = np.array(np.unique(major_ticks))
 
-        fig, axs = plt.subplots(len(motif_counts), 1, figsize=(4, 2 * len(motif_counts)))
-        fig.subplots_adjust(top=0.97, bottom=0.05)
+        fig, axs = plt.subplots(len(motif_counts) // 3, 3, figsize=(4 * len(motif_counts)//3, 2 * len(motif_counts) // 3), 
+                                sharex=True, sharey=False)
+        fig.subplots_adjust(top=0.9, bottom=0.1, left=.1, right=.95, hspace=.4)
 
         for k, motif in enumerate(motif_counts.keys()):
-            ax = axs[k]
+            ax = axs[k//3, k%3]
             ax.plot(np.arange(len(stot) // binsize), motif_counts[motif], "-")
             ax.set_xlim([len(stot) // binsize, 0])
             ax.set_xticks(np.array(major_ticks) // binsize)
             ax.set_xticks(np.array(minor_ticks) // binsize, minor=True)
             ax.set_xticklabels([])
-            if k == len(motif_counts.keys()) - 1:
+            if k//3==1:
                 ax.set_xticklabels(minor_labels, rotation=90, minor=True)
             ax.tick_params(which="minor", length=0)
             ax.grid(alpha=0.5, color="lightgrey", which="major", axis="x")

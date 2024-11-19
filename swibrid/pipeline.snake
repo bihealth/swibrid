@@ -18,6 +18,7 @@ else:
 rule all:
   input:
      expand('output/read_plots/{sample}_reads_by_cluster.png',sample=config['SAMPLES']),
+     expand('output/read_plots/{sample}_reads_by_coverage.png',sample=config['SAMPLES']) if config['DETECT_VARIANTS'] else [],
      expand('output/QC_plots/{sample}_summary.png',sample=config['SAMPLES']),
      expand('output/breakpoint_plots/{sample}_breakpoints.png',sample=config['SAMPLES']),
      'output/summary/{0}_stats.csv'.format(config['STUDY'])
@@ -593,7 +594,7 @@ rule summary:
     cluster_downsampling='pipeline/{sample}/{sample}_cluster_downsampling.csv',
     gaps='pipeline/{sample}/{sample}_gaps.npz',
     breakpoint_stats='pipeline/{sample}/{sample}_breakpoint_stats.csv',
-    variants='pipeline/{sample}/{sample}_variants.txt'
+    variants='pipeline/{sample}/{sample}_variants.txt' if config['DETECT_VARIANTS'] else []
   output:
     plot='output/QC_plots/{sample}_summary.png',
     stats='pipeline/{sample}/{sample}_summary.csv'

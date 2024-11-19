@@ -34,6 +34,8 @@ SWITCH: 'chr14:105583000-105872000:-'
 SWITCH_ANNOTATION: 'index/hg38_switch_regions.bed'
 # bed file with gene annotation
 ANNOTATION: 'index/gencode.v33.annotation.exon.gene_shorted.bed'
+# whether or not to run variant detection (experimental feature)
+DETECT_VARIANTS: False
 # vcf file with variant annotation (e.g., from dbSNP restricted to switch region on chr14)
 VARIANT_ANNOTATION: '' 
 # max number of reads to cluster

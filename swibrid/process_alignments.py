@@ -495,7 +495,7 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties="ont")
     from Bio import Align
 
     def revcomp(seq):
-        from swibrid.scripts.utils import RC
+        from swibrid.utils import RC
 
         return "".join(RC[s] for s in seq[::-1])
 

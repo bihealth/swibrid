@@ -38,7 +38,7 @@ def setup_argparse(parser):
 
 
 def get_rc(seq):
-    from swibrid.scripts.utils import RC
+    from swibrid.utils import RC
 
     return "".join(RC[c] for c in seq[::-1])
 

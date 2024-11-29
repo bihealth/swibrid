@@ -47,7 +47,7 @@ from logzero import logger, loglevel
 from pathlib import Path
 from ruamel.yaml import YAML
 
-from .scripts import (
+from . import (
     demultiplex,
     plot_demux_report,
     process_alignments,
@@ -137,18 +137,18 @@ def test_pipeline(args, snake_options):
 
     if not os.path.isfile("test_config.yaml") or args.overwrite:
         logger.info("copying test_config.yaml")
-        configfile = Path(__file__).parent.parent.joinpath("test_data/test_config.yaml")
+        configfile = Path(__file__).parent.joinpath("test_data/test_config.yaml")
         os.system("cp {0} .".format(configfile))
 
     Path("index").mkdir(exist_ok=True)
     if not os.path.isfile("index/hg38_chr14_105-106MB.fa") or args.overwrite:
         logger.info("setting up index for switch region of hg38")
-        reference = Path(__file__).parent.parent.joinpath("test_data/hg38_chr14_105-106MB.fa")
+        reference = Path(__file__).parent.joinpath("test_data/hg38_chr14_105-106MB.fa")
         os.system("cp {0} index".format(reference))
         os.system("samtools faidx index/hg38_chr14_105-106MB.fa")
         os.system("lastdb index/hg38_chr14_105-106MBdb index/hg38_chr14_105-106MB.fa")
 
-    switch_regions = Path(__file__).parent.parent.joinpath(
+    switch_regions = Path(__file__).parent.joinpath(
         "test_data/hg38_chr14_105-106MB_switch_regions.bed"
     )
     if not os.path.isfile("index/hg38_chr14_105-106MB_switch_regions.bed") or args.overwrite:
@@ -157,15 +157,15 @@ def test_pipeline(args, snake_options):
     Path("input").mkdir(exist_ok=True)
     if not os.path.isfile("input/input_clones.bed") or args.overwrite:
         logger.info("copying input clones")
-        clones = Path(__file__).parent.parent.joinpath("test_data/input_clones.bed")
+        clones = Path(__file__).parent.joinpath("test_data/input_clones.bed")
         os.system("cp {0} input".format(clones))
     if not os.path.isfile("input/input_variants.txt") or args.overwrite:
         logger.info("copying input variants")
-        variants = Path(__file__).parent.parent.joinpath("test_data/input_variants.txt")
+        variants = Path(__file__).parent.joinpath("test_data/input_variants.txt")
         os.system("cp {0} input".format(variants))
     if not os.path.isfile("input/input_pars.par") or args.overwrite:
         logger.info("copying input parameters")
-        pars = Path(__file__).parent.parent.joinpath("test_data/input_pars.par")
+        pars = Path(__file__).parent.joinpath("test_data/input_pars.par")
         os.system("cp {0} input".format(pars))
 
     run_pipeline(args, snake_options)

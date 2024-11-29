@@ -10,6 +10,7 @@ GENOME: 'hg38_chr14_105-106MB'
 REFERENCE: 'index/hg38_chr14_105-106MB.fa'
 SWITCH: 'chr14_switch:583000-872000:-'
 SWITCH_ANNOTATION: 'index/hg38_chr14_105-106MB_switch_regions.bed'
+DETECT_VARIANTS: True
 LAST_INDEX: 'index/hg38_chr14_105-106MBdb'
 MINIMAP_INDEX: ''
 ALIGNER: 'LAST'

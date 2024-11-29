@@ -351,6 +351,18 @@ variants
                 number of variants around specific motif (M=Tw, wrCy, Cg)
 
 
+demultiplexing
+**************
+
+``swibrid demultiplex`` creates fastq files for each sample in a sample sheet, together with ``{sample}_info.csv`` files that contain meta-data for each read (taken from the header of the original raw output, plus locations and identities of detected primers and barcodes). It also creates a summary csv file with statistics on how many reads were assigned to each sample barcode, and a summary figure:
+
+.. image:: _static/20220411_demultiplexing.png
+    :width: 400
+    :alt: demultiplexing output
+
+The bar plot top left shows how many reads were assigned to each sample or remained "undetermined". The pie chart on the right shows a breakdown of undetermined reads by barcode, in case the sample sheet is missing a sample barcode appearing in the reads. The histogram in the lower left shows relative locations of the detected barcodes, and the one in the lower right the distriubtion of read lengths in each sample (colors match the sample colors in the top plot).
+
+
 other output
 ************
 

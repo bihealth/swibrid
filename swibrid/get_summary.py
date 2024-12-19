@@ -485,8 +485,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("# reads")
         ax.set_xlabel("read length")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         ax = axs[0, 1]
         ax.hist(
@@ -507,8 +507,8 @@ def run(args):
         ax.set_yscale("log")
         ax.set_ylabel("# reads")
         ax.set_xlabel("relative position")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         ax = axs[1, 0]
         isotype_read_fraction.index = isotype_read_fraction.index.str.split("_").str[-1]
@@ -537,8 +537,8 @@ def run(args):
             prop={"size": "small"},
         )
         ax.set_ylim([-0.5, 2])
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         ax = axs[1, 1]
         cc = cutoff_scanning.index
@@ -596,8 +596,8 @@ def run(args):
         ax.set_ylabel("# clusters")
         ax.set_xlabel("cluster size")
         ax.legend(loc=1, handlelength=1, prop={"size": "small"}, frameon=False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         ax = axs[2, 1]
         ax.plot(
@@ -608,8 +608,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("length")
         ax.set_xlabel("cluster size")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         logger.info("loading gaps from " + args.gaps)
         gaps = np.load(args.gaps)
@@ -621,8 +621,8 @@ def run(args):
         ax.set_xscale("log")
         ax.set_ylabel("# events")
         ax.set_xlabel("gap size")
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         ax = axs[3, 1]
         use = gaps["gap_size"] > args.max_gap
@@ -643,7 +643,7 @@ def run(args):
         ax.set_xticklabels(minor_labels, minor=True, size="small")
         ax.tick_params(which="minor", length=0)
         ax.legend(loc=9, handlelength=1, frameon=False, prop={"size": "small"}, ncol=2)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
         fig.savefig(args.figure)

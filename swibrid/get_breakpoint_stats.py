@@ -169,8 +169,6 @@ def run(args):
         clustering = pd.read_csv(args.clustering, header=0, index_col=0)
         clustering = clustering[~clustering["cluster"].isna()]
         nreads = clustering.shape[0]
-        logger.info("reading clustering analysis from " + args.clustering_analysis)
-        analysis = pd.read_csv(args.clustering_analysis, header=0, index_col=0)
         if args.use_clones:
             if args.use_clones == "all":
                 clones = clustering["cluster"].astype(int).unique()
@@ -188,7 +186,10 @@ def run(args):
             logger.info("using uniform weights per read")
             w = pd.Series(1, index=np.arange(nreads))
         elif args.weights == "adjusted":
-            logger.info("using adjusted weights per cluster")
+            logger.info(
+                "using adjusted weights from clustering analysis from " + args.clustering_analysis
+            )
+            analysis = pd.read_csv(args.clustering_analysis, header=0, index_col=0)
             w = (
                 analysis.loc[clustering["cluster"].values, "adj_size"]
                 / analysis.loc[clustering["cluster"].values, "size"]

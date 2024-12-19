@@ -855,7 +855,7 @@ def run(args):
                 ]
             )
         ax.add_collection(
-            LineCollection(mate_breaks, linewidths=lw, colors="lightgray", clip_on=False)
+            LineCollection(mate_breaks, linewidths=0.5 * lw, colors="lightgray", clip_on=False)
         )
 
     if args.realignments is not None and os.path.isfile(args.realignments):
@@ -884,7 +884,7 @@ def run(args):
 
             ax.scatter(
                 np.maximum(pleft, pright),
-                nreads - pos,
+                nreads - pos - 0.5,
                 s=nu,
                 lw=lw,
                 marker="_",
@@ -898,7 +898,7 @@ def run(args):
 
             ax.scatter(
                 np.maximum(pleft, pright),
-                nreads - pos,
+                nreads - pos - 0.5,
                 s=nh,
                 c=nh,
                 lw=0,

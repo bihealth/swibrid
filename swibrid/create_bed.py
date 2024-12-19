@@ -22,14 +22,14 @@ def setup_argparse(parser):
     parser.add_argument(
         "--raw_reads",
         dest="raw_reads",
-        help="""fasta file with minION reads (comma-separated list of read mates for paired-end data)""",
+        help="""fasta file with minION reads (interleaved mates for paired-end data)""",
     )
     parser.add_argument(
         "--paired_end_mode",
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""EXPERIMENTAL: use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
+        help="""EXPERIMENTAL: use paired-end mode (use interleaved mates as input)""",
     )
     parser.add_argument(
         "--switch_coords",
@@ -139,92 +139,56 @@ def run(args):
     bed.close()
 
     insert_table = {}
-    if args.paired_end_mode:
-        logger.info("parsing raw reads from " + " and ".join(args.raw_reads.split(",")))
-        for rec1, rec2 in zip(
-            SeqIO.parse(
-                gzip.open(args.raw_reads.split(",")[0], "rt")
-                if args.raw_reads.split(",")[0].endswith(".gz")
-                else open(args.raw_reads.split(",")[0]),
-                "fastq",
-            ),
-            SeqIO.parse(
-                gzip.open(args.raw_reads.split(",")[1], "rt")
-                if args.raw_reads.split(",")[1].endswith(".gz")
-                else open(args.raw_reads.split(",")[1]),
-                "fastq",
-            ),
-        ):
-            if rec1.id != rec2.id or rec1.id not in inserts or rec2.id not in inserts:
+
+    logger.info("parsing raw reads from " + args.raw_reads)
+    raw_reads = SeqIO.parse(
+        gzip.open(args.raw_reads, "rt") if args.raw_reads.endswith(".gz") else open(args.raw_reads),
+        "fastq",
+    )
+
+    rec_id = ""
+    while True:
+        try:
+            rec = next(raw_reads)
+        except StopIteration:
+            break
+
+        if rec_id != rec.id:
+            mate = "R1"
+            rec_id = rec.id
+        else:
+            mate = "R2"
+
+        if rec.id not in inserts or rec.id in insert_table:
+            continue
+
+        for insert, insert_anno, tstart, tend, isotype in inserts[rec.id]:
+            insert_chrom = insert.group("insert_chrom")
+            insert_start = int(insert.group("insert_start"))
+            insert_end = int(insert.group("insert_end"))
+            insert_len = insert_end - insert_start
+            cstart = int(insert.group("switch_left")) - 1
+            cend = int(insert.group("switch_right")) + 1
+            if cend < cstart:
+                cstart, cend = cend, cstart
+            istart = int(insert.group("istart"))
+            iend = int(insert.group("iend"))
+
+            # for paired-end mode, use the correct mate
+            if args.paired_end_mode and insert.group("mate") != mate:
                 continue
 
-            for insert, insert_anno, tstart, tend, isotype in inserts[rec1.id]:
-                insert_chrom = insert.group("insert_chrom")
-                insert_start = int(insert.group("insert_start"))
-                insert_end = int(insert.group("insert_end"))
-                insert_len = insert_end - insert_start
-                cstart = int(insert.group("switch_left")) - 1
-                cend = int(insert.group("switch_right")) + 1
-                if cend < cstart:
-                    cstart, cend = cend, cstart
-                istart = int(insert.group("istart"))
-                iend = int(insert.group("iend"))
+            seq = rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
 
-                assert insert["mate"] in [
-                    "R1",
-                    "R2",
-                ], "insert annotation lacks mate information for paired-end mode"
-                rec = rec1 if insert["mate"] == "R1" else rec2
-                seq = (
-                    rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
-                )
-
-                insert_table[rec.id] = dict(
-                    read=rec.id,
-                    isotype=isotype,
-                    switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
-                    insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
-                    insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
-                    insert_anno=insert_anno,
-                    sequence=seq,
-                )
-
-    else:
-        logger.info("parsing raw reads from " + args.raw_reads)
-        for rec in SeqIO.parse(
-            gzip.open(args.raw_reads, "rt")
-            if args.raw_reads.endswith(".gz")
-            else open(args.raw_reads),
-            "fastq",
-        ):
-            if rec.id not in inserts:
-                continue
-
-            for insert, insert_anno, tstart, tend, isotype in inserts[rec.id]:
-                insert_chrom = insert.group("insert_chrom")
-                insert_start = int(insert.group("insert_start"))
-                insert_end = int(insert.group("insert_end"))
-                insert_len = insert_end - insert_start
-                cstart = int(insert.group("switch_left")) - 1
-                cend = int(insert.group("switch_right")) + 1
-                if cend < cstart:
-                    cstart, cend = cend, cstart
-                istart = int(insert.group("istart"))
-                iend = int(insert.group("iend"))
-
-                seq = (
-                    rec.seq[:istart].lower() + rec.seq[istart:iend].upper() + rec.seq[iend:].lower()
-                )
-
-                insert_table[rec.id] = dict(
-                    read=rec.id,
-                    isotype=isotype,
-                    switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
-                    insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
-                    insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
-                    insert_anno=insert_anno,
-                    sequence=seq,
-                )
+            insert_table[rec.id] = dict(
+                read=rec.id,
+                isotype=isotype,
+                switch_coords="{0}:{1}-{2}".format(switch_chrom, tstart + 1, tend),
+                insert_pos="{0}:{1}-{2}".format(switch_chrom, cstart + 1, cend),
+                insert_coords="{0}:{1}-{2}".format(insert_chrom, insert_start + 1, insert_end),
+                insert_anno=insert_anno,
+                sequence=seq,
+            )
 
     pd.DataFrame.from_dict(insert_table, orient="index").to_csv(
         args.outfile, header=True, index=False, sep="\t"

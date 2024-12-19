@@ -195,7 +195,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--raw_reads",
         dest="raw_reads",
-        help="""fasta file with unaligned reads (comma-separated list of mates for paired-end mode)""",
+        help="""fasta file with unaligned reads (interleaved mates for paired-end mode)""",
     )
     parser.add_argument("--genome", dest="genome", help="""reference genome file""")
     parser.add_argument(
@@ -210,7 +210,13 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""EXPERIMENTAL: use paired-end mode (``--raw_reads`` needs to be a comma-separated list of mates)""",
+        help="""EXPERIMENTAL: use paired-end mode (use interleaved mates as fastq input)""",
+    )
+    parser.add_argument(
+        "--remove_isotypes",
+        dest="remove_isotypes",
+        default="",
+        help="""remove reads with these isotypes (comma-separated list)""",
     )
     parser.add_argument(
         "--interrupt_for_read",
@@ -493,6 +499,7 @@ def combine_alignments(al1, al2, pad):
 def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties="ont"):
     import numpy as np
     from Bio import Align
+    from .utils import calculate_n_homology, calculate_n_untemplated
 
     def revcomp(seq):
         from swibrid.utils import RC
@@ -540,7 +547,6 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties="ont")
     else:
         raise ValueError("unknown gap penalties {0}".format(penalties))
 
-    # genome = genome_dict['genome']
     res = []
     for i in range(len(matches) - 1):
         # ignore breaks between different read mates
@@ -590,44 +596,11 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties="ont")
 
         s1, m1, s0, m2, s2 = combine_alignments(al1[0], al2[0], pad)
 
-        m1s = m1.split("/")
-        m2s = m2.split("/")
-        s0s = s0.split("/")
-
-        n_homology = 0
-        n_untemplated = 0
-
-        # check for homology on the left side of the breakpoint
-        # k = m2s[0].rfind(" ") + 1
-        # n_homology += sum(x == "|" and y == "|" for x, y in zip(m1s[0][k:], m2s[0][k:]))
-        for k in range(len(m2s[0]) - 1, -1, -1):
-            if m1s[0][k] == "|" and m2s[0][k] == "|":
-                n_homology += 1
-            if m2s[0][k] == " " and s0s[0][k] != "-":
-                break
-        # check for homology on the right side of the breakpoint
-        # k = m1s[-1].find(" ")
-        # n_homology += sum(x == "|" and y == "|" for x, y in zip(m1s[-1][:k], m2s[-1][:k]))
-        for k in range(len(m1s[-1])):
-            if m1s[-1][k] == "|" and m2s[-1][k] == "|":
-                n_homology += 1
-            if m1s[-1][k] == " " and s0s[-1][k] != "-":
-                break
-
-        # check for untemplated or homologous nucleotides between the breakpoints on the read
-        if len(m1s) > 2 and len(m2s) > 2:
-            n_homology += sum(
-                x == "|" and y == "|" and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
-            )
-            n_untemplated = sum(
-                x == " " and y == " " and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
-            )
-
         r = {
             "pos_left": pos_left,
             "pos_right": pos_right,
-            "n_homology": n_homology,
-            "n_untemplated": n_untemplated,
+            "n_homology": calculate_n_homology(s0, s1, s2, m1, m2),
+            "n_untemplated": calculate_n_untemplated(m1, m2, s0),
             "orientation": orientation,
             "type": "insert" if "insert" in [matches[i][6], matches[i + 1][6]] else "switch",
             "left_seq": s1,
@@ -1007,8 +980,12 @@ def run(args):
                         )
                     )
 
-        # take only reads matching to switch region (only once enough?)
-        if len(switch_matches) < args.min_num_switch_matches:
+        # take only reads matching to switch region
+        min_num_switch_matches = args.min_num_switch_matches
+        # for paired-end unmerged reads, don't count mate mappings as separate
+        if args.paired_end_mode and read_info.loc[read, "num_mates"] > 1:
+            min_num_switch_matches += 1
+        if len(switch_matches) < min_num_switch_matches:
             stats["nreads_removed_no_switch"] += 1
             use = False
 
@@ -1045,7 +1022,7 @@ def run(args):
         )
         # adjust total read length for paired-end reads
         if args.paired_end_mode:
-            tot_read_len = sum(x[0] for x in set([(m[2], m[-1]) for m in matches]))
+            tot_read_len = read_info.loc[read, "length"]
 
         if tot_cov / tot_read_len < args.min_cov:
             stats["nreads_removed_low_cov"] += 1
@@ -1099,14 +1076,14 @@ def run(args):
             isotype = ",".join(rec[3][3] for rec in tmp)
             i += 1
 
-        if isotype == "":
+        if isotype == "" or isotype in args.remove_isotypes.split(","):
             use = False
             stats["nreads_removed_no_isotype"] += 1
 
         if orientations["1"] > 0 and orientations["-1"] > 0:
             stats["nreads_inversions"] += 1
 
-        if args.interrupt_for_read and read in args.interrupt_for_read:
+        if args.interrupt_for_read and read in args.interrupt_for_read.split(","):
             print(read, [sm[:7] for sm in matches])
             raise Exception("stop")
 
@@ -1238,56 +1215,35 @@ def run(args):
         genome_dict["offset"] = switch_start
 
         realignments = {}
-        if args.paired_end_mode:
-            logger.info(
-                "re-aligning breakpoints using raw reads from "
-                + " and ".join(args.raw_reads.split(","))
+        logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
+        raw_reads = SeqIO.parse(
+            gzip.open(args.raw_reads, "rt")
+            if args.raw_reads.endswith(".gz")
+            else open(args.raw_reads),
+            "fastq",
+        )
+        while True:
+            try:
+                rec = next(raw_reads)
+            except StopIteration:
+                break
+
+            if rec.id not in processed_matches:
+                continue
+
+            seq = str(rec.seq)
+
+            if args.paired_end_mode and read_info.loc[rec.id, "num_mates"] > 1:
+                rec2 = next(raw_reads)
+                assert rec2.id == rec.id, "read mates are not interleaved in fastq file!"
+                seq = (str(rec.seq), str(rec2.seq))
+
+            realignments[rec.id] = realign_breakpoints(
+                processed_matches[rec.id],
+                genome_dict,
+                seq,
+                penalties=args.realignment_penalties,
             )
-            for rec1, rec2 in zip(
-                SeqIO.parse(
-                    gzip.open(args.raw_reads.split(",")[0], "rt")
-                    if args.raw_reads.split(",")[0].endswith(".gz")
-                    else open(args.raw_reads.split(",")[0]),
-                    "fastq",
-                ),
-                SeqIO.parse(
-                    gzip.open(args.raw_reads.split(",")[1], "rt")
-                    if args.raw_reads.split(",")[1].endswith(".gz")
-                    else open(args.raw_reads.split(",")[1]),
-                    "fastq",
-                ),
-            ):
-                if (
-                    rec1.id != rec2.id
-                    or rec1.id not in processed_matches
-                    or rec2.id not in processed_matches
-                ):
-                    continue
-
-                realignments[rec1.id] = realign_breakpoints(
-                    processed_matches[rec1.id],
-                    genome_dict,
-                    (str(rec1.seq), str(rec2.seq)),
-                    penalties=args.realignment_penalties,
-                )
-
-        else:
-            logger.info("re-aligning breakpoints using raw reads from " + args.raw_reads)
-            for rec in SeqIO.parse(
-                gzip.open(args.raw_reads, "rt")
-                if args.raw_reads.endswith(".gz")
-                else open(args.raw_reads),
-                "fastq",
-            ):
-                if rec.id not in processed_matches:
-                    continue
-
-                realignments[rec.id] = realign_breakpoints(
-                    processed_matches[rec.id],
-                    genome_dict,
-                    str(rec.seq),
-                    penalties=args.realignment_penalties,
-                )
 
         logger.info("saving breakpoint re-alignments to " + args.realign_breakpoints)
         df = pd.DataFrame(

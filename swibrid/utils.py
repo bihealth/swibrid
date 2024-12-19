@@ -582,3 +582,130 @@ def weighted_avg_and_std(values, weights):
     # Fast and numerically precise:
     variance = np.average((values - average) ** 2, weights=weights)
     return (average, np.sqrt(variance))
+
+
+def calculate_n_homology(s0, s1, s2, m1, m2):
+    """
+    calculate n_homology by directly comparing genomic sequence left and right of the breakpoint
+    """
+
+    s0s = s0.split("/")
+    s1s = s1.split("/")
+    s2s = s2.split("/")
+    m1s = m1.split("/")
+    m2s = m2.split("/")
+
+    if False:
+        # start from left
+        n1 = 0
+        for k in range(len(s2s[0]) - 1, -1, -1):
+            if s1s[0][k] == s2s[0][k] and s1s[0][k] != "-":
+                n1 += 1
+            else:
+                break
+
+        # start from right
+        n2 = 0
+        for k in range(len(s2s[-1])):
+            if s1s[-1][k] == s2s[-1][k] and s1s[-1][k] != "-":
+                n2 += 1
+            else:
+                break
+
+        # look at nucleotides in ambiguous region "between" breaks
+        if len(s1s) > 2 and len(s2s) > 2:
+            ns1 = 0
+            ns2 = 0
+            for k in range(len(s2s[1])):
+                if s1s[1][k] == s2s[1][k] and s1s[1][k] != "-":
+                    ns1 += 1
+                else:
+                    break
+            for k in range(len(s2s[1]) - 1, -1, -1):
+                if s1s[1][k] == s2s[1][k] and s1s[1][k] != "-":
+                    ns2 += 1
+                else:
+                    break
+
+            # if all nucleotides between the breaks are homologous
+            if (
+                ns1 == ns2
+                and ns1 == len(s1s[1].replace("-", ""))
+                and ns2 == len(s2s[1].replace("-", ""))
+            ):
+                n_homology = n1 + n2 + ns1
+            else:
+                n_homology = max(n1 + ns1, n2 + ns2)
+
+        else:
+            n_homology = n1 + n2
+
+    if False:
+        n_homology = 0
+        n_untemplated = 0
+
+        # check for homology on the left side of the breakpoint
+        for k in range(len(m2s[0]) - 1, -1, -1):
+            if m1s[0][k] == "|" and m2s[0][k] == "|":
+                n_homology += 1
+            if m2s[0][k] == " " and s0s[0][k] != "-":
+                break
+        # check for homology on the right side of the breakpoint
+        for k in range(len(m1s[-1])):
+            if m1s[-1][k] == "|" and m2s[-1][k] == "|":
+                n_homology += 1
+            if m1s[-1][k] == " " and s0s[-1][k] != "-":
+                break
+
+        # check for untemplated or homologous nucleotides between the breakpoints on the read
+        if len(m1s) > 2 and len(m2s) > 2:
+            for k, (x, y, z) in enumerate(zip(m1s[1], m2s[1], s0s[1])):
+                if x == "|" and y == "|" and z != "-":
+                    n_homology += 1
+            n_untemplated = sum(
+                x == " " and y == " " and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
+            )
+
+    nl = 0
+    k = len(s1s[0]) - 1
+    while k >= 0 and s1s[0][k] == s2s[0][k] and s1s[0][k] != "-" and s0s[0][k] != "-":
+        nl += 1
+        k -= 1
+
+    nr = 0
+    k = 0
+    while k < len(s1s[-1]) and s1s[-1][k] == s2s[-1][k] and s1s[-1][k] != "-" and s0s[-1][k] != "-":
+        nr += 1
+        k += 1
+
+    if len(s1s) > 2:
+        k = 0
+        while k < len(s1s[1]) and s1s[1][k] == s2s[1][k] and s1s[1][k] != "-" and s0s[1][k] != "-":
+            nl += 1
+            k += 1
+
+        k = len(s1s[1]) - 1
+        while k >= 0 and s1s[1][k] == s2s[1][k] and s1s[1][k] != "-" and s0s[1][k] != "-":
+            nr += 1
+            k -= 1
+
+    return max(nr, nl)
+
+
+def calculate_n_untemplated(m1, m2, s0):
+    """
+    calculate number of untemplated nucleotides in ambiguous region "between" breaks
+    """
+
+    m1s = m1.split("/")
+    m2s = m2.split("/")
+    s0s = s0.split("/")
+
+    if len(m1s) > 2 and len(m2s) > 2:
+        n_untemplated = sum(
+            x != "|" and y != "|" and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
+        )
+    else:
+        n_untemplated = 0
+
+    return n_untemplated

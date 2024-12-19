@@ -21,7 +21,7 @@ def setup_argparse(parser):
         dest="paired_end_mode",
         action="store_true",
         default=False,
-        help="""use paired-end mode (--raw_reads needs to be a comma-separated list of mates)""",
+        help="""use paired-end mode""",
     )
     parser.add_argument("--msa_csv", dest="msa_csv", help="""msa read info (for paire_end_mode)""")
 

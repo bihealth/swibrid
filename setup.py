@@ -53,7 +53,17 @@ setup(
     description="switch breakpoint identification using long-read sequencing",
     license="MIT license",
     include_package_data=True,
-    package_data={'swibrid': ['test_data/*.bed','test_data/*.fa', 'test_data/*.par', 'test_data/*.txt', 'test_data/*.yaml', 'config.yaml', 'pipeline.snake']},
+    package_data={
+        "swibrid": [
+            "test_data/*.bed",
+            "test_data/*.fa",
+            "test_data/*.par",
+            "test_data/*.txt",
+            "test_data/*.yaml",
+            "config.yaml",
+            "pipeline.snake",
+        ]
+    },
     name="swibrid",
     packages=find_packages(include=["swibrid"]),
     version=versioneer.get_version(),

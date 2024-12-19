@@ -110,7 +110,9 @@ def run(args):
 
     if args.sample_sheet is not None:
         logger.info("reading sample sheet from " + args.sample_sheet)
-        sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze(axis=1)
+        sample_sheet = pd.read_csv(args.sample_sheet, sep="\t", index_col=0, header=None).squeeze(
+            axis=1
+        )
         whitelist = sample_sheet.index
         assert len(whitelist) == len(
             whitelist.unique()

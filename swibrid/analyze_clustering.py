@@ -50,6 +50,13 @@ def setup_argparse(parser):
         help="""max gap size to ignore [75]""",
     )
     parser.add_argument(
+        "--max_realignment_gap",
+        dest="max_realignment_gap",
+        default=75,
+        type=int,
+        help="""max gap size to count positions for realignment [75]""",
+    )
+    parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
@@ -308,8 +315,8 @@ def run(args):
     realignment_stats = pd.DataFrame([], columns=["n_homology_switch", "n_untemplated_switch"])
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("reading breakpoint realignments from " + args.realignments)
-
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
+
         realignments = realignments.loc[realignments.index.intersection(clustering.index)]
 
         realignments["chrom_left"] = realignments["pos_left"].str.split(":").str[0]
@@ -318,9 +325,9 @@ def run(args):
         realignments["pos_left"] = realignments["pos_left"].str.split(":").str[1].astype(int)
         realignments["pos_right"] = realignments["pos_right"].str.split(":").str[1].astype(int)
 
-        # filter out realignments across breaks smaller than max_gap
+        # filter out realignments across breaks smaller than max_realignment_gap
         gap_size = np.abs(realignments["pos_left"] - realignments["pos_right"])
-        keep = (gap_size >= args.max_gap) | (
+        keep = (gap_size >= args.max_realignment_gap) | (
             realignments["chrom_left"] != realignments["chrom_right"]
         )
         realignments = realignments[keep]
@@ -353,13 +360,6 @@ def run(args):
                     }
                 )
 
-            # realignment_stats = (
-            #    realignments.groupby(["type", "cluster"])
-            #    .agg({"n_homology": "mean",
-            #          "n_untemplated": "mean"})
-            #    .unstack(level=0)
-            # )
-
             realignment_stats = (
                 realignments.groupby(["type", "cluster"]).apply(group_realignments).unstack(level=0)
             )
@@ -385,6 +385,7 @@ def run(args):
     )
 
     df = pd.concat([df, insert_stats, realignment_stats], axis=1)
+    df.index = df.index.astype(int)
 
     switch_iis = get_switch_iis(anno_recs, cov_int, 1)
     for isotype in np.unique(switch_iis):
@@ -409,4 +410,4 @@ def run(args):
         df["adj_size"] = df["size"]
 
     logger.info("saving results to " + args.output)
-    df.to_csv(args.output)
+    df.to_csv(args.output, index=True)

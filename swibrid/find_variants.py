@@ -6,7 +6,7 @@ EXPERIMENTAL: find single-nucleotide variants in MSA and determine haplotypes. v
 - high strand bias
 - no cluster with at least min_cluster_cov reads and allele frequency > min_freq
 
-variants are aggregated over clusters, and the distribution across clusters is tested for evenness. variants can be annotated by dbSNP id. motif occurrences around variants are also scored. haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant. 
+variants are aggregated over clusters, and the distribution across clusters is tested for evenness. variants can be annotated by dbSNP id. motif occurrences around variants are also scored. haplotypes are determined by performing a weighted NMF on a matrix of allele frequencies per cluster and variant.
 
 output is a vcf-style file with genomic (1-based) and relative (0-based) coordinates, and a matrix (sparse integer array, same shape as MSA) indicating which read contains a variant at which position
 """
@@ -41,15 +41,15 @@ def setup_argparse(parser):
     parser.add_argument("-o", "--out", dest="out", help="""required: output file (text)""")
     parser.add_argument("-m", "--mat", dest="mat", help="""required: output file (matrix)""")
     parser.add_argument(
-        "--out_complete",
-        dest="out_complete",
-        help="""required: output file with all variants (text)""",
+        "--save_all",
+        dest="save_all",
+        help="""save all variants, not just those passing filters""",
     )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -57,42 +57,46 @@ def setup_argparse(parser):
         help="""bed file with switch annotation""",
     )
     parser.add_argument(
-        "--fdr", dest="fdr", default=0.05, type=float, help="""FDR for variant calling"""
+        "--fdr",
+        dest="fdr",
+        default=0.05,
+        type=float,
+        help="""FDR for variant calling [%(default).2f]""",
     )
     parser.add_argument(
         "--min_cov",
         dest="min_cov",
         default=50,
         type=int,
-        help="""minimum read coverage at potentially variable positions [50]""",
+        help="""minimum read coverage at potentially variable positions [%(default)d]""",
     )
     parser.add_argument(
         "--gap_window_size",
         dest="gap_window_size",
         default=10,
         type=int,
-        help="""size of window to compute local gap frequency [10]""",
+        help="""size of window to compute local gap frequency [%(default)d]""",
     )
     parser.add_argument(
         "--max_local_gap_freq",
         dest="max_local_gap_freq",
         default=0.7,
         type=float,
-        help="""max. local gap frequency in window [.7]""",
+        help="""max. local gap frequency in window [%(default).1f]""",
     )
     parser.add_argument(
         "--min_cluster_cov",
         dest="min_cluster_cov",
         default=10,
         type=int,
-        help="""minimum read coverage at potentially variable positions per cluster [10]""",
+        help="""minimum read coverage at potentially variable positions per cluster [%(default)d]""",
     )
     parser.add_argument(
         "--min_freq",
         dest="min_freq",
         default=0.4,
         type=float,
-        help="""minimum allele frequency at potentially variable positions (in total or per cluster) [.4]""",
+        help="""minimum allele frequency at potentially variable positions (in total or per cluster) [%(default).2f]""",
     )
     parser.add_argument(
         "--nreads",
@@ -115,7 +119,7 @@ def setup_argparse(parser):
         "--motifs",
         dest="motifs",
         default="Cg,wrCy,Tw",
-        help="""comma-separated list of sequence motifs to look up at variant positions [Cg,wrCy,Tw]""",
+        help="""comma-separated list of sequence motifs to look up at variant positions [%(default)s]""",
     )
 
 
@@ -278,9 +282,9 @@ def run(args):
     freq = mat.sum(0).A1 / (msa != 0).sum(0).A1
     no_clust = no_clust & (freq <= args.min_freq)
 
-    padj_complete = padj.copy()
-    padj_complete[few_var] = 1
-    SNP_pos_complete = np.where(padj_complete < args.fdr)[0]
+    padj_all = padj.copy()
+    padj_all[few_var] = 1
+    SNP_pos_all = np.where(padj_all < args.fdr)[0]
 
     padj[low_cov | few_var | stranded | no_clust] = 1
     SNP_pos = np.where(padj < args.fdr)[0]
@@ -420,7 +424,7 @@ def run(args):
         )
         lines = []
         line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9:.3g}\t{10:.3g}\t{11:.3g}\t{12}\t{13}\t{14}\n"
-        for n, pos in enumerate(SNP_pos):
+        for n, pos in enumerate(SNP_pos_all if args.save_all else SNP_pos):
             ref = ref_seq[pos]
             real_pos = cov_map[pos] + 1
             region = []
@@ -457,39 +461,3 @@ def run(args):
                 (mat.data, (read_ii[mi], mj)), shape=(nreads, msa.shape[1]), dtype=np.int8
             )
         scipy.sparse.save_npz(args.mat, mat)
-
-    if args.out_complete:
-        logger.info("saving complete variant table to {0}".format(args.out_complete))
-        with open(args.out_complete, "w") as outf:
-            outf.write(
-                "chrom\tposition\tregion\trel_pos\tref\talt\tcounts\tpval\tpadj\tcov\tpp_adj\tpstrand\tfreq\tused\n"
-            )
-            lines = []
-            line = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7:.3g}\t{8:.3g}\t{9}\t{10:.3g}\t{11:.3g}\t{12:.3g}\t{13}\n"
-            for n, pos in enumerate(SNP_pos_complete):
-                ref = ref_seq[pos]
-                real_pos = cov_map[pos] + 1
-                region = []
-                for _, _, _, hit in intersect_intervals(
-                    [("chr14", real_pos - 1, real_pos)], switch_anno, loj=True
-                ):
-                    region.append(hit[3])
-                region = ",".join(region)
-                vals = [
-                    switch_chrom,
-                    real_pos,
-                    region,
-                    pos,
-                    ref,
-                    "ACGT"[alt[pos] - 1],
-                    ",".join(map(str, nuc_dist[pos])),
-                    pvar[pos],
-                    padj_complete[pos],
-                    nr[pos],
-                    pp_adj[pos],
-                    pstrand[pos],
-                    freq[pos],
-                    pos in SNP_pos,
-                ]
-                lines.append(line.format(*vals))
-            outf.writelines(lines)

@@ -150,7 +150,7 @@ rule minimap_pars:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
-    swibrid get_alignment_pars -i {input.sam} -o {output.par} -r {params.reference} 2> {log}
+    swibrid get_alignment_pars -i {input.bam} -o {output.par} -r {params.reference} 2> {log}
     """
 
 

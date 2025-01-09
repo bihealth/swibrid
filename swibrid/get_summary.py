@@ -1,6 +1,6 @@
 """\
-produce a summary of features derived from a sample and a plot. 
-collects statistics produced by process_alignments, find_clusters, and downsample_clustering. 
+produce a summary of features derived from a sample and a plot.
+collects statistics produced by process_alignments, find_clusters, and downsample_clustering.
 produces cluster distribution statistics similar to downsample_clustering (the latter are averaged):
 
 - mean_cluster_size (as fraction of reads)
@@ -15,8 +15,8 @@ produces cluster distribution statistics similar to downsample_clustering (the l
 - size_length_bias: regression coefficient of log(cluster_size) ~ length
 - size_GC_bias: regression coefficient of log(cluster_size) ~ GC
 
-averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters. 
-collects number of reads / clusters per isotype.   
+averages cluster-specific features from analyze_clustering and get_breakpoint_stats over clusters.
+collects number of reads / clusters per isotype.
 gets statistics on variants (germline vs. somatic, transitions vs. transversions, etc.)
 """
 
@@ -40,7 +40,7 @@ def setup_argparse(parser):
         dest="max_gap",
         default=75,
         type=int,
-        help="""max gap size to ignore [75]""",
+        help="""max gap size to ignore [%(default)d]""",
     )
     parser.add_argument(
         "--clustering",
@@ -76,7 +76,7 @@ def setup_argparse(parser):
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -92,21 +92,21 @@ def setup_argparse(parser):
         "--weights",
         dest="weights",
         default="cluster",
-        help="""specify weights ("cluster" | "reads" | "adjusted") [cluster]""",
+        help="""specify weights ("cluster" | "reads" | "adjusted") [%(default)s]""",
     )
     parser.add_argument(
         "--max_n_blunt",
         dest="max_n_blunt",
         default=0.5,
         type=float,
-        help="""max avg. number of untemplated / homologous nucleotides of reads in cluster to be considered a blunt end [.5]""",
+        help="""max avg. number of untemplated / homologous nucleotides of reads in cluster to be considered a blunt end [%(default).1f]""",
     )
     parser.add_argument(
         "--big_clone_cutoff",
         dest="big_clone_cutoff",
         default=0.01,
         type=float,
-        help="""cutoff to determine a "big" clone as fraction of clustered reads [.01]""",
+        help="""cutoff to determine a "big" clone as fraction of clustered reads [%(default).2f]""",
     )
 
 

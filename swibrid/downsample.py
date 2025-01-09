@@ -16,64 +16,67 @@ def setup_argparse(parser):
         help="""downsampled sample name""",
     )
     parser.add_argument(
-        "-n", "--n", dest="n", type=int, default=5000, help="""use only n reads [5000]"""
+        "-n", "--n", dest="n", type=int, default=5000, help="""use only n reads [%(default)d]"""
     )
     parser.add_argument(
-        "--aligner", dest="aligner", default="last", help="""alignment algorithm used [last]"""
+        "--aligner",
+        dest="aligner",
+        default="last",
+        help="""alignment algorithm used [%(default)s]""",
     )
     parser.add_argument(
         "--msa_path",
         dest="msa_path",
         default="pipeline/{sample}/{sample}_msa.npz",
-        help="""path pattern for msa files ["pipeline/{sample}/{sample}_msa.npz"]""",
+        help="""path pattern for msa files [%(default)s]""",
     )
     parser.add_argument(
         "--msa_csv_path",
         dest="msa_csv_path",
         default="pipeline/{sample}/{sample}_msa.csv",
-        help="""path pattern for msa csv files ["pipeline/{sample}/{sample}_msa.csv"]""",
+        help="""path pattern for msa csv files [%(default)s]""",
     )
     parser.add_argument(
         "--info_path",
         dest="info_path",
         default="input/{sample}_info.csv",
-        help="""path pattern for info csv files ["input/{sample}_info.csv"]""",
+        help="""path pattern for info csv files [%(default)s]""",
     )
     parser.add_argument(
         "--process_path",
         dest="process_path",
         default="pipeline/{sample}/{sample}_processed.out",
-        help="""path pattern for processing output ["pipeline/{sample}/{sample}_processed.out"]""",
+        help="""path pattern for processing output [%(default)s]""",
     )
     parser.add_argument(
         "--process_stats_path",
         dest="process_stats_path",
         default="pipeline/{sample}/{sample}_process_stats.csv",
-        help="""path pattern for process stats csv ["pipeline/{sample}/{sample}_process_stats.csv"]""",
+        help="""path pattern for process stats csv [%(default)s]""",
     )
     parser.add_argument(
         "--alignment_pars_path",
         dest="alignment_pars_path",
         default="pipeline/{sample}/{sample}_{aligner}_pars.npz",
-        help="""path pattern for alignment pars ["pipeline/{sample}/{sample}_{aligner}_pars.npz"]""",
+        help="""path pattern for alignment pars [%(default)s]""",
     )
     parser.add_argument(
         "--breakpoint_alignments_path",
         dest="breakpoint_alignments_path",
         default="pipeline/{sample}/{sample}_breakpoint_alignments.csv",
-        help="""path pattern for breakpoint alignments ["pipeline/{sample}/{sample}_breakpoint_alignments.csv"]""",
+        help="""path pattern for breakpoint alignments [%(default)s]""",
     )
     parser.add_argument(
         "--inserts_tsv_path",
         dest="inserts_tsv_path",
         default="pipeline/{sample}/{sample}_inserts.tsv",
-        help="""path pattern for inserts tsv ["pipeline/{sample}/{sample}_inserts.tsv"]""",
+        help="""path pattern for inserts tsv [%(default)s]""",
     )
     parser.add_argument(
         "--bed_path",
         dest="bed_path",
         default="pipeline/{sample}/{sample}.bed",
-        help="""path pattern for bed ["pipeline/{sample}/{sample}.bed"]""",
+        help="""path pattern for bed [%(default)s]""",
     )
 
 

@@ -180,87 +180,54 @@ def p_adjust_bh(p):
 
 
 def parse_LAST_pars(pars):
+    single_line_pars = {
+        "mean_del_size": "# mean delete size",
+        "mean_ins_size": "# mean insert size",
+        "p_open_del": "# delOpenProb",
+        "p_open_ins": "# insOpenProb",
+        "p_extend_del": "# delExtendProb",
+        "p_extend_ins": "# insExtendProb",
+        "cost_open_del": "# delExistCost",
+        "cost_open_ins": "# insExistCost",
+        "cost_extend_del": "# delExtendCost",
+        "cost_extend_ins": "# insExtendCost",
+    }
+    multi_line_pars = {
+        "p_c": "# count matrix",
+        "p_mat": "# probability matrix",
+    }
+
+    params = {}
+
     with open(pars) as inf:
         line = inf.readline()
         while line:
-            if line.startswith("# mean delete size"):
-                mean_del_size = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# mean insert size"):
-                mean_ins_size = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# delOpenProb"):
-                p_open_del = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# insOpenProb"):
-                p_open_ins = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# delExtendProb"):
-                p_extend_del = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# insExtendProb"):
-                p_extend_ins = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# delExistCost"):
-                cost_open_del = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# insExistCost"):
-                cost_open_ins = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# delExtendCost"):
-                cost_extend_del = float(line.split(":")[1].strip())
-                line = inf.readline()
-            if line.startswith("# insExtendCost"):
-                cost_extend_ins = float(line.split(":")[1].strip())
-                line = inf.readline()
+            for par, key in single_line_pars.items():
+                if line.startswith(key):
+                    params[par] = float(line.split(":")[1].strip())
+                    line = inf.readline()
+
+            for par, key in multi_line_pars.items():
+                if line.startswith(key):
+                    line = inf.readline()
+                    params[par] = np.array(
+                        [list(map(float, inf.readline().split()[2:])) for k in range(4)]
+                    )
+
             if line.startswith("# substitution percent identity"):
-                p_sub = float(line.split(":")[1].strip()) / 100.0
+                params["p_sub"] = float(line.split(":")[1].strip()) / 100.0
                 line = inf.readline()
-
-            if line.startswith("# count matrix"):
-                ll = inf.readline()
-                p_c = []
-                for k in range(4):
-                    ll = inf.readline()
-                    p_c.append(list(map(float, ll.split()[2:])))
-                p_c = np.array(p_c)
-
-            if line.startswith("# probability matrix"):
-                ll = inf.readline()
-                p_mat = []
-                for k in range(4):
-                    ll = inf.readline()
-                    p_mat.append(list(map(float, ll.split()[2:])))
-                p_mat = np.array(p_mat)
 
             if line.startswith("# score matrix"):
-                ll = inf.readline()
-                if not ll.startswith("#"):
+                if not inf.readline().startswith("#"):
                     break
-                cost_mat = []
-                for k in range(4):
-                    ll = inf.readline()
-                    cost_mat.append(list(map(int, ll.split()[2:])))
-                cost_mat = np.array(cost_mat)
+                params["cost_mat"] = np.array(
+                    [list(map(int, inf.readline().split()[2:])) for k in range(4)]
+                )
 
             line = inf.readline()
 
-    return {
-        "mean_del_size": mean_del_size,
-        "mean_ins_size": mean_ins_size,
-        "p_open_del": p_open_del,
-        "p_open_ins": p_open_ins,
-        "p_extend_del": p_extend_del,
-        "p_extend_ins": p_extend_ins,
-        "p_sub": p_sub,
-        "p_c": p_c,
-        "p_mat": p_mat,
-        "cost_open_del": cost_open_del,
-        "cost_open_ins": cost_open_ins,
-        "cost_extend_del": cost_extend_del,
-        "cost_extend_ins": cost_extend_ins,
-        "cost_mat": cost_mat,
-    }
+    return params
 
 
 def decode_match(match_string):
@@ -533,7 +500,7 @@ def nmf_consistency(U_max, U_all):
         mm = np.argmax(contingency_matrix(gmax, g), axis=1)
         try:
             c.append(mm[g])
-        except:
+        except Exception:
             pass
     return np.mean(np.array(c), 0)
 
@@ -584,87 +551,14 @@ def weighted_avg_and_std(values, weights):
     return (average, np.sqrt(variance))
 
 
-def calculate_n_homology(s0, s1, s2, m1, m2):
+def calculate_n_homology(s0, s1, s2):
     """
     calculate n_homology by directly comparing genomic sequence left and right of the breakpoint
     """
 
-    s0s = s0.split("/")
-    s1s = s1.split("/")
-    s2s = s2.split("/")
-    m1s = m1.split("/")
-    m2s = m2.split("/")
-
-    if False:
-        # start from left
-        n1 = 0
-        for k in range(len(s2s[0]) - 1, -1, -1):
-            if s1s[0][k] == s2s[0][k] and s1s[0][k] != "-":
-                n1 += 1
-            else:
-                break
-
-        # start from right
-        n2 = 0
-        for k in range(len(s2s[-1])):
-            if s1s[-1][k] == s2s[-1][k] and s1s[-1][k] != "-":
-                n2 += 1
-            else:
-                break
-
-        # look at nucleotides in ambiguous region "between" breaks
-        if len(s1s) > 2 and len(s2s) > 2:
-            ns1 = 0
-            ns2 = 0
-            for k in range(len(s2s[1])):
-                if s1s[1][k] == s2s[1][k] and s1s[1][k] != "-":
-                    ns1 += 1
-                else:
-                    break
-            for k in range(len(s2s[1]) - 1, -1, -1):
-                if s1s[1][k] == s2s[1][k] and s1s[1][k] != "-":
-                    ns2 += 1
-                else:
-                    break
-
-            # if all nucleotides between the breaks are homologous
-            if (
-                ns1 == ns2
-                and ns1 == len(s1s[1].replace("-", ""))
-                and ns2 == len(s2s[1].replace("-", ""))
-            ):
-                n_homology = n1 + n2 + ns1
-            else:
-                n_homology = max(n1 + ns1, n2 + ns2)
-
-        else:
-            n_homology = n1 + n2
-
-    if False:
-        n_homology = 0
-        n_untemplated = 0
-
-        # check for homology on the left side of the breakpoint
-        for k in range(len(m2s[0]) - 1, -1, -1):
-            if m1s[0][k] == "|" and m2s[0][k] == "|":
-                n_homology += 1
-            if m2s[0][k] == " " and s0s[0][k] != "-":
-                break
-        # check for homology on the right side of the breakpoint
-        for k in range(len(m1s[-1])):
-            if m1s[-1][k] == "|" and m2s[-1][k] == "|":
-                n_homology += 1
-            if m1s[-1][k] == " " and s0s[-1][k] != "-":
-                break
-
-        # check for untemplated or homologous nucleotides between the breakpoints on the read
-        if len(m1s) > 2 and len(m2s) > 2:
-            for k, (x, y, z) in enumerate(zip(m1s[1], m2s[1], s0s[1])):
-                if x == "|" and y == "|" and z != "-":
-                    n_homology += 1
-            n_untemplated = sum(
-                x == " " and y == " " and z != "-" for x, y, z in zip(m1s[1], m2s[1], s0s[1])
-            )
+    s0s = s0.split("/")  # read sequence left, between and right of the break(s)
+    s1s = s1.split("/")  # left genomic sequence
+    s2s = s2.split("/")  # right genomic sequence
 
     nl = 0
     k = len(s1s[0]) - 1
@@ -697,9 +591,9 @@ def calculate_n_untemplated(m1, m2, s0):
     calculate number of untemplated nucleotides in ambiguous region "between" breaks
     """
 
-    m1s = m1.split("/")
-    m2s = m2.split("/")
-    s0s = s0.split("/")
+    m1s = m1.split("/")  # match between left genomic sequence and read sequence
+    m2s = m2.split("/")  # match between right genomic sequence and read sequence
+    s0s = s0.split("/")  # read sequence left, between and right of the break(s)
 
     if len(m1s) > 2 and len(m2s) > 2:
         n_untemplated = sum(

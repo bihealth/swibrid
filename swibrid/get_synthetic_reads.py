@@ -7,13 +7,25 @@ additional homozygous / heterozygous / other variants can be added
 
 
 def setup_argparse(parser):
-    parser.add_argument("-b", "--bed", dest="bed", help="""required: input bed file""")
     parser.add_argument(
-        "-r", "--reference", dest="reference", help="""required: reference sequence"""
+        "-b", "--bed", dest="bed", required=True, help="""required: input bed file"""
     )
-    parser.add_argument("-p", "--par", dest="par", help="""required: file with LAST parameters""")
     parser.add_argument(
-        "-o", "--out", dest="out", help="""required: output fasta / fastq (.gz) file"""
+        "-r",
+        "--reference",
+        dest="reference",
+        required=True,
+        help="""required: reference sequence""",
+    )
+    parser.add_argument(
+        "-p", "--par", dest="par", required=True, help="""required: file with LAST parameters"""
+    )
+    parser.add_argument(
+        "-o",
+        "--out",
+        dest="out",
+        required=True,
+        help="""required: output fasta / fastq (.gz) file""",
     )
     parser.add_argument("-i", "--info", dest="info", help="""output info file""")
     parser.add_argument(
@@ -29,21 +41,21 @@ def setup_argparse(parser):
         dest="k",
         type=float,
         default=1,
-        help="""number of mutated copies per sequence [1]""",
+        help="""number of mutated copies per sequence [%(default).1f]""",
     )
     parser.add_argument(
         "-d",
         "--distribution",
         dest="distribution",
         default="poisson",
-        help="""distribution type for k (delta | poisson | nbinom | P | NB | D) [nbinom]""",
+        help="""distribution type for k (delta | poisson | nbinom | P | NB | D) [%(default)s]""",
     )
     parser.add_argument(
         "--nbinom_alpha",
         dest="nbinom_alpha",
         default=4,
         type=float,
-        help="""dispersion alpha of negative binomial [4]""",
+        help="""dispersion alpha of negative binomial [%(default).1f]""",
     )
     parser.add_argument(
         "--variants",

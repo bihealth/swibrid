@@ -1,5 +1,5 @@
 """\
-construct (pseudo) MSA from processed alignments: 
+construct (pseudo) MSA from processed alignments:
 this script will take aligned segments and sequences from process_alignments and construct a MSA.
 the MSA is stored as a sparse matrix of n_reads x n_positions, where the positions run over the concatenation of individual switch regions specified in a bed file.
 matrix values m code for coverage and nucleotide identity:

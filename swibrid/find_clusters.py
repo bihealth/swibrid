@@ -1,5 +1,5 @@
 """\
-find clusters by cutting linkage dendrogram: inputs are the linkage matrix (from ``construct_linkage``) 
+find clusters by cutting linkage dendrogram: inputs are the linkage matrix (from ``construct_linkage``)
 and read info (``from construct_msa``). output is a csv file that adds cluster identity to the read info file
 
 cutoff can be fixed or determined by scanning cutoffs between cmin and cmax
@@ -13,16 +13,22 @@ def setup_argparse(parser):
         "-l",
         "--linkage",
         dest="linkage",
+        required=True,
         help="""required: output of construct_linkage""",
     )
     parser.add_argument(
         "-i",
         "--input",
         dest="input",
+        required=True,
         help="""required: read info (output of construct_msa)""",
     )
     parser.add_argument(
-        "-o", "--output", dest="output", help="""required: output file with clustering"""
+        "-o",
+        "--output",
+        dest="output",
+        required=True,
+        help="""required: output file with clustering""",
     )
     parser.add_argument("-s", "--stats", dest="stats", help="""file with statistics""")
     parser.add_argument(
@@ -41,35 +47,35 @@ def setup_argparse(parser):
         "--fit_method",
         dest="fit_method",
         default="distance",
-        help="""cutoff determination method: "trend" or "distance" [distance]""",
+        help="""cutoff determination method: "trend" or "distance" [%(default)s]""",
     )
     parser.add_argument(
         "-c",
         dest="cmin",
         default=0.001,
         type=float,
-        help="""minimum cutoff value [.001]""",
+        help="""minimum cutoff value [%(default).3f]""",
     )
     parser.add_argument(
         "-C",
         dest="cmax",
         default=0.1,
         type=float,
-        help="""maximum cutoff value [.1]""",
+        help="""maximum cutoff value [%(default).3f]""",
     )
     parser.add_argument(
         "-n",
         dest="nc",
         default=100,
         type=int,
-        help="""number of cutoff values between cmin and cmax [100]""",
+        help="""number of cutoff values between cmin and cmax [%(default)d]""",
     )
     parser.add_argument(
         "--filtering_cutoff",
         dest="filtering_cutoff",
         default=0.95,
         type=float,
-        help="""filter out smallest clusters, keeping at least this fraction of reads [.95]""",
+        help="""filter out smallest clusters, keeping at least this fraction of reads [%(default).2f]""",
     )
 
 
@@ -87,7 +93,6 @@ def fit_cutoff(cc, nn, method="fit"):
     if method == "trend":
         from .utils import res2
 
-        # p0 = [nmax, 0, nmin, np.log(nmax / nmin) / (cmax - cmin)]
         p0 = [0.75 * (nmax - nmin), 10, 0.25 * (nmax - nmin), 200]
         opt2 = scipy.optimize.least_squares(
             res2,

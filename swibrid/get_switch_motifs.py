@@ -7,13 +7,17 @@ output is a .npz file with count arrays for each motif
 
 
 def setup_argparse(parser):
-    parser.add_argument("-g", "--genome", dest="genome", help="""required: genome fasta file""")
-    parser.add_argument("-o", "--output", dest="output", help="""required: output file (npz)""")
+    parser.add_argument(
+        "-g", "--genome", dest="genome", required=True, help="""required: genome fasta file"""
+    )
+    parser.add_argument(
+        "-o", "--output", dest="output", required=True, help="""required: output file (npz)"""
+    )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -26,7 +30,7 @@ def setup_argparse(parser):
         dest="binsize",
         type=int,
         default=100,
-        help="""binsize [100]""",
+        help="""binsize [%(default)d]""",
     )
     parser.add_argument(
         "--motifs",
@@ -39,7 +43,7 @@ def setup_argparse(parser):
         dest="k",
         type=int,
         default=5,
-        help="""value k for estimate of k-mer complexity [5]""",
+        help="""value k for estimate of k-mer complexity [%(default)d]""",
     )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
 

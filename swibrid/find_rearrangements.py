@@ -10,15 +10,20 @@ def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
+        required=True,
         help="""required: file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("-o", "--out", dest="out", help="""required: output file (bed)""")
-    parser.add_argument("-m", "--mat", dest="mat", help="""required: output file (matrix)""")
+    parser.add_argument(
+        "-o", "--out", dest="out", required=True, help="""required: output file (bed)"""
+    )
+    parser.add_argument(
+        "-m", "--mat", dest="mat", required=True, help="""required: output file (matrix)"""
+    )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -30,7 +35,7 @@ def setup_argparse(parser):
         dest="max_rearrangement_gap",
         default=25,
         type=int,
-        help="""max gap within rearrangements to ignore [25]""",
+        help="""max gap within rearrangements to ignore [%(default)d]""",
     )
 
 

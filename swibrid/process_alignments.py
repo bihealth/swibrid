@@ -32,14 +32,18 @@ def setup_argparse(parser):
     parser.add_argument(
         "--alignments",
         dest="alignments",
+        required=True,
         help="""required: MAF file (LAST output) or SAM file (minimap2 output) with aligned reads (LAST output)""",
     )
     parser.add_argument(
         "--outfile",
         dest="outfile",
+        required=True,
         help="""required: output table with processed reads""",
     )
-    parser.add_argument("--info", dest="info", help="""required: csv file with read info""")
+    parser.add_argument(
+        "--info", dest="info", required=True, help="""required: csv file with read info"""
+    )
     parser.add_argument(
         "--sequences",
         dest="sequences",
@@ -50,7 +54,7 @@ def setup_argparse(parser):
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000",
-        help="""coordinates of switch region [chr14:106050000-106337000]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -62,7 +66,7 @@ def setup_argparse(parser):
         dest="min_length",
         default=500,
         type=int,
-        help="""minimum read length""",
+        help="""minimum read length [%(default)d]""",
     )
     parser.add_argument(
         "--only_complete",
@@ -110,70 +114,70 @@ def setup_argparse(parser):
         dest="max_switch_overlap",
         default=0,
         type=int,
-        help="""max overlap between switch parts of different orientation [0]""",
+        help="""max overlap between switch parts of different orientation [%(default)d]""",
     )
     parser.add_argument(
         "--max_insert_gap",
         dest="max_insert_gap",
         default=100,
         type=int,
-        help="""max gap between insert and switch parts (on the read) [100]""",
+        help="""max gap between insert and switch parts (on the read) [%(default)d]""",
     )
     parser.add_argument(
         "--max_insert_overlap",
         dest="max_insert_overlap",
         default=50,
         type=int,
-        help="""max overlap between switch and insert parts (on the read) [50]""",
+        help="""max overlap between switch and insert parts (on the read) [%(default)d]""",
     )
     parser.add_argument(
         "--min_insert_match",
         dest="min_insert_match",
         default=50,
         type=int,
-        help="""min length of insert [50]""",
+        help="""min length of insert [%(default)d]""",
     )
     parser.add_argument(
         "--min_num_switch_matches",
         dest="min_num_switch_matches",
         default=1,
         type=int,
-        help="""min number of switch matches in read [1]""",
+        help="""min number of switch matches in read [%(default)d]""",
     )
     parser.add_argument(
         "--min_cov",
         dest="min_cov",
         default=0.9,
         type=float,
-        help="""coverage cutoff on reads [0.95 but 0.4 for plasmid]""",
+        help="""coverage cutoff on reads [%(default).2f]""",
     )
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
         default=75,
         type=float,
-        help="""split alignments with gaps beyond that value [75]""",
+        help="""split alignments with gaps beyond that value [%(default)d]""",
     )
     parser.add_argument(
         "--isotype_extra",
         dest="isotype_extra",
         default=200,
         type=int,
-        help="""extra space added to define isotypes [200]""",
+        help="""extra space added to define isotypes [%(default)d]""",
     )
     parser.add_argument(
         "--telo_cutoff",
         dest="telo_cutoff",
         default=90,
         type=float,
-        help="""%% identify cutoff for telomer match [90]""",
+        help="""%% identify cutoff for telomer match [%(default)d]""",
     )
     parser.add_argument(
         "--min_telo_matchlen",
         dest="min_telo_matchlen",
         type=int,
         default=25,
-        help="""minimum matchlen for telomeric repeat matches [25]""",
+        help="""minimum matchlen for telomeric repeat matches [%(default)d]""",
     )
     parser.add_argument(
         "--blacklist_regions",
@@ -190,7 +194,7 @@ def setup_argparse(parser):
         "--realignment_penalties",
         dest="realignment_penalties",
         default="ont",
-        help="""re-alignment penalties ("ont", "hifi" or "sr") [ont]""",
+        help="""re-alignment penalties ("ont", "hifi" or "sr") [%(default)s]""",
     )
     parser.add_argument(
         "--raw_reads",
@@ -599,7 +603,7 @@ def realign_breakpoints(matches, genome_dict, read_seq, pad=20, penalties="ont")
         r = {
             "pos_left": pos_left,
             "pos_right": pos_right,
-            "n_homology": calculate_n_homology(s0, s1, s2, m1, m2),
+            "n_homology": calculate_n_homology(s0, s1, s2),
             "n_untemplated": calculate_n_untemplated(m1, m2, s0),
             "orientation": orientation,
             "type": "insert" if "insert" in [matches[i][6], matches[i + 1][6]] else "switch",

@@ -1,5 +1,5 @@
 """\
-analyze breakpoint statistics: this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters. homology scores are calculated from binned breakpoint frequencies weighted by homology of bins; 
+analyze breakpoint statistics: this will produce aggregate statistics on breakpoints, either averaged over reads, or clusters. homology scores are calculated from binned breakpoint frequencies weighted by homology of bins;
 motif scores are calculated from binned breakpoint frequencies weighted by motif occurrences.
 output file contains following values:
 
@@ -25,12 +25,14 @@ def setup_argparse(parser):
         "-g",
         "--gaps",
         dest="gaps",
+        required=True,
         help="""required: file with gap positions (output of get_gaps)""",
     )
     parser.add_argument(
         "-r",
         "--rearrangements",
         dest="rearrangements",
+        required=True,
         help="""required: file with inversion/duplication positions (output of find_rearrangements)""",
     )
     parser.add_argument(
@@ -45,7 +47,7 @@ def setup_argparse(parser):
         dest="clustering_analysis",
         help="""file with clustering analysis""",
     )
-    parser.add_argument("-o", "--out", help="""required: output file""")
+    parser.add_argument("-o", "--out", requird=True, help="""required: output file""")
     parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument(
         "-b",
@@ -53,21 +55,21 @@ def setup_argparse(parser):
         dest="binsize",
         default=50,
         type=int,
-        help="""binsize [50]""",
+        help="""binsize [%(default)d]""",
     )
     parser.add_argument(
         "--scale_factor",
         dest="scale_factor",
         default=10,
         type=int,
-        help="""factor to increase binsize for 2D histogram [10]""",
+        help="""factor to increase binsize for 2D histogram [%(default)d]""",
     )
     parser.add_argument(
         "--max_gap",
         dest="max_gap",
         default=75,
         type=int,
-        help="""max gap size to ignore [75]""",
+        help="""max gap size to ignore [%(default)d]""",
     )
     parser.add_argument(
         "--homology",
@@ -84,7 +86,7 @@ def setup_argparse(parser):
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "--switch_annotation",
@@ -100,23 +102,23 @@ def setup_argparse(parser):
         "--weights",
         dest="weights",
         default="cluster",
-        help="""use different weights ("cluster" | "reads" | "adjusted") [cluster]""",
+        help="""use different weights ("cluster" | "reads" | "adjusted") [%(default)s]""",
     )
     parser.add_argument(
         "--range",
         dest="range",
         default="5",
-        help="""range of kmer sizes, e.g., 3,5-7 [5]""",
+        help="""range of kmer sizes, e.g., 3,5-7 [%(default)s]""",
     )
     parser.add_argument(
         "--top_donor",
         dest="top_donor",
-        help="""output file with top donor sequences""",
+        help="""output additional file with top donor sequences""",
     )
     parser.add_argument(
         "--top_acceptor",
         dest="top_acceptor",
-        help="""output file with top acceptor sequences""",
+        help="""output additional file with top acceptor sequences""",
     )
     parser.add_argument(
         "-n",

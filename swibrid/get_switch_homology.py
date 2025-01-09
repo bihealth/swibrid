@@ -1,5 +1,5 @@
 """\
-analyze sequence homology within switch region bins by jaccard similarity of k-mers: 
+analyze sequence homology within switch region bins by jaccard similarity of k-mers:
 from switch region coordinates and a genome file, this script assesses homology of
 pairs of bins by jaccard similarity of k-mer occurrences in forward or reverse orientation.
 output is a .npz file with pairwise forward and reverse homology arrays for each value of k
@@ -7,18 +7,23 @@ output is a .npz file with pairwise forward and reverse homology arrays for each
 
 
 def setup_argparse(parser):
-    parser.add_argument("-g", "--genome", dest="genome", help="""required: genome fasta file""")
-    parser.add_argument("-o", "--output", dest="output", help="""required: output file (npz)""")
+    parser.add_argument(
+        "-g", "--genome", dest="genome", required=True, help="""required: genome fasta file"""
+    )
+    parser.add_argument(
+        "-o", "--output", dest="output", required=True, help="""required: output file (npz)"""
+    )
     parser.add_argument(
         "--switch_annotation",
         dest="switch_annotation",
+        required=True,
         help="""required: bed file with switch annotation""",
     )
     parser.add_argument(
         "--switch_coords",
         dest="switch_coords",
         default="chr14:106050000-106337000:-",
-        help="""coordinates of switch region [chr14:106050000-106337000:-]""",
+        help="""coordinates of switch region [%(default)s]""",
     )
     parser.add_argument(
         "-b",
@@ -26,13 +31,13 @@ def setup_argparse(parser):
         dest="binsize",
         type=int,
         default=100,
-        help="""binsize [100]""",
+        help="""binsize [%(default)d]""",
     )
     parser.add_argument(
         "--range",
         dest="range",
         default="5",
-        help="""range of kmer sizes, e.g., 3,5-7 [5]""",
+        help="""range of kmer sizes, e.g., 3,5-7 [%(default)s]""",
     )
     parser.add_argument("--figure", dest="figure", help="""output figure""")
 

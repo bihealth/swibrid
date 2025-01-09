@@ -13,9 +13,10 @@ def setup_argparse(parser):
     parser.add_argument(
         "--msa",
         dest="msa",
+        required=True,
         help="""required: .npz file with  (pseudo) multiple alignment of read sequences for clustering""",
     )
-    parser.add_argument("-o", "--out", help="""required: output file (.npz)""")
+    parser.add_argument("-o", "--out", required=True, help="""required: output file (.npz)""")
     parser.add_argument(
         "--paired_end_mode",
         dest="paired_end_mode",
@@ -23,7 +24,7 @@ def setup_argparse(parser):
         default=False,
         help="""use paired-end mode""",
     )
-    parser.add_argument("--msa_csv", dest="msa_csv", help="""msa read info (for paire_end_mode)""")
+    parser.add_argument("--msa_csv", dest="msa_csv", help="""msa read info (for paired_end_mode)""")
 
 
 def run(args):
@@ -48,7 +49,7 @@ def run(args):
         mate_breaks = dict(
             (i, (int(mb.split(";")[0]), int(mb.split(";")[1])))
             for i, mb in msa_csv["mate_breaks"].dropna().items()
-            if not "nan" in mb
+            if "nan" not in mb
         )
         use = [
             i not in mate_breaks or mate_breaks[i] != (l, r)

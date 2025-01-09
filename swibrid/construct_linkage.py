@@ -1,5 +1,5 @@
 """\
-construct hiearchical agglomerative clustering from MSA: 
+construct hiearchical agglomerative clustering from MSA:
 from the input MSA, only coverage information will be used and gaps smaller than `max_gap` will be removed.
 by default, `fastcluster` is used with cosine metric and average linkage.
 output is a npz file containing the linkage matrix

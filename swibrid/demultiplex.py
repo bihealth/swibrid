@@ -15,8 +15,8 @@ def setup_argparse(parser):
         "-b",
         "--blast",
         dest="blast",
-        help="""required: BLAST output file (or stdin)""",
         required=True,
+        help="""required: BLAST output file (or stdin)""",
     )
     parser.add_argument(
         "-o", "--outdir", dest="outdir", help="""required: output directory""", required=True
@@ -27,7 +27,7 @@ def setup_argparse(parser):
         dest="cutoff",
         default=70,
         type=float,
-        help="""%% identify cutoff [70]""",
+        help="""%% identify cutoff [%(default).1f]""",
     )
     parser.add_argument(
         "-d",
@@ -35,7 +35,7 @@ def setup_argparse(parser):
         dest="dist",
         default=100,
         type=float,
-        help="""max distance of match to end of sequence""",
+        help="""max distance of match to end of sequence [%(default)d]""",
     )
     parser.add_argument(
         "-m",
@@ -43,7 +43,7 @@ def setup_argparse(parser):
         dest="min_reads",
         default=1000,
         type=float,
-        help="""min # of reads required to create separate file if no sample sheet is given [1000]""",
+        help="""min # of reads required to create separate file if no sample sheet is given [%(default).0f]""",
     )
     parser.add_argument("-f", "--figure", dest="figure", help="""summary figure""")
     parser.add_argument("-r", "--report", dest="report", help="""summary report""")
@@ -71,7 +71,7 @@ def setup_argparse(parser):
         "--max_split_dist",
         dest="max_split_dist",
         default=200,
-        help="""maximum distance between internal primer matches to split read""",
+        help="""maximum distance between internal primer matches to split read [%(default)d]""",
     )
     parser.add_argument("--nmax", dest="nmax", type=int, help="""maximum number of reads""")
     parser.add_argument(
@@ -85,7 +85,7 @@ def setup_argparse(parser):
         "--umi_regex",
         dest="umi_regex",
         default=r"[ACGTN]{12}",
-        help="""regex to find UMI in read description""",
+        help="""regex to find UMI in read description [%(default)s]""",
     )
     parser.add_argument(
         "--write_info_chunks",

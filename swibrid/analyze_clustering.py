@@ -1,5 +1,5 @@
 """\
-analyze clustering: given the clustering from ``find_clusters`` as input, 
+analyze clustering: given the clustering from ``find_clusters`` as input,
 various aggregate statistics are generated per cluster.
 output table contains the following columns:
 

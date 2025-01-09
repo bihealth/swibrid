@@ -1,5 +1,5 @@
 """\
-downsample the clustering to get more robust diversity measures: 
+downsample the clustering to get more robust diversity measures:
 given the input MSA (and associated gaps), clustering is repeated `nreps` times on a subsample of `nreads` reads
 using `fastcluster`  with (by defalt) cosine metric and average linkage and a cutoff derived from cluster_stats input.
 the following diversity measured are calculated:
@@ -34,10 +34,14 @@ def setup_argparse(parser):
         help="""required: output file with clustering statistics after downsampling""",
     )
     parser.add_argument(
-        "--nreads", dest="nreads", type=int, default=1000, help="""number of reads used [1000]"""
+        "--nreads",
+        dest="nreads",
+        type=int,
+        default=1000,
+        help="""number of reads used [%(default)d]""",
     )
     parser.add_argument(
-        "--nreps", dest="nreps", type=int, default=10, help="""number of replicates [10]"""
+        "--nreps", dest="nreps", type=int, default=10, help="""number of replicates [%(default)d]"""
     )
     parser.add_argument("--gaps", dest="gaps", help="""output of get_gaps""")
     parser.add_argument(
@@ -45,19 +49,19 @@ def setup_argparse(parser):
         dest="max_gap",
         default=75,
         type=int,
-        help="""max gap size to ignore [75]""",
+        help="""max gap size to ignore [%(default)d]""",
     )
     parser.add_argument(
         "--metric",
         dest="metric",
         default="cosine",
-        help="""clustering metric [cosine]""",
+        help="""clustering metric [%(default)s]""",
     )
     parser.add_argument(
         "--method",
         dest="method",
         default="average",
-        help="""clustering method for hierarchical clustering [average]""",
+        help="""clustering method for hierarchical clustering [%(default)s]""",
     )
     parser.add_argument(
         "--ignore_unused_positions",
@@ -71,14 +75,14 @@ def setup_argparse(parser):
         dest="filtering_cutoff",
         default=0.95,
         type=float,
-        help="""filter out smallest clusters, keeping at least this fraction of reads [.95]""",
+        help="""filter out smallest clusters, keeping at least this fraction of reads [%(default).2f]""",
     )
     parser.add_argument(
         "--big_clone_cutoff",
         dest="big_clone_cutoff",
         default=0.01,
         type=float,
-        help="""cutoff to determine a "big" clone as fraction of clustered reads [.01]""",
+        help="""cutoff to determine a "big" clone as fraction of clustered reads [%(default).2f]""",
     )
 
 

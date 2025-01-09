@@ -277,7 +277,7 @@ test_parser = subparsers.add_parser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     description=dedent(
         """\
-    test the pipeline. 
+    test the pipeline.
     this will create synthetic reads in ``input`` and run the pipeline on this data,
     using a reduced hg38 genome in ``index`` with only the switch region (chr14:105000000-106000000).
     it will probably take about 30-60 minutes and will call snakemake, passing on additional options.

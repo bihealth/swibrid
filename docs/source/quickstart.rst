@@ -17,7 +17,7 @@ installation
 
 #. install ``swibrid``::
 
-        pip install -e .
+        pip install .
 
 
 testing
@@ -29,7 +29,7 @@ for a simple and (relatively) quick end-to-end test, run::
 
 this will create two samples with about 1000 synthetic reads in ``input`` and run the pipeline on this data,
 using a reduced hg38 genome in ``index`` with only the switch region (chr14:105000000-106000000).
-it will probably take about 30-60 minutes and produce plots in ``output/read_plots`` and 
+it will probably take about 10 minutes and produce plots in ``output/read_plots`` and 
 table of summary statistics in ``output/summary``
 
 
@@ -56,6 +56,8 @@ and a file with barcode and primer sequences like so::
    CTCAGTCCAACACCCACCACTCC
    >primer_gamma_rv
    CTGCCTCCCAGTGTCCTGCATTACTTCTG
+
+if you don't have multiplexed data, you should still run the demultiplexing for primer detection; simply set up a dummy sample sheet and the file with primers; all reads will end up in ``undetermined.fastq.gz``
 
 #. set up snakemake and config files in a new directory::
 

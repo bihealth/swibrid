@@ -24,7 +24,7 @@ jobs:
         run: |
           python -m pip install -U sphinx
           python -m pip install sphinx-rtd-theme sphinxcontrib-autoprogram
-          python -m pip install biopython fastcluster logzero matplotlib numpy openpyxl pandas pysam python-dateutil python-fastjsonschema python-json-logger ruamel.yaml.clib ruamel.yaml scikit-learn scipy tabulate 
+          python -m pip install biopython fastcluster logzero matplotlib numpy openpyxl pandas pysam python-dateutil fastjsonschema python-json-logger ruamel.yaml scikit-learn scipy tabulate 
       
       - name: make the sphinx docs
         run: |

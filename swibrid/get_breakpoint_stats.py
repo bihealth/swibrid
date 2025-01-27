@@ -47,7 +47,7 @@ def setup_argparse(parser):
         dest="clustering_analysis",
         help="""file with clustering analysis""",
     )
-    parser.add_argument("-o", "--out", requird=True, help="""required: output file""")
+    parser.add_argument("-o", "--out", required=True, help="""required: output file""")
     parser.add_argument("-p", "--plot", help="""plot file""")
     parser.add_argument(
         "-b",

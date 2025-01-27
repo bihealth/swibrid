@@ -24,6 +24,7 @@ jobs:
         run: |
           python -m pip install -U sphinx
           python -m pip install sphinx-rtd-theme sphinxcontrib-autoprogram
+          python -m pip install logzero
       
       - name: make the sphinx docs
         run: |

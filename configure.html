@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>configuration &mdash; swibrid 2024 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=172f29ee"></script>
+      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="understanding output" href="output.html" />
+    <link rel="prev" title="quick start guide" href="quickstart.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            swibrid
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">quick start guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="output.html">understanding output</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">command-line interface</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">swibrid</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">configuration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/configure.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="configuration">
+<h1>configuration<a class="headerlink" href="#configuration" title="Permalink to this heading"></a></h1>
+<p>the SWIBRID pipeline is configured via entries in the <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> file</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># CONFIG FILE FOR SWIBRID</span>
+<span class="c1">#</span>
+<span class="c1"># name of conda environment (will be passed to snakemake)</span>
+<span class="n">ENV</span><span class="p">:</span> <span class="s2">&quot;swibrid_env&quot;</span>
+<span class="c1"># default options to pass to snakemake</span>
+<span class="c1"># e.g., include ``--profile`` to reference a profile for SLURM</span>
+<span class="n">SNAKEOPTS</span><span class="p">:</span> <span class="s2">&quot;-j 100 -k --rerun-incomplete --latency-wait 60 -p --retries 10&quot;</span> 
+<span class="c1"># study name (used in summary output csv file)</span>
+<span class="n">STUDY</span><span class="p">:</span> <span class="s2">&quot;current_study&quot;</span>
+<span class="c1"># input fastq file (if demultiplexing is included)</span>
+<span class="n">INPUT</span><span class="p">:</span> <span class="s2">&quot;path/to/reads.fastq.gz&quot;</span>
+<span class="c1"># sample sheet specifying barcodes and associated sample names</span>
+<span class="n">SAMPLE_SHEET</span><span class="p">:</span> <span class="s2">&quot;path/to/sample_sheet.csv&quot;</span>
+<span class="c1"># fasta file with barcodes and primers used during demultiplexing </span>
+<span class="n">BARCODES_PRIMERS</span><span class="p">:</span> <span class="s1">&#39;index/barcodes_primers.fa&#39;</span>
+<span class="c1"># list of samples for which  to run the pipeline</span>
+<span class="c1"># IMPORTANT: these sample names must appear in the sample sheet if demultiplexing is used</span>
+<span class="n">SAMPLES</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;sample1&quot;</span><span class="p">,</span><span class="s2">&quot;sample2&quot;</span><span class="p">]</span>
+<span class="c1"># minimum read length</span>
+<span class="n">MINLENGTH</span><span class="p">:</span> <span class="mi">500</span>
+<span class="c1"># reference genome (fasta file, index should be present)</span>
+<span class="n">REFERENCE</span><span class="p">:</span> <span class="s1">&#39;index/hg38.fa&#39;</span>
+<span class="c1"># LAST index of reference genome</span>
+<span class="n">LAST_INDEX</span><span class="p">:</span> <span class="s1">&#39;index/hg38db&#39;</span>
+<span class="c1"># minimap2 index of reference genome if ALIGNER==minimap2</span>
+<span class="n">MINIMAP_INDEX</span><span class="p">:</span> <span class="s1">&#39;index/hg38-ont.mmi&#39;</span>
+<span class="c1"># aligner to use (LAST is more precise and recommended, minimap2 is much faster)</span>
+<span class="n">ALIGNER</span><span class="p">:</span> <span class="s1">&#39;LAST&#39;</span>
+<span class="c1"># fasta file specifying the telomer repeat unit, e.g., CCTAACCCTAACCCTAACCCTAACCCTAAC</span>
+<span class="n">TELO_REPEAT</span><span class="p">:</span> <span class="s1">&#39;&#39;</span>
+<span class="c1"># coordinates of switch region (altogether)</span>
+<span class="n">SWITCH</span><span class="p">:</span> <span class="s1">&#39;chr14:105583000-105872000:-&#39;</span>
+<span class="c1"># bed file with coordinates of individual switch regions</span>
+<span class="n">SWITCH_ANNOTATION</span><span class="p">:</span> <span class="s1">&#39;index/hg38_switch_regions.bed&#39;</span>
+<span class="c1"># bed file with gene annotation</span>
+<span class="n">ANNOTATION</span><span class="p">:</span> <span class="s1">&#39;index/gencode.v33.annotation.exon.gene_shorted.bed&#39;</span>
+<span class="c1"># whether or not to run variant detection (experimental feature)</span>
+<span class="n">DETECT_VARIANTS</span><span class="p">:</span> <span class="kc">False</span>
+<span class="c1"># vcf file with variant annotation (e.g., from dbSNP restricted to switch region on chr14)</span>
+<span class="n">VARIANT_ANNOTATION</span><span class="p">:</span> <span class="s1">&#39;&#39;</span> 
+<span class="c1"># max number of reads to cluster</span>
+<span class="n">NMAX</span><span class="p">:</span> <span class="mi">50000</span>
+<span class="c1"># clustering metric to use </span>
+<span class="n">CLUSTERING_METRIC</span><span class="p">:</span> <span class="s1">&#39;cosine&#39;</span>
+<span class="c1"># clustering method to use</span>
+<span class="n">CLUSTERING_METHOD</span><span class="p">:</span> <span class="s1">&#39;average&#39;</span>
+<span class="c1"># fixed clustering cutoff</span>
+<span class="n">CLUSTERING_CUTOFF</span><span class="p">:</span> <span class="mf">0.01</span>
+<span class="c1"># cutoff for cluster filtering</span>
+<span class="n">CLUSTER_FILTERING_CUTOFF</span><span class="p">:</span> <span class="mf">0.95</span>
+<span class="c1"># max gap size to remove before clustering</span>
+<span class="n">MAX_GAP</span><span class="p">:</span> <span class="mi">75</span>
+<span class="c1"># bin size for breakpoint analysis</span>
+<span class="n">BINSIZE</span><span class="p">:</span> <span class="mi">50</span>
+<span class="c1"># blacklisted regions for insert detection</span>
+<span class="n">BLACKLIST_REGIONS</span><span class="p">:</span> <span class="s1">&#39;&#39;</span>
+<span class="c1"># weights to use for averaging features over clusters (or reads)</span>
+<span class="n">WEIGHTS</span><span class="p">:</span> <span class="s1">&#39;cluster&#39;</span>
+<span class="c1"># number of reads to use for downsampling analysis</span>
+<span class="n">CLUSTER_DOWNSAMPLING_NREADS</span><span class="p">:</span> <span class="mi">1000</span>
+<span class="c1"># number of replicates used in downsampling</span>
+<span class="n">CLUSTER_DOWNSAMPLING_NREPS</span><span class="p">:</span> <span class="mi">10</span>
+</pre></div>
+</div>
+<p>for a more in-depth control over parameters to individual functions, have a look at the snakemake file <code class="docutils literal notranslate"><span class="pre">pipeline.snake</span></code>. e.g., resource requirements are specified there, or which exact plots should be produced.</p>
+<p>for extended testing, the <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> (or <code class="docutils literal notranslate"><span class="pre">test_config.yaml</span></code> when using <code class="docutils literal notranslate"><span class="pre">swibrid</span> <span class="pre">test</span></code>)  draws on a section specifying input parameters for generation of synthetic reads:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">SIMULATION_PARAMS</span><span class="p">:</span>
+  <span class="n">input_clones</span><span class="p">:</span> <span class="s1">&#39;input/input_clones.bed&#39;</span>    <span class="c1"># bed file with coordinates of switch segments for input clones</span>
+  <span class="n">input_pars</span><span class="p">:</span> <span class="s1">&#39;input/input_pars.par&#39;</span>     <span class="c1"># parameters for adding mutations and insertions/deletions</span>
+  <span class="n">model</span><span class="p">:</span> <span class="s2">&quot;poisson&quot;</span>                       <span class="c1"># distribution of clone sizes</span>
+  <span class="n">mix_n10_s1_10k</span><span class="p">:</span>                        <span class="c1"># parameters for specific sample (name should appear in SAMPLES)</span>
+    <span class="n">nclones</span><span class="p">:</span> <span class="mi">10</span>                          <span class="c1"># number of input clones</span>
+    <span class="n">nreads</span><span class="p">:</span> <span class="mi">1000</span>                         <span class="c1"># total number of input reads</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="mi">1</span>                              <span class="c1"># random seed</span>
+  <span class="n">mix_n1000_s2_10k</span><span class="p">:</span>
+    <span class="n">nclones</span><span class="p">:</span> <span class="mi">1000</span>
+    <span class="n">nreads</span><span class="p">:</span> <span class="mi">10</span>
+    <span class="n">seed</span><span class="p">:</span> <span class="mi">2</span>
+</pre></div>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="quick start guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="output.html" class="btn btn-neutral float-right" title="understanding output" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Benedikt Obermayer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,448 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>understanding output &mdash; swibrid 2024 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=172f29ee"></script>
+      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="command-line interface" href="cli.html" />
+    <link rel="prev" title="configuration" href="configure.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            swibrid
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">quick start guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configure.html">configuration</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">understanding output</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#read-plot">read plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#breakpoint-histogram">breakpoint histogram</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#qc-plot">QC plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#output-features">output features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#qc-features">QC features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#diversity-features">diversity features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#isotypes">isotypes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#structural-rearrangements">structural rearrangements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#context-features">context features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#breakpoint-matrix">breakpoint matrix</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#variants">variants</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#demultiplexing">demultiplexing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#other-output">other output</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">command-line interface</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">swibrid</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">understanding output</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/output.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="understanding-output">
+<h1>understanding output<a class="headerlink" href="#understanding-output" title="Permalink to this heading"></a></h1>
+<section id="read-plot">
+<h2>read plot<a class="headerlink" href="#read-plot" title="Permalink to this heading"></a></h2>
+<p>SWIBRID produces read plots to visualize alignments, clustering and single-nucleotide/structural variants detected in input reads. By default, two plots are produced (in <code class="docutils literal notranslate"><span class="pre">output/read_plots</span></code>). The first one shows all read alignments to selected regions in the IGH locus, where reads are ordered according to the dendrogram produced by hierarchical clustering and colored by the cluster identity obtained from cutting the dendrogram at the specified cutoff (indicated by the red line). Primer locations are visible from the “justified” positions of the read ends, while breaks are visible from the “ragged” positions. Small gaps are ignored for clustering, while intermediate gaps indicate intra-switch breaks, and large gaps regular switch junctions.</p>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_reads_annotated.png"><img alt="read plot by cluster identity" src="_images/20211122_85_n500_1_downsampled_reads_annotated.png" style="width: 800px;" /></a>
+<p>The second plot shows the same reads but now colored by coverage (of the genome, per read): blue indicates 1x coverage, violet 2x coverage (i.e., a duplication event), and orange negative coverage (an inversion event). Single-nucleotide variants are marked by black dots, and triangles on top indicate a tentative assignment of these variants into likely homo- or heterozygous germline, or likely somatic.</p>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_coverage_annotated.png"><img alt="read plot by coverage with variants" src="_images/20211122_85_n500_1_downsampled_coverage_annotated.png" style="width: 800px;" /></a>
+</section>
+<section id="breakpoint-histogram">
+<h2>breakpoint histogram<a class="headerlink" href="#breakpoint-histogram" title="Permalink to this heading"></a></h2>
+<p>The breakpoint histograms (in <code class="docutils literal notranslate"><span class="pre">output/breakpoint_plots</span></code>) show 1D and 2D histograms of breakpoint positions over selected regions in the IGH locus. Regular breaks are shown in black, while breaks connected to inversions and duplications are shown in red and blue, respectively. The 1D histogram shows donor and acceptor breakpoints together in 50nt bins, the 2D histogram shows junctions between a donor region (on the x-axis) and an acceptor region (on the y-axis) in 500nt bins. The regions shaded in green, orange and purple indicate breaks corresponding to “single” events, sequential switching or intra-switch breaks, respectively. Inversions and duplications (in red and blue) are indicated in the lower right diagonal of the plot.</p>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png"><img alt="breakpoint histograms" src="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png" style="width: 300px;" /></a>
+</section>
+<section id="qc-plot">
+<h2>QC plot<a class="headerlink" href="#qc-plot" title="Permalink to this heading"></a></h2>
+<p>QC plots are created in <code class="docutils literal notranslate"><span class="pre">output/QC_plots</span></code> and contain the following panels:</p>
+<ol class="upperalpha simple">
+<li><p>histogram of input read lengths</p></li>
+<li><p>histogram of positions of detected primers and barcodes (dashed lines indicate “internal” barcodes / primers, i.e., more than 100nt from the ends)</p></li>
+<li><p>isotype composition, as fraction of clusters (top) or reads (bottom)</p></li>
+<li><p>plot of # clusters (in red; left y-axis, log-scale) as function of dendrogram cutoff, or of the entropy of the cluster distribution (blue; right y-axis, linear scale)</p></li>
+<li><p>histogram of cluster size, filtered clusters are indicated by orange shading</p></li>
+<li><p>scatter plot of clone length (in nt) vs. cluster size (# of reads).</p></li>
+<li><p>histogram of gap sizes in MSA. 75bp cutoff is indicated by red line</p></li>
+<li><p>histogram of breakpoint positions, separated by donor (=left) and acceptor (=right)</p></li>
+</ol>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_summary_annotated.png"><img alt="QC plots" src="_images/20211122_85_n500_1_downsampled_summary_annotated.png" style="width: 500px;" /></a>
+</section>
+<section id="output-features">
+<h2>output features<a class="headerlink" href="#output-features" title="Permalink to this heading"></a></h2>
+<p>SWIBRID produces a table of features for each sample in <code class="docutils literal notranslate"><span class="pre">output/summary</span></code> with the following columns</p>
+<section id="qc-features">
+<h3>QC features<a class="headerlink" href="#qc-features" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>nreads_initial</dt><dd><p>initial number of reads</p>
+</dd>
+<dt>nreads_mapped</dt><dd><p>number of reads mapped</p>
+</dd>
+<dt>nreads_removed_short</dt><dd><p>number of reads that are too short for processing (&lt;500nt)</p>
+</dd>
+<dt>nreads_removed_incomplete</dt><dd><p>number of reads without forward and reverse primer</p>
+</dd>
+<dt>nreads_removed_no_info</dt><dd><p>number of reads without info on primers</p>
+</dd>
+<dt>nreads_removed_internal_primer</dt><dd><p>number of reads removed because of internal primers</p>
+</dd>
+<dt>nreads_removed_no_switch</dt><dd><p>number of reads removed because of lacking alignment to switch region</p>
+</dd>
+<dt>nreads_removed_length_mismatch</dt><dd><p>number of reads removed because mapped part of read are much longer than mapped part of genome</p>
+</dd>
+<dt>nreads_removed_overlap_mismatch</dt><dd><p>number of reads removed because there’s overlap betwen alignments on the read or on the genome</p>
+</dd>
+<dt>nreads_inversions</dt><dd><p>number of reads that contain inverted segments</p>
+</dd>
+<dt>nreads_removed_low_cov</dt><dd><p>number of reads removed because too little of the read maps</p>
+</dd>
+<dt>nreads_removed_switch_order</dt><dd><p>number of reads removed because switch alignments are in wrong order</p>
+</dd>
+<dt>nreads_removed_no_isotype</dt><dd><p>number of reads removed because isotype could not be determined</p>
+</dd>
+<dt>nreads_removed_duplicate</dt><dd><p>number of reads removed because of duplicate UMIs (in UMI mode, <code class="docutils literal notranslate"><span class="pre">--remove-duplicates</span></code>)</p>
+</dd>
+<dt>nreads_unmapped</dt><dd><p>number of unmapped reads</p>
+</dd>
+<dt>frac_reads_unused</dt><dd><p>fraction of unused reads</p>
+</dd>
+<dt>nreads_final</dt><dd><p>final number of reads</p>
+</dd>
+<dt>mean_frac_mapped</dt><dd><p>mean fraction of read that’s mapped</p>
+</dd>
+<dt>mean_frac_mapped_multi</dt><dd><p>mean fraction of read that’s mapped multiple</p>
+</dd>
+<dt>mean_frac_ignored</dt><dd><p>mean fraction of read that doesn’t mapped to selected switch regions</p>
+</dd>
+<dt>c_opt</dt><dd><p>dendrogram cutoff (specified or inferred from data)</p>
+</dd>
+<dt>frac_singletons</dt><dd><p>fraction of singleton clusters</p>
+</dd>
+<dt>size_length_bias</dt><dd><p>regression coefficient of cluster length vs. cluster size</p>
+</dd>
+<dt>size_GC_bias</dt><dd><p>regression coefficient of cluster GC vs. cluster size</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="diversity-features">
+<h3>diversity features<a class="headerlink" href="#diversity-features" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><p>these features are computed twice: once on the total number of reads, and then again as averages of 10 replicates from downsampling to 1000 reads</p>
+<dl class="simple">
+<dt>nclusters_initial</dt><dd><p>pre-filter cluster number</p>
+</dd>
+<dt>nclusters_final(_downsampled)</dt><dd><p>post-filter cluster number</p>
+</dd>
+<dt>nclusters_eff(_downsampled)</dt><dd><p>number of equally-sized clusters that has the same entropy as observed</p>
+</dd>
+<dt>mean_cluster_size(_downsampled)</dt><dd><p>mean cluster size (in fraction of reads)</p>
+</dd>
+<dt>std_cluster_size(_downsampled)</dt><dd><p>std dev of cluster size</p>
+</dd>
+<dt>cluster_gini(_downsampled)</dt><dd><p>Gini cofficient of cluster size distribution</p>
+</dd>
+<dt>cluster_entropy(_downsampled)</dt><dd><p>entropy of cluster size distribution</p>
+</dd>
+<dt>cluster_inverse_simpson(_downsampled)</dt><dd><p>inverse Simpson coefficient of cluster size distribution</p>
+</dd>
+<dt>top_clone_occupancy(_downsampled)</dt><dd><p>fraction of reads in biggest clone</p>
+</dd>
+<dt>big_clones_occupancy(_downsampled)</dt><dd><p>fraction of reads in all clones that contain more than 1% of reads</p>
+</dd>
+<dt>mean_length</dt><dd><p>mean length of clusters (in nt)</p>
+</dd>
+<dt>std_length</dt><dd><p>std deviation of cluster length</p>
+</dd>
+<dt>mean_GC</dt><dd><p>mean GC content of clusters</p>
+</dd>
+<dt>std_GC</dt><dd><p>std dev of GC content</p>
+</dd>
+<dt>mean/std_length_SX</dt><dd><p>mean and std of cluster length for isotype SX</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="isotypes">
+<h3>isotypes<a class="headerlink" href="#isotypes" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>frac_reads_SX</dt><dd><p>fraction of reads in isotype SX</p>
+</dd>
+<dt>frac_clusters_SX</dt><dd><p>fraction of clusters with isotype SX</p>
+</dd>
+<dt>alpha_ratio_reads</dt><dd><p>fraction of reads with isotype SA*</p>
+</dd>
+<dt>alpha_ratio_clusters</dt><dd><p>fraction of clusters with isotype SA*</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="structural-rearrangements">
+<h3>structural rearrangements<a class="headerlink" href="#structural-rearrangements" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>n_inserts</dt><dd><p>number of inserts</p>
+</dd>
+<dt>n_unique_inserts</dt><dd><p>number of unique inserts</p>
+</dd>
+<dt>n_clusters_inserts</dt><dd><p>number of clusters with inserts</p>
+</dd>
+<dt>insert_frequency</dt><dd><p>insert frequency (over the dataset)</p>
+</dd>
+<dt>mean_insert_frequency</dt><dd><p>mean insert frequency (per cluster)</p>
+</dd>
+<dt>mean_insert_overlap</dt><dd><p>mean overlap of inserts for reads in the same cluster</p>
+</dd>
+<dt>mean_insert_pos_overlap</dt><dd><p>mean overlap of left and right insert-generating breakpoints for reads in the same cluster</p>
+</dd>
+<dt>mean_insert_length</dt><dd><p>mean insert length</p>
+</dd>
+<dt>mean_insert_gap_length</dt><dd><p>mean length of gaps between left and right insert-generating breakpoints</p>
+</dd>
+<dt>ninserts_SX_SY</dt><dd><p>number of inserts between SX and SY regions</p>
+</dd>
+<dt>median_inversion_size</dt><dd><p>median size of inversions</p>
+</dd>
+<dt>median_duplication_size</dt><dd><p>median size of duplications</p>
+</dd>
+<dt>frac_breaks_inversions</dt><dd><p>fraction of breaks creating inversions</p>
+</dd>
+<dt>frac_breaks_duplications</dt><dd><p>fraction of breaks creating duplications</p>
+</dd>
+<dt>frac_breaks_inversions_intra</dt><dd><p>fraction of breaks creating inversions for intra-switch breaks</p>
+</dd>
+<dt>frac_breaks_duplications_intra</dt><dd><p>fraction of breaks creating duplications for intra-switch breaks</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="context-features">
+<h3>context features<a class="headerlink" href="#context-features" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>n_untemplated_switch</dt><dd><p>mean number of untemplated nucleotides for switch junctions</p>
+</dd>
+<dt>n_homology_switch</dt><dd><p>mean number of homologous nucleotides for switch junctions</p>
+</dd>
+<dt>n_untemplated_switch_SX</dt><dd><p>mean number of untemplated nucleotides for switch junctions for isotype SX</p>
+</dd>
+<dt>n_homology_switch_SX</dt><dd><p>mean number of homologous nucleotides for switch junctions of isotype SX</p>
+</dd>
+<dt>frac_blunt</dt><dd><p>fraction of blunt ends (no untemplated, no homologous nucleotides)</p>
+</dd>
+<dt>frac_blunt_SX</dt><dd><p>fraction of blunt ends (no untemplated, no homologous nucleotides) for isotype SX</p>
+</dd>
+<dt>homology_fw</dt><dd><p>average amount of homology in 50nt bins between donor and acceptor region</p>
+</dd>
+<dt>homology_rv</dt><dd><p>average amount of (reverse-complementary) homology in 50nt bins between donor and acceptor region</p>
+</dd>
+<dt>homology_fw/rv_SX_SY</dt><dd><p>average amount of homology in 50nt bins between donor (SX) and acceptor (SY) region</p>
+</dd>
+<dt>donor_score_M</dt><dd><p>score (=weighted frequency) for motif M (M=S,W,WGCW,GAGCT,GGGST with S=G/C, W=A/T) in 50nt bins of donor switch regions</p>
+</dd>
+<dt>acceptor_score_M</dt><dd><p>score for motif M in 50nt bins of acceptor switch regions</p>
+</dd>
+<dt>donor_complexity</dt><dd><p>complexity score (number of observed 5mers / number of possible 5mers) in 50nt bins of donor switch regions</p>
+</dd>
+<dt>acceptor_complexity</dt><dd><p>complexity score for acceptor regions</p>
+</dd>
+<dt>donor/acceptor_score_M_SX_SY</dt><dd><p>donor/acceptor score for motif M between donor region SX and acceptor region SY</p>
+</dd>
+<dt>donor/acceptor_complexity_SX_SY</dt><dd><p>donor/acceptor complexity between donor region SX and acceptor region SY</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="breakpoint-matrix">
+<h3>breakpoint matrix<a class="headerlink" href="#breakpoint-matrix" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>breaks_normalized</dt><dd><p>number of breaks by number of clusters</p>
+</dd>
+<dt>frac_breaks_SX_SY</dt><dd><p>fraction of breaks between SX and SY</p>
+</dd>
+<dt>frac_breaks_single</dt><dd><p>fraction of “single” breaks (see green region in 2D breakpoint histogram)</p>
+</dd>
+<dt>frac_breaks_sequential</dt><dd><p>fraction of “sequential” breaks (see orange region in 2D breakpoint histogram)</p>
+</dd>
+<dt>frac_breaks_intra</dt><dd><p>fraction of “intra” breaks (see purple region in 2D breakpoint histogram)</p>
+</dd>
+<dt>mean_intra_break_size</dt><dd><p>mean size of intra-switch breaks</p>
+</dd>
+<dt>std_intra_break_size</dt><dd><p>std dev size of intra-switch breaks</p>
+</dd>
+<dt>spread_SX</dt><dd><p>spread (standard deviation) of breakpoint positions in region SX</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="variants">
+<h3>variants<a class="headerlink" href="#variants" title="Permalink to this heading"></a></h3>
+<blockquote>
+<div><dl class="simple">
+<dt>num_variants</dt><dd><p>number of detected single-nucleotide variants</p>
+</dd>
+<dt>frac_variants_germline</dt><dd><p>fraction of variants classified as likely germline</p>
+</dd>
+<dt>frac_variants_transitions</dt><dd><p>fraction of transition variants</p>
+</dd>
+<dt>frac_variants_X&gt;Y</dt><dd><p>fraction of variants from ref X to alt Y</p>
+</dd>
+<dt>num_variants_M</dt><dd><p>number of variants around specific motif (M=Tw, wrCy, Cg)</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+</section>
+<section id="demultiplexing">
+<h2>demultiplexing<a class="headerlink" href="#demultiplexing" title="Permalink to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">swibrid</span> <span class="pre">demultiplex</span></code> creates fastq files for each sample in a sample sheet, together with <code class="docutils literal notranslate"><span class="pre">{sample}_info.csv</span></code> files that contain meta-data for each read (taken from the header of the original raw output, plus locations and identities of detected primers and barcodes). It also creates a summary csv file with statistics on how many reads were assigned to each sample barcode, and a summary figure:</p>
+<a class="reference internal image-reference" href="_images/20220411_demultiplexing.png"><img alt="demultiplexing output" src="_images/20220411_demultiplexing.png" style="width: 400px;" /></a>
+<p>The bar plot top left shows how many reads were assigned to each sample or remained “undetermined”. The pie chart on the right shows a breakdown of undetermined reads by barcode, in case the sample sheet is missing a sample barcode appearing in the reads. The histogram in the lower left shows relative locations of the detected barcodes, and the one in the lower right the distriubtion of read lengths in each sample (colors match the sample colors in the top plot).</p>
+</section>
+<section id="other-output">
+<h2>other output<a class="headerlink" href="#other-output" title="Permalink to this heading"></a></h2>
+<p>the pipeline writes intermediate files to folders <code class="docutils literal notranslate"><span class="pre">pipeline/{sample}</span></code> and log files to <code class="docutils literal notranslate"><span class="pre">logs/{step}</span></code> (or <code class="docutils literal notranslate"><span class="pre">logs/slurm/{step}</span></code> if <code class="docutils literal notranslate"><span class="pre">--slurm</span></code> is used). intermediate files are</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_aligned.par</span></code></dt><dd><p>LAST parameters estimated for that sample</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_last_pars.npz</span></code></dt><dd><p>LAST parameters as numpy array</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_aligned.maf.gz</span></code></dt><dd><p>LAST output (as MAF) for that sample</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_telo.out</span></code></dt><dd><p>output from BLASTing reads against telomer repeats</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_processed.out</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">process_alignments</span></code> output table</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_process_stats.csv</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">process_alignments</span></code> stats</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_aligned.fasta.gz</span></code></dt><dd><p>aligned reads as input to <code class="docutils literal notranslate"><span class="pre">construct_MSA</span></code></p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_breakpoint_alignments.csv</span></code></dt><dd><p>table with breakpoint re-alignment results</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_msa.npz</span></code></dt><dd><p>MSA in numpy sparse array format</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_msa.csv</span></code></dt><dd><p>table with reads used in MSA</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_gaps.npz</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">get_gaps</span></code> output (numpy arrays)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_rearrangements.npz</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">find_rearrangements</span></code> output (numpy arrays)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_rearrangements.bed</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">find_rearrangements</span></code> output as bed file</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_linkage.npz</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">construct_linkage</span></code> output (linkage matrix, python standard)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_inserts.tsv</span></code></dt><dd><p>table with insert coordinates, annotation and sequence</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}.bed</span></code></dt><dd><p>bed file with alignment coordinates for all reads and inserts</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_cutoff_scanning.csv</span></code></dt><dd><p>number of clusters as function of cutoff</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_clustering.csv</span></code></dt><dd><p>cluster assignment</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_cluster_stats.csv</span></code></dt><dd><p><code class="docutils literal notranslate"><span class="pre">find_clusters</span></code> statistics</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_cluster_analysis.csv</span></code></dt><dd><p>statistics aggregated over clusters</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_cluster_downsampling.csv</span></code></dt><dd><p>cluster statistics after downsampling 10 times</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_breakpoint_stats.csv</span></code></dt><dd><p>table with breakpoint matrix statistics</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_variants.txt</span></code></dt><dd><p>txt file (vcf-like) with variants</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_variants.npz</span></code></dt><dd><p>numpy file with variant and read coordinates</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_haplotypes.csv</span></code></dt><dd><p>table with haplotype assignments for clusters</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">{sample}_summary.csv</span></code></dt><dd><p>summary of features for that sample</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="configure.html" class="btn btn-neutral float-left" title="configuration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cli.html" class="btn btn-neutral float-right" title="command-line interface" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Benedikt Obermayer.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

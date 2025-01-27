@@ -10,7 +10,7 @@ SWIBRID (SWItch joint Breakpoint Repertoire IDentification) is a computational p
 documentation
 =============
 
-read the `documentation <https://swibrid.readthedocs.io>`_.
+read the `documentation <https://bihealth.github.io/swibrid/>`_.
 
 
 quick start guide

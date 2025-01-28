@@ -1,21 +1,21 @@
 
 
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>understanding output &mdash; swibrid 2024 documentation</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=172f29ee"></script>
-      <script src="_static/doctools.js?v=888ff710"></script>
-      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="_static/documentation_options.js?v=6fefd858"></script>
+      <script src="_static/doctools.js?v=9a2dae69"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -92,21 +92,24 @@
            <div itemprop="articleBody">
              
   <section id="understanding-output">
-<h1>understanding output<a class="headerlink" href="#understanding-output" title="Permalink to this heading"></a></h1>
+<h1>understanding output<a class="headerlink" href="#understanding-output" title="Link to this heading"></a></h1>
 <section id="read-plot">
-<h2>read plot<a class="headerlink" href="#read-plot" title="Permalink to this heading"></a></h2>
+<h2>read plot<a class="headerlink" href="#read-plot" title="Link to this heading"></a></h2>
 <p>SWIBRID produces read plots to visualize alignments, clustering and single-nucleotide/structural variants detected in input reads. By default, two plots are produced (in <code class="docutils literal notranslate"><span class="pre">output/read_plots</span></code>). The first one shows all read alignments to selected regions in the IGH locus, where reads are ordered according to the dendrogram produced by hierarchical clustering and colored by the cluster identity obtained from cutting the dendrogram at the specified cutoff (indicated by the red line). Primer locations are visible from the “justified” positions of the read ends, while breaks are visible from the “ragged” positions. Small gaps are ignored for clustering, while intermediate gaps indicate intra-switch breaks, and large gaps regular switch junctions.</p>
-<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_reads_annotated.png"><img alt="read plot by cluster identity" src="_images/20211122_85_n500_1_downsampled_reads_annotated.png" style="width: 800px;" /></a>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_reads_annotated.png"><img alt="read plot by cluster identity" src="_images/20211122_85_n500_1_downsampled_reads_annotated.png" style="width: 800px;" />
+</a>
 <p>The second plot shows the same reads but now colored by coverage (of the genome, per read): blue indicates 1x coverage, violet 2x coverage (i.e., a duplication event), and orange negative coverage (an inversion event). Single-nucleotide variants are marked by black dots, and triangles on top indicate a tentative assignment of these variants into likely homo- or heterozygous germline, or likely somatic.</p>
-<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_coverage_annotated.png"><img alt="read plot by coverage with variants" src="_images/20211122_85_n500_1_downsampled_coverage_annotated.png" style="width: 800px;" /></a>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_coverage_annotated.png"><img alt="read plot by coverage with variants" src="_images/20211122_85_n500_1_downsampled_coverage_annotated.png" style="width: 800px;" />
+</a>
 </section>
 <section id="breakpoint-histogram">
-<h2>breakpoint histogram<a class="headerlink" href="#breakpoint-histogram" title="Permalink to this heading"></a></h2>
+<h2>breakpoint histogram<a class="headerlink" href="#breakpoint-histogram" title="Link to this heading"></a></h2>
 <p>The breakpoint histograms (in <code class="docutils literal notranslate"><span class="pre">output/breakpoint_plots</span></code>) show 1D and 2D histograms of breakpoint positions over selected regions in the IGH locus. Regular breaks are shown in black, while breaks connected to inversions and duplications are shown in red and blue, respectively. The 1D histogram shows donor and acceptor breakpoints together in 50nt bins, the 2D histogram shows junctions between a donor region (on the x-axis) and an acceptor region (on the y-axis) in 500nt bins. The regions shaded in green, orange and purple indicate breaks corresponding to “single” events, sequential switching or intra-switch breaks, respectively. Inversions and duplications (in red and blue) are indicated in the lower right diagonal of the plot.</p>
-<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png"><img alt="breakpoint histograms" src="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png" style="width: 300px;" /></a>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png"><img alt="breakpoint histograms" src="_images/20211122_85_n500_1_downsampled_breakpoints_annotated.png" style="width: 300px;" />
+</a>
 </section>
 <section id="qc-plot">
-<h2>QC plot<a class="headerlink" href="#qc-plot" title="Permalink to this heading"></a></h2>
+<h2>QC plot<a class="headerlink" href="#qc-plot" title="Link to this heading"></a></h2>
 <p>QC plots are created in <code class="docutils literal notranslate"><span class="pre">output/QC_plots</span></code> and contain the following panels:</p>
 <ol class="upperalpha simple">
 <li><p>histogram of input read lengths</p></li>
@@ -118,13 +121,14 @@
 <li><p>histogram of gap sizes in MSA. 75bp cutoff is indicated by red line</p></li>
 <li><p>histogram of breakpoint positions, separated by donor (=left) and acceptor (=right)</p></li>
 </ol>
-<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_summary_annotated.png"><img alt="QC plots" src="_images/20211122_85_n500_1_downsampled_summary_annotated.png" style="width: 500px;" /></a>
+<a class="reference internal image-reference" href="_images/20211122_85_n500_1_downsampled_summary_annotated.png"><img alt="QC plots" src="_images/20211122_85_n500_1_downsampled_summary_annotated.png" style="width: 500px;" />
+</a>
 </section>
 <section id="output-features">
-<h2>output features<a class="headerlink" href="#output-features" title="Permalink to this heading"></a></h2>
+<h2>output features<a class="headerlink" href="#output-features" title="Link to this heading"></a></h2>
 <p>SWIBRID produces a table of features for each sample in <code class="docutils literal notranslate"><span class="pre">output/summary</span></code> with the following columns</p>
 <section id="qc-features">
-<h3>QC features<a class="headerlink" href="#qc-features" title="Permalink to this heading"></a></h3>
+<h3>QC features<a class="headerlink" href="#qc-features" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>nreads_initial</dt><dd><p>initial number of reads</p>
@@ -179,7 +183,7 @@
 </div></blockquote>
 </section>
 <section id="diversity-features">
-<h3>diversity features<a class="headerlink" href="#diversity-features" title="Permalink to this heading"></a></h3>
+<h3>diversity features<a class="headerlink" href="#diversity-features" title="Link to this heading"></a></h3>
 <blockquote>
 <div><p>these features are computed twice: once on the total number of reads, and then again as averages of 10 replicates from downsampling to 1000 reads</p>
 <dl class="simple">
@@ -217,7 +221,7 @@
 </div></blockquote>
 </section>
 <section id="isotypes">
-<h3>isotypes<a class="headerlink" href="#isotypes" title="Permalink to this heading"></a></h3>
+<h3>isotypes<a class="headerlink" href="#isotypes" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>frac_reads_SX</dt><dd><p>fraction of reads in isotype SX</p>
@@ -232,7 +236,7 @@
 </div></blockquote>
 </section>
 <section id="structural-rearrangements">
-<h3>structural rearrangements<a class="headerlink" href="#structural-rearrangements" title="Permalink to this heading"></a></h3>
+<h3>structural rearrangements<a class="headerlink" href="#structural-rearrangements" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>n_inserts</dt><dd><p>number of inserts</p>
@@ -271,7 +275,7 @@
 </div></blockquote>
 </section>
 <section id="context-features">
-<h3>context features<a class="headerlink" href="#context-features" title="Permalink to this heading"></a></h3>
+<h3>context features<a class="headerlink" href="#context-features" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>n_untemplated_switch</dt><dd><p>mean number of untemplated nucleotides for switch junctions</p>
@@ -308,7 +312,7 @@
 </div></blockquote>
 </section>
 <section id="breakpoint-matrix">
-<h3>breakpoint matrix<a class="headerlink" href="#breakpoint-matrix" title="Permalink to this heading"></a></h3>
+<h3>breakpoint matrix<a class="headerlink" href="#breakpoint-matrix" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>breaks_normalized</dt><dd><p>number of breaks by number of clusters</p>
@@ -331,7 +335,7 @@
 </div></blockquote>
 </section>
 <section id="variants">
-<h3>variants<a class="headerlink" href="#variants" title="Permalink to this heading"></a></h3>
+<h3>variants<a class="headerlink" href="#variants" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
 <dt>num_variants</dt><dd><p>number of detected single-nucleotide variants</p>
@@ -349,13 +353,14 @@
 </section>
 </section>
 <section id="demultiplexing">
-<h2>demultiplexing<a class="headerlink" href="#demultiplexing" title="Permalink to this heading"></a></h2>
+<h2>demultiplexing<a class="headerlink" href="#demultiplexing" title="Link to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">swibrid</span> <span class="pre">demultiplex</span></code> creates fastq files for each sample in a sample sheet, together with <code class="docutils literal notranslate"><span class="pre">{sample}_info.csv</span></code> files that contain meta-data for each read (taken from the header of the original raw output, plus locations and identities of detected primers and barcodes). It also creates a summary csv file with statistics on how many reads were assigned to each sample barcode, and a summary figure:</p>
-<a class="reference internal image-reference" href="_images/20220411_demultiplexing.png"><img alt="demultiplexing output" src="_images/20220411_demultiplexing.png" style="width: 400px;" /></a>
+<a class="reference internal image-reference" href="_images/20220411_demultiplexing.png"><img alt="demultiplexing output" src="_images/20220411_demultiplexing.png" style="width: 400px;" />
+</a>
 <p>The bar plot top left shows how many reads were assigned to each sample or remained “undetermined”. The pie chart on the right shows a breakdown of undetermined reads by barcode, in case the sample sheet is missing a sample barcode appearing in the reads. The histogram in the lower left shows relative locations of the detected barcodes, and the one in the lower right the distriubtion of read lengths in each sample (colors match the sample colors in the top plot).</p>
 </section>
 <section id="other-output">
-<h2>other output<a class="headerlink" href="#other-output" title="Permalink to this heading"></a></h2>
+<h2>other output<a class="headerlink" href="#other-output" title="Link to this heading"></a></h2>
 <p>the pipeline writes intermediate files to folders <code class="docutils literal notranslate"><span class="pre">pipeline/{sample}</span></code> and log files to <code class="docutils literal notranslate"><span class="pre">logs/{step}</span></code> (or <code class="docutils literal notranslate"><span class="pre">logs/slurm/{step}</span></code> if <code class="docutils literal notranslate"><span class="pre">--slurm</span></code> is used). intermediate files are</p>
 <dl class="simple">
 <dt><code class="docutils literal notranslate"><span class="pre">{sample}_aligned.par</span></code></dt><dd><p>LAST parameters estimated for that sample</p>

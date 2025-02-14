@@ -35,6 +35,11 @@ installation
         pip install .
 
 
+alternatively, use the docker image::
+
+        docker run -v $(pwd):/home/swibriduser -u $(id -u):$(id -g):swibridgroup ghcr.io/bihealth/swibrid:latest -h 
+
+
 testing
 -------
 
@@ -118,3 +123,4 @@ and a file with barcode and primer sequences like so::
         swibrid run            # for an actual run
         swibrid run --slurm    # submit to slurm
         swibrid run --unlock   # unlock snakemake before restarting an interrupted/killed instance
+

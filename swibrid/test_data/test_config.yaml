@@ -1,4 +1,4 @@
-ENV: "swibrid"
+ENV: "swibrid_env"
 SNAKEOPTS: "-j 100 -k --rerun-incomplete --latency-wait 60 -p" 
 STUDY: "test"
 INPUT: ""

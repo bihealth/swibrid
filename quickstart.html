@@ -102,6 +102,10 @@
 </div>
 </li>
 </ol>
+<p>alternatively, use the docker image:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>docker run -v $(pwd):/home/swibriduser -u $(id -u):$(id -g) ghcr.io/bihealth/swibrid:latest -h
+</pre></div>
+</div>
 </section>
 <section id="testing">
 <h2>testing<a class="headerlink" href="#testing" title="Link to this heading"></a></h2>
@@ -111,7 +115,7 @@
 </div>
 <p>this will create two samples with about 1000 synthetic reads in <code class="docutils literal notranslate"><span class="pre">input</span></code> and run the pipeline on this data,
 using a reduced hg38 genome in <code class="docutils literal notranslate"><span class="pre">index</span></code> with only the switch region (chr14:105000000-106000000).
-it will probably take about 10 minutes and produce plots in <code class="docutils literal notranslate"><span class="pre">output/read_plots</span></code> and
+it will probably take about 5 minutes and produce plots in <code class="docutils literal notranslate"><span class="pre">output/read_plots</span></code> and
 table of summary statistics in <code class="docutils literal notranslate"><span class="pre">output/summary</span></code></p>
 </section>
 <section id="running-your-own-data">

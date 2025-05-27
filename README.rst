@@ -37,7 +37,7 @@ installation
 
 alternatively, use the docker image::
 
-        docker run -v $(pwd):/home/swibriduser -u $(id -u):$(id -g):swibridgroup ghcr.io/bihealth/swibrid:latest -h 
+        docker run -v $(pwd):/home/swibriduser -u $(id -u):$(id -g) ghcr.io/bihealth/swibrid:latest -h 
 
 
 testing

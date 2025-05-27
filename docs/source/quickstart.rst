@@ -20,6 +20,10 @@ installation
         pip install .
 
 
+alternatively, use the docker image::
+
+        docker run -v $(pwd):/home/swibriduser -u $(id -u):$(id -g) ghcr.io/bihealth/swibrid:latest -h 
+
 testing
 -------
 
@@ -29,7 +33,7 @@ for a simple and (relatively) quick end-to-end test, run::
 
 this will create two samples with about 1000 synthetic reads in ``input`` and run the pipeline on this data,
 using a reduced hg38 genome in ``index`` with only the switch region (chr14:105000000-106000000).
-it will probably take about 10 minutes and produce plots in ``output/read_plots`` and 
+it will probably take about 5 minutes and produce plots in ``output/read_plots`` and 
 table of summary statistics in ``output/summary``
 
 

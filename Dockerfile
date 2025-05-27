@@ -19,7 +19,7 @@ COPY swibrid_env.yaml .
 # Create the conda environment
 RUN conda env create -f swibrid_env.yaml
 
-# Setup SSH keys (as the non-root user)
+# Setup SSH keys 
 RUN mkdir -p /root/.ssh
 COPY id_rsa /root/.ssh/id_rsa
 RUN chmod 600 /root/.ssh/id_rsa
@@ -27,7 +27,7 @@ RUN chmod 600 /root/.ssh/id_rsa
 # Add GitHub to known hosts to prevent SSH from asking for confirmation
 RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 
-# Clone the private repository using the deploy key
+# Clone the swibrid repository 
 RUN git clone git@github.com:bihealth/swibrid.git
 
 # Install swibrid

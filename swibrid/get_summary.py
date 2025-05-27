@@ -70,6 +70,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--variants",
         dest="variants",
+        nargs='?',
         help="""file with variant table (from find_variants)""",
     )
     parser.add_argument(

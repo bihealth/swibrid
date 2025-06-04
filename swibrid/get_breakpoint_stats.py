@@ -325,6 +325,19 @@ def run(args):
         m2 = np.sum(pos**2 * bps_here) / np.sum(bps_here)
         stats["spread_" + sr] = np.sqrt(m2 - m**2)
 
+    regions = np.unique(switch_iis)
+    if switch_orientation == "-":
+        regions = regions[::-1]
+
+    for i in range(len(regions)):
+        r1 = regions[i]
+        for j in range(i + 1):
+            r2 = regions[j]
+            take = (switch_iis[xx] == r1) & (switch_iis[yy] == r2) | (switch_iis[yy] == r1) & (
+                switch_iis[xx] == r2
+            )
+            stats["frac_breaks_{1}_{0}".format(r1, r2)] = bp_hist[take].sum() / (nbreaks)
+
     # collapse different gamma and alpha isotypes for frac_breaks and homology scores
     switch_iis = np.array([si[:2] for si in switch_iis])
     regions = np.unique(switch_iis)

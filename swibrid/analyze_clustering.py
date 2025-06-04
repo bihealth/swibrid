@@ -316,23 +316,25 @@ def run(args):
     if args.realignments is not None and os.path.isfile(args.realignments):
         logger.info("reading breakpoint realignments from " + args.realignments)
         realignments = pd.read_csv(args.realignments, header=0, index_col=0)
+        if len(realignments.index.intersection(clustering.index)) > 0:
 
-        realignments = realignments.loc[realignments.index.intersection(clustering.index)]
-
-        realignments["chrom_left"] = realignments["pos_left"].str.split(":").str[0]
-        realignments["chrom_right"] = realignments["pos_right"].str.split(":").str[0]
-
-        realignments["pos_left"] = realignments["pos_left"].str.split(":").str[1].astype(int)
-        realignments["pos_right"] = realignments["pos_right"].str.split(":").str[1].astype(int)
-
-        # filter out realignments across breaks smaller than max_realignment_gap
-        gap_size = np.abs(realignments["pos_left"] - realignments["pos_right"])
-        keep = (gap_size >= args.max_realignment_gap) | (
-            realignments["chrom_left"] != realignments["chrom_right"]
-        )
-        realignments = realignments[keep]
+            realignments = realignments.loc[realignments.index.intersection(clustering.index)]
+    
+            realignments["chrom_left"] = realignments["pos_left"].str.split(":").str[0]
+            realignments["chrom_right"] = realignments["pos_right"].str.split(":").str[0]
+    
+            realignments["pos_left"] = realignments["pos_left"].str.split(":").str[1].astype(int)
+            realignments["pos_right"] = realignments["pos_right"].str.split(":").str[1].astype(int)
+    
+            # filter out realignments across breaks smaller than max_realignment_gap
+            gap_size = np.abs(realignments["pos_left"] - realignments["pos_right"])
+            keep = (gap_size >= args.max_realignment_gap) | (
+                realignments["chrom_left"] != realignments["chrom_right"]
+            )
+            realignments = realignments[keep]
 
         if realignments.shape[0] > 0:
+
             realignments["cluster"] = clustering.loc[realignments.index, "cluster"]
 
             def group_realignments(df, max_dist=5):

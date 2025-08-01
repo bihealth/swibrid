@@ -385,7 +385,7 @@ def run(args):
 
         ref = variants["ref"].apply(lambda x: ncodes[x] - 1)
         alt = variants["alt"].apply(lambda x: ncodes[x] - 1)
-        germline = (variants["type"] != "n.d.") | ~variants["anno"].isnull()
+        somatic = (variants["type"] == "n.d.") & variants["anno"].isnull()
 
         mm = (
             pd.crosstab(ref, alt)
@@ -398,7 +398,7 @@ def run(args):
         var_stats = pd.Series(
             {
                 "num_variants": len(ref),
-                "frac_variants_germline": np.mean(germline),
+                "somatic_variants": np.sum(somatic),
                 "frac_variants_transitions": mm[(0, 2, 1, 3), (2, 0, 3, 1)].sum() / len(ref),
                 "frac_variants_C>A": mm[(1, 2), (0, 3)].sum() / len(ref),
                 "frac_variants_C>G": mm[(1, 2), (2, 1)].sum() / len(ref),

@@ -7,7 +7,7 @@ def increase_mem (wildcards, attempt):
   return 32000*attempt
 
 def get_partition (wildcards, attempt):
-  return 'medium' # if attempt <= 5 else 'highmem')
+  return 'medium' 
 
 if "INPUT_CLONES" in config and os.path.isfile(config["INPUT_CLONES"]):
   ruleorder: simulate > demux
@@ -349,7 +349,8 @@ rule variants:
     switch=config['SWITCH'],
     switch_annotation=config['SWITCH_ANNOTATION'],
     reference=config['REFERENCE'],
-    variant_annotation=config['VARIANT_ANNOTATION'] if 'VARIANT_ANNOTATION' in config else []
+    variant_annotation=config['VARIANT_ANNOTATION'] if 'VARIANT_ANNOTATION' in config else [],
+    nreads=config['VARIANT_MAX_NREADS']
   threads: 1
   resources:
     mem_mb=increase_mem,
@@ -361,7 +362,7 @@ rule variants:
   shell:
     r"""
     mkdir -p pipeline/{wildcards.sample}
-    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht}  --variant_annotation {params.variant_annotation} 2> {log}
+    swibrid find_variants --msa {input.msa} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --clustering {input.clustering} --reference {params.reference} --pars {input.pars} -o {output.txt} -m {output.mat} --haplotypes {output.ht}  --variant_annotation {params.variant_annotation} --nreads {params.nreads} 2> {log}
     """
 
 
@@ -626,8 +627,6 @@ rule collect:
      expand("pipeline/{sample}/{sample}_cluster_analysis.csv", sample=config['SAMPLES']),
   output:
     sample_stats='output/summary/{0}_stats.csv'.format(config['STUDY']),
-    #inserts='output/summary/{0}_inserts.xlsx'.format(config['STUDY']),
-    #cluster_stats='output/summary/{0}_clusters.xlsx'.format(config['STUDY'])
   params:
     samples=','.join(config['SAMPLES']),
   threads: 1
@@ -640,6 +639,5 @@ rule collect:
   shell:
     r"""
     mkdir -p output/summary
-    swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} 2> {log}
+    swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} --clean_column_names 2> {log}
     """
-    #swibrid collect_results --samples {params.samples} --sample_stats {output.sample_stats} --inserts {output.inserts} --cluster_stats {output.cluster_stats} 2> {log}

@@ -583,7 +583,9 @@ def calculate_n_homology(s0, s1, s2):
             nr += 1
             k -= 1
 
-    return max(nr, nl)
+        return max(nr, nl)
+    else:
+        return nr + nl
 
 
 def calculate_n_untemplated(m1, m2, s0):

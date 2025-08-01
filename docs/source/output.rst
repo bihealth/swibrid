@@ -64,7 +64,7 @@ H.
 output features
 ***************
 
-SWIBRID produces a table of features for each sample in ``output/summary`` with the following columns
+SWIBRID produces a table of features for each sample in ``output/summary``. Below is a detailed explanation of the columns in that file. Note that some feature names are different internally and only changed to these values in the final aggregation step (`swibrid collect_results`). Check the source code for the mapping of old to new names.
 
 QC features
 -----------
@@ -117,7 +117,7 @@ QC features
         frac_reads_unused
                 fraction of unused reads
 
-        nreads_final
+        nreads
                 final number of reads
 
         mean_frac_mapped
@@ -127,68 +127,59 @@ QC features
                 mean fraction of read that's mapped multiple 
 
         mean_frac_ignored
-                mean fraction of read that doesn't mapped to selected switch regions
+                mean fraction of read that doesn't map to selected switch regions
 
-        c_opt
+        clustering_cutoff
                 dendrogram cutoff (specified or inferred from data)
 
         frac_singletons
                 fraction of singleton clusters
 
-        size_length_bias
+        PCR_bias_length
                 regression coefficient of cluster length vs. cluster size 
 
-        size_GC_bias
+        PCR_bias_GC
                 regression coefficient of cluster GC vs. cluster size 
 
 diversity features
 ------------------
 
-        these features are computed twice: once on the total number of reads, and then again as averages of 10 replicates from downsampling to 1000 reads
+        these features are computed twice: once on the total number of reads ("_raw"), and then again as averages of 10 replicates from downsampling to 1000 reads
 
-        nclusters_initial
+        clusters_initial
                 pre-filter cluster number
 
-        nclusters_final(_downsampled)
+        clusters(_raw)
                 post-filter cluster number
 
-        nclusters_eff(_downsampled)
+        clusters_eff(_raw)
                 number of equally-sized clusters that has the same entropy as observed
 
-        mean_cluster_size(_downsampled)
-                mean cluster size (in fraction of reads)
+        cluster_size_(mean/std)(_raw)
+                mean and std.dev of cluster size (in fraction of reads)
 
-        std_cluster_size(_downsampled)
-                std dev of cluster size 
-
-        cluster_gini(_downsampled)
+        cluster_gini(_raw)
                 Gini cofficient of cluster size distribution
 
-        cluster_entropy(_downsampled)
+        cluster_entropy(_raw)
                 entropy of cluster size distribution
 
-        cluster_inverse_simpson(_downsampled)
+        cluster_inverse_simpson(_raw)
                 inverse Simpson coefficient of cluster size distribution
 
-        top_clone_occupancy(_downsampled)
-                fraction of reads in biggest clone
+        occupancy_top_cluster(_raw)
+                fraction of reads in biggest cluster
 
-        big_clones_occupancy(_downsampled)
-                fraction of reads in all clones that contain more than 1% of reads
+        occupancy_big_clusters(_raw)
+                fraction of reads in all clusters that contain more than 1% of reads
 
-        mean_length
-                mean length of clusters (in nt)
+        read_length_(mean/std)
+                mean and std.dev. of length of reads in clusters (in nt)
 
-        std_length
-                std deviation of cluster length
-
-        mean_GC
-                mean GC content of clusters
-
-        std_GC
-                std dev of GC content
+        GC_content_(mean/std)
+                mean and std.dev. GC content of clusters
         
-        mean/std_length_SX
+        read_length_(mean/std)_SX
                 mean and std of cluster length for isotype SX
 
 isotypes
@@ -197,8 +188,8 @@ isotypes
         frac_reads_SX
                 fraction of reads in isotype SX
         
-        frac_clusters_SX
-                fraction of clusters with isotype SX
+        pct_clusters_SX
+                percentage of clusters with isotype SX
         
         alpha_ratio_reads
                 fraction of reads with isotype SA* 
@@ -209,6 +200,27 @@ isotypes
 structural rearrangements
 -------------------------
 
+        pct_templated_inserts
+                insert frequency (over the dataset)
+
+        inversion_size
+                median size of inversions
+
+        duplication_size
+                median size of duplications
+        
+        pct_inversions
+                percentage of breaks creating inversions
+
+        pct_duplications
+                percentage of breaks creating duplications
+
+        frac_breaks_inversions_intra
+                fraction of breaks creating inversions for intra-switch breaks
+
+        frac_breaks_duplications_intra
+                fraction of breaks creating duplications for intra-switch breaks
+
         n_inserts
                 number of inserts
 
@@ -218,11 +230,9 @@ structural rearrangements
         n_clusters_inserts
                 number of clusters with inserts
 
-        insert_frequency
-                insert frequency (over the dataset)
-
-        mean_insert_frequency
+        mean_cluster_insert_frequency
                 mean insert frequency (per cluster)
+
         mean_insert_overlap
                 mean overlap of inserts for reads in the same cluster
 
@@ -238,53 +248,35 @@ structural rearrangements
         ninserts_SX_SY
                 number of inserts between SX and SY regions
 
-        median_inversion_size
-                median size of inversions
-
-        median_duplication_size
-                median size of duplications
-        
-        frac_breaks_inversions
-                fraction of breaks creating inversions
-
-        frac_breaks_duplications
-                fraction of breaks creating duplications
-        
-        frac_breaks_inversions_intra
-                fraction of breaks creating inversions for intra-switch breaks
-
-        frac_breaks_duplications_intra
-                fraction of breaks creating duplications for intra-switch breaks
-
 
 context features
 ----------------
 
-        n_untemplated_switch
+        untemplated_inserts
                 mean number of untemplated nucleotides for switch junctions
 
-        n_homology_switch
-                mean number of homologous nucleotides for switch junctions
-
-        n_untemplated_switch_SX
+        untemplated_inserts_SX
                 mean number of untemplated nucleotides for switch junctions for isotype SX
                 
-        n_homology_switch_SX
+        homology
+                mean number of homologous nucleotides for switch junctions
+
+        homology_SX
                 mean number of homologous nucleotides for switch junctions of isotype SX
 
-        frac_blunt
-                fraction of blunt ends (no untemplated, no homologous nucleotides)
+        pct_blunt
+                percentage of blunt ends (no untemplated, no homologous nucleotides)
 
-        frac_blunt_SX
-                fraction of blunt ends (no untemplated, no homologous nucleotides) for isotype SX
+        pct_blunt_SX
+                percentage of blunt ends (no untemplated, no homologous nucleotides) for isotype SX
         
-        homology_fw
+        homology_score_fw
                 average amount of homology in 50nt bins between donor and acceptor region
 
-        homology_rv
+        homology_score_rv
                 average amount of (reverse-complementary) homology in 50nt bins between donor and acceptor region
 
-        homology_fw/rv_SX_SY
+        homology_score_fw/rv_SX_SY
                 average amount of homology in 50nt bins between donor (SX) and acceptor (SY) region
 
         donor_score_M
@@ -311,26 +303,23 @@ breakpoint matrix
         breaks_normalized
                 number of breaks by number of clusters
         
-        frac_breaks_SX_SY
+        pct_breaks_SX_SY
                 fraction of breaks between SX and SY
         
-        frac_breaks_single
-                fraction of "single" breaks (see green region in 2D breakpoint histogram)
+        pct_direct_switch
+                percentage of "single" breaks (see green region in 2D breakpoint histogram)
                 
-        frac_breaks_sequential
-                fraction of "sequential" breaks (see orange region in 2D breakpoint histogram)
+        pct_sequential_switch
+                percentage of "sequential" breaks (see orange region in 2D breakpoint histogram)
 
-        frac_breaks_intra
-                fraction of "intra" breaks (see purple region in 2D breakpoint histogram)
+        pct_intraswitch_deletion
+                percentage of breaks creating intraswitch deletions (see purple region in 2D breakpoint histogram)
 
-        mean_intra_break_size
-                mean size of intra-switch breaks
+        intraswitch_size_(mean/std)
+                mean and std.dev. size of intra-switch breaks
 
-        std_intra_break_size
-                std dev size of intra-switch breaks
-
-        spread_SX
-                spread (standard deviation) of breakpoint positions in region SX
+        break_dispersion_SX
+                dispersion (standard deviation) of breakpoint positions in region SX
         
 variants
 --------
@@ -338,8 +327,8 @@ variants
         num_variants
                 number of detected single-nucleotide variants
 
-        frac_variants_germline
-                fraction of variants classified as likely germline
+        somatic_variants
+                number of variants classified as likely somatic (not germline)
 
         frac_variants_transitions
                 fraction of transition variants

@@ -126,7 +126,7 @@
 </section>
 <section id="output-features">
 <h2>output features<a class="headerlink" href="#output-features" title="Link to this heading"></a></h2>
-<p>SWIBRID produces a table of features for each sample in <code class="docutils literal notranslate"><span class="pre">output/summary</span></code> with the following columns</p>
+<p>SWIBRID produces a table of features for each sample in <code class="docutils literal notranslate"><span class="pre">output/summary</span></code>. Below is a detailed explanation of the columns in that file. Note that some feature names are different internally and only changed to these values in the final aggregation step (<cite>swibrid collect_results</cite>). Check the source code for the mapping of old to new names.</p>
 <section id="qc-features">
 <h3>QC features<a class="headerlink" href="#qc-features" title="Link to this heading"></a></h3>
 <blockquote>
@@ -163,21 +163,21 @@
 </dd>
 <dt>frac_reads_unused</dt><dd><p>fraction of unused reads</p>
 </dd>
-<dt>nreads_final</dt><dd><p>final number of reads</p>
+<dt>nreads</dt><dd><p>final number of reads</p>
 </dd>
 <dt>mean_frac_mapped</dt><dd><p>mean fraction of read that’s mapped</p>
 </dd>
 <dt>mean_frac_mapped_multi</dt><dd><p>mean fraction of read that’s mapped multiple</p>
 </dd>
-<dt>mean_frac_ignored</dt><dd><p>mean fraction of read that doesn’t mapped to selected switch regions</p>
+<dt>mean_frac_ignored</dt><dd><p>mean fraction of read that doesn’t map to selected switch regions</p>
 </dd>
-<dt>c_opt</dt><dd><p>dendrogram cutoff (specified or inferred from data)</p>
+<dt>clustering_cutoff</dt><dd><p>dendrogram cutoff (specified or inferred from data)</p>
 </dd>
 <dt>frac_singletons</dt><dd><p>fraction of singleton clusters</p>
 </dd>
-<dt>size_length_bias</dt><dd><p>regression coefficient of cluster length vs. cluster size</p>
+<dt>PCR_bias_length</dt><dd><p>regression coefficient of cluster length vs. cluster size</p>
 </dd>
-<dt>size_GC_bias</dt><dd><p>regression coefficient of cluster GC vs. cluster size</p>
+<dt>PCR_bias_GC</dt><dd><p>regression coefficient of cluster GC vs. cluster size</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -185,37 +185,31 @@
 <section id="diversity-features">
 <h3>diversity features<a class="headerlink" href="#diversity-features" title="Link to this heading"></a></h3>
 <blockquote>
-<div><p>these features are computed twice: once on the total number of reads, and then again as averages of 10 replicates from downsampling to 1000 reads</p>
+<div><p>these features are computed twice: once on the total number of reads (“_raw”), and then again as averages of 10 replicates from downsampling to 1000 reads</p>
 <dl class="simple">
-<dt>nclusters_initial</dt><dd><p>pre-filter cluster number</p>
+<dt>clusters_initial</dt><dd><p>pre-filter cluster number</p>
 </dd>
-<dt>nclusters_final(_downsampled)</dt><dd><p>post-filter cluster number</p>
+<dt>clusters(_raw)</dt><dd><p>post-filter cluster number</p>
 </dd>
-<dt>nclusters_eff(_downsampled)</dt><dd><p>number of equally-sized clusters that has the same entropy as observed</p>
+<dt>clusters_eff(_raw)</dt><dd><p>number of equally-sized clusters that has the same entropy as observed</p>
 </dd>
-<dt>mean_cluster_size(_downsampled)</dt><dd><p>mean cluster size (in fraction of reads)</p>
+<dt>cluster_size_(mean/std)(_raw)</dt><dd><p>mean and std.dev of cluster size (in fraction of reads)</p>
 </dd>
-<dt>std_cluster_size(_downsampled)</dt><dd><p>std dev of cluster size</p>
+<dt>cluster_gini(_raw)</dt><dd><p>Gini cofficient of cluster size distribution</p>
 </dd>
-<dt>cluster_gini(_downsampled)</dt><dd><p>Gini cofficient of cluster size distribution</p>
+<dt>cluster_entropy(_raw)</dt><dd><p>entropy of cluster size distribution</p>
 </dd>
-<dt>cluster_entropy(_downsampled)</dt><dd><p>entropy of cluster size distribution</p>
+<dt>cluster_inverse_simpson(_raw)</dt><dd><p>inverse Simpson coefficient of cluster size distribution</p>
 </dd>
-<dt>cluster_inverse_simpson(_downsampled)</dt><dd><p>inverse Simpson coefficient of cluster size distribution</p>
+<dt>occupancy_top_cluster(_raw)</dt><dd><p>fraction of reads in biggest cluster</p>
 </dd>
-<dt>top_clone_occupancy(_downsampled)</dt><dd><p>fraction of reads in biggest clone</p>
+<dt>occupancy_big_clusters(_raw)</dt><dd><p>fraction of reads in all clusters that contain more than 1% of reads</p>
 </dd>
-<dt>big_clones_occupancy(_downsampled)</dt><dd><p>fraction of reads in all clones that contain more than 1% of reads</p>
+<dt>read_length_(mean/std)</dt><dd><p>mean and std.dev. of length of reads in clusters (in nt)</p>
 </dd>
-<dt>mean_length</dt><dd><p>mean length of clusters (in nt)</p>
+<dt>GC_content_(mean/std)</dt><dd><p>mean and std.dev. GC content of clusters</p>
 </dd>
-<dt>std_length</dt><dd><p>std deviation of cluster length</p>
-</dd>
-<dt>mean_GC</dt><dd><p>mean GC content of clusters</p>
-</dd>
-<dt>std_GC</dt><dd><p>std dev of GC content</p>
-</dd>
-<dt>mean/std_length_SX</dt><dd><p>mean and std of cluster length for isotype SX</p>
+<dt>read_length_(mean/std)_SX</dt><dd><p>mean and std of cluster length for isotype SX</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -226,7 +220,7 @@
 <div><dl class="simple">
 <dt>frac_reads_SX</dt><dd><p>fraction of reads in isotype SX</p>
 </dd>
-<dt>frac_clusters_SX</dt><dd><p>fraction of clusters with isotype SX</p>
+<dt>pct_clusters_SX</dt><dd><p>percentage of clusters with isotype SX</p>
 </dd>
 <dt>alpha_ratio_reads</dt><dd><p>fraction of reads with isotype SA*</p>
 </dd>
@@ -239,15 +233,27 @@
 <h3>structural rearrangements<a class="headerlink" href="#structural-rearrangements" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
+<dt>pct_templated_inserts</dt><dd><p>insert frequency (over the dataset)</p>
+</dd>
+<dt>inversion_size</dt><dd><p>median size of inversions</p>
+</dd>
+<dt>duplication_size</dt><dd><p>median size of duplications</p>
+</dd>
+<dt>pct_inversions</dt><dd><p>percentage of breaks creating inversions</p>
+</dd>
+<dt>pct_duplications</dt><dd><p>percentage of breaks creating duplications</p>
+</dd>
+<dt>frac_breaks_inversions_intra</dt><dd><p>fraction of breaks creating inversions for intra-switch breaks</p>
+</dd>
+<dt>frac_breaks_duplications_intra</dt><dd><p>fraction of breaks creating duplications for intra-switch breaks</p>
+</dd>
 <dt>n_inserts</dt><dd><p>number of inserts</p>
 </dd>
 <dt>n_unique_inserts</dt><dd><p>number of unique inserts</p>
 </dd>
 <dt>n_clusters_inserts</dt><dd><p>number of clusters with inserts</p>
 </dd>
-<dt>insert_frequency</dt><dd><p>insert frequency (over the dataset)</p>
-</dd>
-<dt>mean_insert_frequency</dt><dd><p>mean insert frequency (per cluster)</p>
+<dt>mean_cluster_insert_frequency</dt><dd><p>mean insert frequency (per cluster)</p>
 </dd>
 <dt>mean_insert_overlap</dt><dd><p>mean overlap of inserts for reads in the same cluster</p>
 </dd>
@@ -259,18 +265,6 @@
 </dd>
 <dt>ninserts_SX_SY</dt><dd><p>number of inserts between SX and SY regions</p>
 </dd>
-<dt>median_inversion_size</dt><dd><p>median size of inversions</p>
-</dd>
-<dt>median_duplication_size</dt><dd><p>median size of duplications</p>
-</dd>
-<dt>frac_breaks_inversions</dt><dd><p>fraction of breaks creating inversions</p>
-</dd>
-<dt>frac_breaks_duplications</dt><dd><p>fraction of breaks creating duplications</p>
-</dd>
-<dt>frac_breaks_inversions_intra</dt><dd><p>fraction of breaks creating inversions for intra-switch breaks</p>
-</dd>
-<dt>frac_breaks_duplications_intra</dt><dd><p>fraction of breaks creating duplications for intra-switch breaks</p>
-</dd>
 </dl>
 </div></blockquote>
 </section>
@@ -278,23 +272,23 @@
 <h3>context features<a class="headerlink" href="#context-features" title="Link to this heading"></a></h3>
 <blockquote>
 <div><dl class="simple">
-<dt>n_untemplated_switch</dt><dd><p>mean number of untemplated nucleotides for switch junctions</p>
+<dt>untemplated_inserts</dt><dd><p>mean number of untemplated nucleotides for switch junctions</p>
 </dd>
-<dt>n_homology_switch</dt><dd><p>mean number of homologous nucleotides for switch junctions</p>
+<dt>untemplated_inserts_SX</dt><dd><p>mean number of untemplated nucleotides for switch junctions for isotype SX</p>
 </dd>
-<dt>n_untemplated_switch_SX</dt><dd><p>mean number of untemplated nucleotides for switch junctions for isotype SX</p>
+<dt>homology</dt><dd><p>mean number of homologous nucleotides for switch junctions</p>
 </dd>
-<dt>n_homology_switch_SX</dt><dd><p>mean number of homologous nucleotides for switch junctions of isotype SX</p>
+<dt>homology_SX</dt><dd><p>mean number of homologous nucleotides for switch junctions of isotype SX</p>
 </dd>
-<dt>frac_blunt</dt><dd><p>fraction of blunt ends (no untemplated, no homologous nucleotides)</p>
+<dt>pct_blunt</dt><dd><p>percentage of blunt ends (no untemplated, no homologous nucleotides)</p>
 </dd>
-<dt>frac_blunt_SX</dt><dd><p>fraction of blunt ends (no untemplated, no homologous nucleotides) for isotype SX</p>
+<dt>pct_blunt_SX</dt><dd><p>percentage of blunt ends (no untemplated, no homologous nucleotides) for isotype SX</p>
 </dd>
-<dt>homology_fw</dt><dd><p>average amount of homology in 50nt bins between donor and acceptor region</p>
+<dt>homology_score_fw</dt><dd><p>average amount of homology in 50nt bins between donor and acceptor region</p>
 </dd>
-<dt>homology_rv</dt><dd><p>average amount of (reverse-complementary) homology in 50nt bins between donor and acceptor region</p>
+<dt>homology_score_rv</dt><dd><p>average amount of (reverse-complementary) homology in 50nt bins between donor and acceptor region</p>
 </dd>
-<dt>homology_fw/rv_SX_SY</dt><dd><p>average amount of homology in 50nt bins between donor (SX) and acceptor (SY) region</p>
+<dt>homology_score_fw/rv_SX_SY</dt><dd><p>average amount of homology in 50nt bins between donor (SX) and acceptor (SY) region</p>
 </dd>
 <dt>donor_score_M</dt><dd><p>score (=weighted frequency) for motif M (M=S,W,WGCW,GAGCT,GGGST with S=G/C, W=A/T) in 50nt bins of donor switch regions</p>
 </dd>
@@ -317,19 +311,17 @@
 <div><dl class="simple">
 <dt>breaks_normalized</dt><dd><p>number of breaks by number of clusters</p>
 </dd>
-<dt>frac_breaks_SX_SY</dt><dd><p>fraction of breaks between SX and SY</p>
+<dt>pct_breaks_SX_SY</dt><dd><p>fraction of breaks between SX and SY</p>
 </dd>
-<dt>frac_breaks_single</dt><dd><p>fraction of “single” breaks (see green region in 2D breakpoint histogram)</p>
+<dt>pct_direct_switch</dt><dd><p>percentage of “single” breaks (see green region in 2D breakpoint histogram)</p>
 </dd>
-<dt>frac_breaks_sequential</dt><dd><p>fraction of “sequential” breaks (see orange region in 2D breakpoint histogram)</p>
+<dt>pct_sequential_switch</dt><dd><p>percentage of “sequential” breaks (see orange region in 2D breakpoint histogram)</p>
 </dd>
-<dt>frac_breaks_intra</dt><dd><p>fraction of “intra” breaks (see purple region in 2D breakpoint histogram)</p>
+<dt>pct_intraswitch_deletion</dt><dd><p>percentage of breaks creating intraswitch deletions (see purple region in 2D breakpoint histogram)</p>
 </dd>
-<dt>mean_intra_break_size</dt><dd><p>mean size of intra-switch breaks</p>
+<dt>intraswitch_size_(mean/std)</dt><dd><p>mean and std.dev. size of intra-switch breaks</p>
 </dd>
-<dt>std_intra_break_size</dt><dd><p>std dev size of intra-switch breaks</p>
-</dd>
-<dt>spread_SX</dt><dd><p>spread (standard deviation) of breakpoint positions in region SX</p>
+<dt>break_dispersion_SX</dt><dd><p>dispersion (standard deviation) of breakpoint positions in region SX</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -340,7 +332,7 @@
 <div><dl class="simple">
 <dt>num_variants</dt><dd><p>number of detected single-nucleotide variants</p>
 </dd>
-<dt>frac_variants_germline</dt><dd><p>fraction of variants classified as likely germline</p>
+<dt>somatic_variants</dt><dd><p>number of variants classified as likely somatic (not germline)</p>
 </dd>
 <dt>frac_variants_transitions</dt><dd><p>fraction of transition variants</p>
 </dd>

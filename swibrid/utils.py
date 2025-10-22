@@ -324,7 +324,7 @@ def filter_clustering(Z, C, p=0.95, min_size=0):
     o_rev = np.zeros_like(o)
     o_rev[o] = np.arange(len(o))
     remove = (
-        (csize < min_size) | ((np.cumsum(csize[o])[o_rev] >= p * len(C)) & (csize <= p * len(C)))
+        (csize < min_size) | (np.cumsum(csize[o])[o_rev] - csize >= p * len(C))
     )[cinv]
     C_filtered = np.copy(C)
     C_filtered[remove] = -1

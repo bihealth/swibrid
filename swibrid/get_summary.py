@@ -109,6 +109,12 @@ def setup_argparse(parser):
         type=float,
         help="""cutoff to determine a "big" clone as fraction of clustered reads [%(default).2f]""",
     )
+    parser.add_argument(
+        "--diversity_by_isotype",
+        default=False,
+        action="store_true",
+        help="""calculate diversity measures per isotype""",
+    )
 
 
 def run(args):
@@ -249,6 +255,20 @@ def run(args):
         except ValueError:
             stats["size_GC_bias"] = 0
 
+        if args.diversity_by_isotype:
+            logger.info("calculating diversity measures per isotype")
+            for isotype in cluster_analysis.loc[clones,"isotype"].dropna().unique():
+                clusters_here = clustering["filtered_cluster"][clustering["isotype"]==isotype].dropna()
+                clones_here = clusters_here[clusters_here >= 0].astype(int).unique()
+                if len(clones_here) == 0:
+                    continue
+                rel_size_here = cluster_analysis.loc[clones_here, "size"] / cluster_analysis.loc[clones_here, "size"].sum()
+                stats["cluster_gini_" + isotype] = calculate_gini(rel_size_here)
+                stats["cluster_entropy_" + isotype] = scipy.stats.entropy(rel_size_here) / np.log(len(rel_size_here))
+                stats["cluster_inverse_simpson_" + isotype] = 1.0 / (rel_size_here**2).sum()
+                stats["top_clone_occupancy_" + isotype] = rel_size_here.max()
+                stats["big_clones_occupancy_" + isotype] = rel_size_here[rel_size_here > args.big_clone_cutoff].sum()
+
     if args.cluster_downsampling:
         logger.info(
             "reading cluster downsampling results from {0}".format(args.cluster_downsampling)
@@ -270,6 +290,7 @@ def run(args):
     isotype_read_fraction.index = "frac_reads_" + isotype_read_fraction.index
     isotype_cluster_fraction.index = "frac_clusters_" + isotype_cluster_fraction.index
     isotype_insert_count.index = "ninserts_" + isotype_insert_count.index.astype(str)
+
     take = ~clustering["cluster"].isna()
     inserts = [
         decode_coords(m)

@@ -50,9 +50,12 @@ def run(args):
 
         logger.info("reading bam file " + args.inf)
 
-        for rec in pysam.Samfile(args.inf):
+        for n, rec in enumerate(pysam.Samfile(args.inf)):
             if rec.is_unmapped or rec.seq is None or rec.is_secondary:
                 continue
+
+            if n%100000==0:
+                logger.info(f"{n} records read")
 
             pairs = rec.get_aligned_pairs()
             ref_seq = genome.fetch(

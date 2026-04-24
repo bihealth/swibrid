@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>configuration &mdash; swibrid 2024 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
@@ -139,6 +139,8 @@
 <span class="n">CLUSTER_DOWNSAMPLING_NREADS</span><span class="p">:</span> <span class="mi">1000</span>
 <span class="c1"># number of replicates used in downsampling</span>
 <span class="n">CLUSTER_DOWNSAMPLING_NREPS</span><span class="p">:</span> <span class="mi">10</span>
+<span class="c1"># file with positive control reads to flag</span>
+<span class="n">POSITIVE_CONTROL</span><span class="p">:</span> <span class="s1">&#39;&#39;</span>
 </pre></div>
 </div>
 <p>for a more in-depth control over parameters to individual functions, have a look at the snakemake file <code class="docutils literal notranslate"><span class="pre">pipeline.snake</span></code>. e.g., resource requirements are specified there, or which exact plots should be produced.</p>

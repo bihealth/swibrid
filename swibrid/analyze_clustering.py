@@ -84,6 +84,19 @@ def setup_argparse(parser):
         type=int,
         help="""extra space added to define isotypes [500]""",
     )
+    parser.add_argument(
+        "--positive_control_msa",
+        nargs="?",
+        default="positive_control_msa",
+        help="""MSA for positive control reads""",
+    )
+    parser.add_argument(
+        "--cutoff",
+        dest="cutoff",
+        type=float,
+        default=.01,
+        help="""clustering cutoff [.01]""",
+    )
 
 
 def run(args):
@@ -410,6 +423,18 @@ def run(args):
 
     else:
         df["adj_size"] = df["size"]
+
+    if args.positive_control_msa:
+
+        from scipy.spatial.distance import cdist
+        pc_msa = scipy.sparse.load_npz(args.positive_control_msa)
+        pc_cleaned = remove_gaps(pc_msa, max_gap=args.max_gap)
+
+        pc_dist = cdist(avg_msa, pc_cleaned.todense(), 'cosine')
+
+        df["is_positive_control"] = (pc_dist < args.cutoff).any(1)
+        df["min_positive_control_dist"] = pc_dist.min(1)
+        df["best_positive_control"] = pc_dist.argmin(1)
 
     logger.info("saving results to " + args.output)
     df.to_csv(args.output, index=True)

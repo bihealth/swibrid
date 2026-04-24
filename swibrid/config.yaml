@@ -60,3 +60,5 @@ WEIGHTS: 'cluster'
 CLUSTER_DOWNSAMPLING_NREADS: 1000
 # number of replicates used in downsampling
 CLUSTER_DOWNSAMPLING_NREPS: 10
+# file with positive control reads to flag
+POSITIVE_CONTROL: ''

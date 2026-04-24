@@ -391,7 +391,7 @@ def remove_gaps(msa, gaps=None, max_gap=75, return_sparse=True):
     import scipy.sparse
 
     if gaps is None:
-        read_idx, pos_left, pos_right, gap_size = get_gap_positions(msa)
+        read_idx, gap_left, gap_right, gap_size = get_gap_positions(msa)
     else:
         read_idx = gaps["read_idx"]
         gap_left = gaps["gap_left"]

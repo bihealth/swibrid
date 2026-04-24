@@ -393,6 +393,9 @@ def run(args):
         axis=0,
     )
 
+    if 'is_positive_control' in cluster_analysis.columns:
+        stats['frac_positive_control'] = cluster_analysis[cluster_analysis['is_positive_control']]['size'].sum()/cluster_analysis['size'].sum()
+
     cutoff_scanning = pd.read_csv(args.scanning, header=0, index_col=0)
 
     if args.breakpoint_stats and os.path.isfile(args.breakpoint_stats):

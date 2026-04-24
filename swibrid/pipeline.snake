@@ -436,16 +436,48 @@ rule motifs:
     """
 
 
+rule make_positive_control:
+  log: "logs/positive_control.log"
+  output:
+    reads="input/positive_control.fastq.gz",
+    info="input/positive_control_info.csv"
+  params: 
+    positive_control=config['POSITIVE_CONTROL']
+  run:
+    import gzip
+    from Bio import SeqIO
+    import pandas as pd
+
+    recs = []
+    info = {}
+    for read in SeqIO.parse(params.positive_control,'fasta'):
+        read.letter_annotations['phred_quality'] = [40] * len(read)
+        recs.append(read)
+        info[read.id] = {
+                "length": len(read),
+                "barcodes": "BC01@1-30:+",
+                "primers": "primer_fw@0-50:+;primer_rv@{0}-{1}:+".format(len(read) - 50, len(read)),
+                "internal": ""
+                }
+
+    with gzip.open(output.reads,'wt') as outf:
+        SeqIO.write(recs, outf, 'fastq')
+
+    pd.DataFrame.from_dict(info, orient="index").to_csv(output.info)
+
+
 rule analyze_clustering:
   input:
     msa='pipeline/{sample}/{sample}_msa.npz',
     gaps='pipeline/{sample}/{sample}_gaps.npz',
     clustering='pipeline/{sample}/{sample}_clustering.csv',
     inserts='pipeline/{sample}/{sample}_inserts.tsv',
-    realignments='pipeline/{sample}/{sample}_breakpoint_alignments.csv'
+    realignments='pipeline/{sample}/{sample}_breakpoint_alignments.csv',
+    positive_control_msa='pipeline/positive_control/positive_control_msa.npz'
   output:
     'pipeline/{sample}/{sample}_cluster_analysis.csv'
   params:
+    cutoff=config['CLUSTERING_CUTOFF'],
     switch=config['SWITCH'],
     switch_annotation=config['SWITCH_ANNOTATION'],
     max_gap=config['MAX_GAP']
@@ -459,7 +491,7 @@ rule analyze_clustering:
   log: "logs/cluster/{sample}_analysis.log"
   shell:
     r"""
-    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --realignments {input.realignments} --adjust_size 2> {log}
+    swibrid analyze_clustering -o {output} --msa {input.msa} --gaps {input.gaps} --max_gap {params.max_gap} --clustering {input.clustering} --switch_coords {params.switch} --switch_annotation {params.switch_annotation} --inserts {input.inserts} --realignments {input.realignments} --adjust_size --positive_control_msa {input.positive_control_msa} --cutoff {params.cutoff} 2> {log}
     """
 
 

@@ -154,8 +154,8 @@ def run(args):
             break
 
     if len(all_hits) == 0:
-        logger.warn("no hits in BLAST output file! exiting ...")
-        sys.exit()
+        logger.warn("no hits in BLAST output file!")
+        #sys.exit()
     else:
         logger.info("{0} hits read, {1} kept".format(n, m))
 

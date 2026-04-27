@@ -442,7 +442,7 @@ rule make_positive_control:
     reads="input/positive_control.fastq.gz",
     info="input/positive_control_info.csv"
   params: 
-    positive_control=config['POSITIVE_CONTROL']
+    positive_control=config['POSITIVE_CONTROL'] if 'POSITIVE_CONTROL' in config else []
   run:
     import gzip
     from Bio import SeqIO
@@ -473,7 +473,7 @@ rule analyze_clustering:
     clustering='pipeline/{sample}/{sample}_clustering.csv',
     inserts='pipeline/{sample}/{sample}_inserts.tsv',
     realignments='pipeline/{sample}/{sample}_breakpoint_alignments.csv',
-    positive_control_msa='pipeline/positive_control/positive_control_msa.npz'
+    positive_control_msa='pipeline/positive_control/positive_control_msa.npz' if 'POSITIVE_CONTROL' in config and os.path.isfile(config['POSITIVE_CONTROL']) else []
   output:
     'pipeline/{sample}/{sample}_cluster_analysis.csv'
   params:

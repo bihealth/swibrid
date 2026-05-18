@@ -398,7 +398,7 @@ def run(args):
                         read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
                         if "start_time" in read_info[comb].columns:
                             read_info[comb]["start_time"] = pd.to_datetime(
-                                read_info[comb]["start_time"]
+                                read_info[comb]["start_time"], format='ISO8601'
                             ).apply(lambda x: time.mktime(x.timetuple()))
                             read_info[comb]["start_time"] = (
                                 read_info[comb]["start_time"] - read_info[comb]["start_time"].min()
@@ -424,7 +424,7 @@ def run(args):
         for comb in read_info.keys():
             read_info[comb] = pd.DataFrame.from_dict(read_info[comb], orient="index")
             if "start_time" in read_info[comb].columns:
-                read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"]).apply(
+                read_info[comb]["start_time"] = pd.to_datetime(read_info[comb]["start_time"], format='ISO8601').apply(
                     lambda x: time.mktime(x.timetuple())
                 )
                 read_info[comb]["start_time"] = (

@@ -87,7 +87,7 @@ def setup_argparse(parser):
     parser.add_argument(
         "--positive_control_msa",
         nargs="?",
-        default="positive_control_msa",
+        dest="positive_control_msa",
         help="""MSA for positive control reads""",
     )
     parser.add_argument(

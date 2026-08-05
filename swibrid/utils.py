@@ -168,7 +168,7 @@ def p_adjust_bh(p):
     (taken and modified for nan values from here: http://stackoverflow.com/questions/7450957/how-to-implement-rs-p-adjust-in-python)
     """
 
-    p = np.asfarray(p)
+    p = np.asarray(p, dtype='float')
     ok = np.isfinite(p)
     by_descend = p[ok].argsort()[::-1]
     by_orig = by_descend.argsort()

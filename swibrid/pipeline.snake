@@ -350,7 +350,7 @@ rule variants:
     switch_annotation=config['SWITCH_ANNOTATION'],
     reference=config['REFERENCE'],
     variant_annotation=config['VARIANT_ANNOTATION'] if 'VARIANT_ANNOTATION' in config else [],
-    nreads=config['VARIANT_MAX_NREADS']
+    nreads=config['VARIANT_MAX_NREADS'] if 'VARIANT_MAX_NREADS' in config else 1000,
   threads: 1
   resources:
     mem_mb=increase_mem,
